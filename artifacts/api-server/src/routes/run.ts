@@ -13,6 +13,7 @@ import path from "path";
 import os from "os";
 import { logger } from "../lib/logger";
 import { runLimiter } from "../middlewares/rate-limit";
+import { checkAndIncrementRuns, resolveUsageKey } from "../lib/usage";
 
 const router = Router();
 
@@ -319,7 +320,15 @@ router.post("/run/stream", runLimiter, async (req, res) => {
   }
 
   if (!acquireSlot()) {
-    res.status(503).json({ error: "Server is busy — too many concurrent executions. Please try again in a moment." });
+    res.status(503).json({ error: "Server is busy — too many concurrent executions. Please try again in a moment.", code: "SERVER_BUSY" });
+    return;
+  }
+
+  const usageKey = resolveUsageKey(req.headers["x-user-key"], req.ip);
+  const usage = await checkAndIncrementRuns(usageKey);
+  if (!usage.allowed) {
+    releaseSlot();
+    res.status(429).json({ error: "Daily run limit reached (50/day). Resets at midnight UTC.", code: "DAILY_LIMIT_REACHED", remaining: 0 });
     return;
   }
 
@@ -340,7 +349,12 @@ router.post("/run/stream", runLimiter, async (req, res) => {
   try {
     for await (const event of handler.execute({ code, filename, execId })) {
       sendEvent(event);
-      if (event.type === "done" || (event.type === "error" && !event.chunk)) break;
+      if (event.type === "done") {
+        // Send remaining usage count so the frontend can update its display
+        res.write(`data: ${JSON.stringify({ type: "usage", remaining: usage.remaining })}\n\n`);
+        break;
+      }
+      if (event.type === "error" && !event.chunk) break;
     }
   } catch (err) {
     logger.error({ err, execId }, "stream execution error");
@@ -380,12 +394,20 @@ router.post("/run", runLimiter, async (req, res) => {
   }
 
   if (!acquireSlot()) {
-    res.status(503).json({ error: "Server is busy — too many concurrent executions. Please try again in a moment." });
+    res.status(503).json({ error: "Server is busy — too many concurrent executions. Please try again in a moment.", code: "SERVER_BUSY" });
+    return;
+  }
+
+  const usageKey = resolveUsageKey(req.headers["x-user-key"], req.ip);
+  const usage = await checkAndIncrementRuns(usageKey);
+  if (!usage.allowed) {
+    releaseSlot();
+    res.status(429).json({ error: "Daily run limit reached (50/day). Resets at midnight UTC.", code: "DAILY_LIMIT_REACHED", remaining: 0 });
     return;
   }
 
   const execId = randomBytes(6).toString("hex");
-  logger.info({ execId, language: handler.id, activeExecutions }, "buffered execution start");
+  logger.info({ execId, language: handler.id, activeExecutions, runsRemaining: usage.remaining }, "buffered execution start");
 
   let stdout = "";
   let stderr = "";
@@ -422,7 +444,7 @@ router.post("/run", runLimiter, async (req, res) => {
   }
 
   releaseSlot();
-  res.json({ stdout, stderr, exitCode, duration, error: execError, html: htmlContent });
+  res.json({ stdout, stderr, exitCode, duration, error: execError, html: htmlContent, remaining: usage.remaining });
 });
 
 // Prevent circular reference — re-export for withTempDir usage

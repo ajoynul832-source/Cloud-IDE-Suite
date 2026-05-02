@@ -5,6 +5,7 @@ import runRouter from "./run";
 import projectBuildRouter from "./project-build";
 import projectsRouter from "./projects";
 import versionsRouter from "./versions";
+import usageRouter from "./usage";
 import shareRouter from "./share";
 
 const router: IRouter = Router();
@@ -14,6 +15,7 @@ router.use(runRouter);
 router.use(projectBuildRouter);
 router.use(projectsRouter);
 router.use(versionsRouter);
+router.use(usageRouter);
 router.use(shareRouter);
 router.use(buildRouter);
 

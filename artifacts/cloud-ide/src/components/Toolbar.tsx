@@ -1,24 +1,28 @@
-import { Play, Box, Download, Loader2, FolderOpen, ChevronDown, Database, Share2, Compass, CheckCircle2 } from "lucide-react";
+import {
+  Play, Box, Download, Loader2, FolderOpen, ChevronDown,
+  Database, Share2, Compass, CheckCircle2, Gauge,
+} from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "./ui/button";
 
 export type AutosaveStatus = "idle" | "saving" | "saved";
 
 interface ToolbarProps {
-  isBuilding:      boolean;
-  isRunning?:      boolean;
-  onRun:           () => void;
-  onBuild:         () => void;
-  onNewProject:    () => void;
-  onOpenProjects:  () => void;
-  onShare?:        () => void;
-  buildStatus?:    string | null;
-  jobId?:          string | null;
+  isBuilding:       boolean;
+  isRunning?:       boolean;
+  onRun:            () => void;
+  onBuild:          () => void;
+  onNewProject:     () => void;
+  onOpenProjects:   () => void;
+  onShare?:         () => void;
+  buildStatus?:     string | null;
+  jobId?:           string | null;
   currentLanguage?: string;
-  canRun?:         boolean;
-  canShare?:       boolean;
-  projectName?:    string;
-  autosaveStatus?: AutosaveStatus;
+  canRun?:          boolean;
+  canShare?:        boolean;
+  projectName?:     string;
+  autosaveStatus?:  AutosaveStatus;
+  runsRemaining?:   number | null;
 }
 
 export function Toolbar({
@@ -36,10 +40,14 @@ export function Toolbar({
   canShare,
   projectName,
   autosaveStatus = "idle",
+  runsRemaining,
 }: ToolbarProps) {
+  const runsLow = runsRemaining !== null && runsRemaining !== undefined && runsRemaining < 5;
+
   return (
     <div className="h-12 bg-card border-b border-border flex items-center justify-between px-4 shrink-0 gap-2">
-      {/* Left: brand + project nav */}
+
+      {/* ── Left: brand + nav ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 min-w-0">
         <div className="flex items-center gap-2 shrink-0">
           <Box className="text-primary" size={18} />
@@ -50,7 +58,6 @@ export function Toolbar({
 
         <div className="w-px h-5 bg-border shrink-0" />
 
-        {/* New Project */}
         <button
           data-testid="button-new-project"
           onClick={onNewProject}
@@ -61,7 +68,6 @@ export function Toolbar({
           <ChevronDown size={11} />
         </button>
 
-        {/* Projects (save/load) */}
         <button
           data-testid="button-projects"
           onClick={onOpenProjects}
@@ -72,7 +78,6 @@ export function Toolbar({
           <span className="hidden md:block">Projects</span>
         </button>
 
-        {/* Explore */}
         <Link
           href="/explore"
           className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded hover:bg-primary/10 shrink-0"
@@ -81,7 +86,6 @@ export function Toolbar({
           <span className="hidden md:block">Explore</span>
         </Link>
 
-        {/* Share — only shown when a project is saved */}
         {canShare && onShare && (
           <button
             data-testid="button-share"
@@ -94,32 +98,26 @@ export function Toolbar({
           </button>
         )}
 
-        {/* Current project name + autosave status */}
+        {/* Project name + autosave indicator */}
         {projectName && (
           <>
             <div className="w-px h-4 bg-border shrink-0" />
-            <span
-              className="text-xs font-mono text-muted-foreground truncate max-w-[130px]"
-              title={projectName}
-            >
+            <span className="text-xs font-mono text-muted-foreground truncate max-w-[130px]" title={projectName}>
               {projectName}
             </span>
             {autosaveStatus === "saving" && (
               <span className="hidden sm:flex items-center gap-1 text-[10px] font-mono text-muted-foreground/60 shrink-0">
-                <Loader2 size={9} className="animate-spin" />
-                saving
+                <Loader2 size={9} className="animate-spin" />saving
               </span>
             )}
             {autosaveStatus === "saved" && (
               <span className="hidden sm:flex items-center gap-1 text-[10px] font-mono text-primary/70 shrink-0">
-                <CheckCircle2 size={9} />
-                saved
+                <CheckCircle2 size={9} />saved
               </span>
             )}
           </>
         )}
 
-        {/* Language badge */}
         {currentLanguage && (
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25 shrink-0">
             {currentLanguage}
@@ -127,23 +125,42 @@ export function Toolbar({
         )}
       </div>
 
-      {/* Right: actions */}
+      {/* ── Right: usage + actions ────────────────────────────────────────── */}
       <div className="flex items-center gap-2 shrink-0">
+
+        {/* Daily runs remaining counter */}
+        {runsRemaining !== null && runsRemaining !== undefined && (
+          <div
+            title={`${runsRemaining} runs remaining today (resets at midnight UTC)`}
+            className={[
+              "hidden sm:flex items-center gap-1 px-2 py-0.5 rounded font-mono text-[10px] border",
+              runsLow
+                ? "text-orange-400 border-orange-400/30 bg-orange-400/10"
+                : "text-muted-foreground border-border bg-transparent",
+            ].join(" ")}
+          >
+            <Gauge size={10} />
+            <span>{runsLow && runsRemaining === 0 ? "No runs left" : `${runsRemaining} runs left`}</span>
+          </div>
+        )}
+
         {/* Run */}
         <Button
           data-testid="button-run"
           variant="outline"
           size="sm"
           onClick={onRun}
-          disabled={isRunning || !canRun}
+          disabled={isRunning || !canRun || runsRemaining === 0}
           title={
-            canRun
+            runsRemaining === 0
+              ? "Daily run limit reached (50/day). Resets at midnight UTC."
+              : canRun
               ? "Run current file (JS, TS, Python, HTML)"
               : "Open a JS, TS, Python, or HTML file to run"
           }
           className={[
             "font-mono text-xs h-7 px-3",
-            canRun
+            canRun && runsRemaining !== 0
               ? "hover:text-primary hover:border-primary"
               : "opacity-40 cursor-not-allowed",
           ].join(" ")}
@@ -180,13 +197,8 @@ export function Toolbar({
             asChild
             className="font-mono text-xs h-7 px-3 border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
           >
-            <a
-              href={`/api/download/${jobId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Download size={12} className="mr-1.5" />
-              Download APK
+            <a href={`/api/download/${jobId}`} target="_blank" rel="noopener noreferrer">
+              <Download size={12} className="mr-1.5" />Download APK
             </a>
           </Button>
         )}

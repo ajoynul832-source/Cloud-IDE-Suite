@@ -12,6 +12,7 @@ import { useFileSystem } from "@/hooks/useFileSystem";
 import { useBuild } from "@/hooks/useBuild";
 import { useRun } from "@/hooks/useRun";
 import { useProjects } from "@/hooks/useProjects";
+import { getUserKey } from "@/lib/user-key";
 import { ProjectTemplate } from "@/lib/templates";
 
 const AUTOSAVE_DEBOUNCE_MS = 3_000;
@@ -42,11 +43,11 @@ function getDisplayLanguage(filename: string): string | undefined {
 export default function IDE() {
   const { files, saveFile, createFile, renameFile, deleteFile, loadTemplate } = useFileSystem();
   const { isBuilding, startBuild, status, logs, jobId, projectType, previewData } = useBuild();
-  const { isRunning, stream, runCode } = useRun();
+  const { isRunning, stream, runsRemaining, runCode } = useRun();
   const { saveProject, createVersion } = useProjects();
 
-  const [openFiles,    setOpenFiles]    = useState<string[]>([]);
-  const [activeFile,   setActiveFile]   = useState<string | null>(null);
+  const [openFiles,     setOpenFiles]     = useState<string[]>([]);
+  const [activeFile,    setActiveFile]    = useState<string | null>(null);
   const [rightPanelTab, setRightPanelTab] = useState<PanelTab>("preview");
   const [showTemplates, setShowTemplates] = useState(false);
   const [showProjects,  setShowProjects]  = useState(false);
@@ -56,36 +57,47 @@ export default function IDE() {
   const [currentProjectId,   setCurrentProjectId]   = useState<string | null>(null);
   const [currentProjectName, setCurrentProjectName] = useState<string>("Untitled Project");
   const [autosaveStatus,     setAutosaveStatus]     = useState<AutosaveStatus>("idle");
+  // Seeded from GET /api/usage on mount, then kept live via SSE usage events
+  const [localRunsRemaining, setLocalRunsRemaining] = useState<number | null>(null);
 
   const editorRef     = useRef<EditorRef>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Track whether files have changed since last save to avoid redundant saves
   const lastSavedHash = useRef<string>("");
 
   const currentLanguage = getDisplayLanguage(activeFile ?? Object.keys(files)[0] ?? "");
   const canRun   = !!activeFile && !!getExecLanguage(activeFile);
   const canShare = !!currentProjectId;
 
-  // ─── Autosave ────────────────────────────────────────────────────────────────
+  // Merge server-reported runsRemaining (from SSE events) into local state
+  useEffect(() => {
+    if (runsRemaining !== null) setLocalRunsRemaining(runsRemaining);
+  }, [runsRemaining]);
+
+  // ─── Fetch initial usage on mount ────────────────────────────────────────────
+  useEffect(() => {
+    fetch("/api/usage", { headers: { "X-User-Key": getUserKey() } })
+      .then((r) => r.json())
+      .then((d: { runsRemaining?: number }) => {
+        if (typeof d.runsRemaining === "number") setLocalRunsRemaining(d.runsRemaining);
+      })
+      .catch(() => {}); // non-critical
+  }, []);
+
+  // ─── Autosave ─────────────────────────────────────────────────────────────────
 
   const scheduleAutosave = useCallback(() => {
     if (!currentProjectId) return;
-
     const hash = JSON.stringify(files);
-    if (hash === lastSavedHash.current) return; // nothing changed
-
+    if (hash === lastSavedHash.current) return;
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-
     autosaveTimer.current = setTimeout(async () => {
       const currentHash = JSON.stringify(files);
       if (currentHash === lastSavedHash.current) return;
-
       setAutosaveStatus("saving");
       const saved = await saveProject(currentProjectName, projectType, files, currentProjectId);
       if (saved) {
         lastSavedHash.current = currentHash;
         setAutosaveStatus("saved");
-        // Fade back to idle after 2 s
         setTimeout(() => setAutosaveStatus("idle"), 2_000);
       } else {
         setAutosaveStatus("idle");
@@ -95,14 +107,11 @@ export default function IDE() {
 
   useEffect(() => {
     scheduleAutosave();
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    };
-  // Only run when files change (not when scheduleAutosave reference changes)
+    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files]);
 
-  // ─── File & project handlers ──────────────────────────────────────────────────
+  // ─── Handlers ────────────────────────────────────────────────────────────────
 
   const handleSelectFile = (path: string) => {
     if (!openFiles.includes(path)) setOpenFiles((prev) => [...prev, path]);
@@ -120,19 +129,11 @@ export default function IDE() {
   const handleRun = async () => {
     const file = activeFile;
     if (!file) return;
-
     const content = editorRef.current?.getContent() ?? files[file] ?? "";
     saveFile(file, content);
-
     const lang = getExecLanguage(file);
     if (!lang) { setRightPanelTab("preview"); return; }
-
-    if (lang === "html") {
-      setHtmlPreview(content);
-      setRightPanelTab("preview");
-      return;
-    }
-
+    if (lang === "html") { setHtmlPreview(content); setRightPanelTab("preview"); return; }
     setRightPanelTab("console");
     await runCode(lang, content, file);
   };
@@ -145,40 +146,25 @@ export default function IDE() {
     } else {
       startBuild(files);
     }
-
-    const isRN = Object.values(files).some(
-      (c) => c.includes("react-native") || c.includes("expo"),
-    );
+    const isRN = Object.values(files).some((c) => c.includes("react-native") || c.includes("expo"));
     setRightPanelTab(isRN ? "preview" : "build");
   };
 
   const handleLoadTemplate = (template: ProjectTemplate) => {
     loadTemplate(template.files);
-    setOpenFiles([]);
-    setActiveFile(null);
-    setShowTemplates(false);
-    setHtmlPreview(null);
-    setCurrentProjectId(null);
-    setCurrentProjectName("Untitled Project");
+    setOpenFiles([]); setActiveFile(null);
+    setShowTemplates(false); setHtmlPreview(null);
+    setCurrentProjectId(null); setCurrentProjectName("Untitled Project");
     lastSavedHash.current = "";
-
     const first = Object.keys(template.files).sort()[0];
     if (first) { setOpenFiles([first]); setActiveFile(first); }
   };
 
-  const handleLoadProject = (
-    loadedFiles: Record<string, string>,
-    name: string,
-    id: string,
-  ) => {
+  const handleLoadProject = (loadedFiles: Record<string, string>, name: string, id: string) => {
     loadTemplate(loadedFiles);
-    setOpenFiles([]);
-    setActiveFile(null);
-    setHtmlPreview(null);
-    setCurrentProjectId(id);
-    setCurrentProjectName(name);
+    setOpenFiles([]); setActiveFile(null); setHtmlPreview(null);
+    setCurrentProjectId(id); setCurrentProjectName(name);
     lastSavedHash.current = JSON.stringify(loadedFiles);
-
     const first = Object.keys(loadedFiles).sort()[0];
     if (first) { setOpenFiles([first]); setActiveFile(first); }
   };
@@ -187,7 +173,6 @@ export default function IDE() {
     setCurrentProjectId(id);
     setCurrentProjectName(name);
     lastSavedHash.current = JSON.stringify(files);
-    // Take a version snapshot on every explicit save
     createVersion(id, "Saved");
   };
 
@@ -208,6 +193,7 @@ export default function IDE() {
         canShare={canShare}
         projectName={currentProjectName}
         autosaveStatus={autosaveStatus}
+        runsRemaining={localRunsRemaining}
       />
 
       <div className="flex-1 overflow-hidden">
@@ -245,10 +231,7 @@ export default function IDE() {
                 ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground font-mono text-sm gap-3">
                     <span>Select a file to edit</span>
-                    <button
-                      onClick={() => setShowTemplates(true)}
-                      className="text-xs text-primary hover:underline"
-                    >
+                    <button onClick={() => setShowTemplates(true)} className="text-xs text-primary hover:underline">
                       or start a new project
                     </button>
                   </div>
@@ -270,16 +253,14 @@ export default function IDE() {
               snackPreview={previewData}
               htmlPreview={htmlPreview}
               projectType={projectType}
+              runsRemaining={localRunsRemaining}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
 
       {showTemplates && (
-        <TemplateSelector
-          onSelect={handleLoadTemplate}
-          onClose={() => setShowTemplates(false)}
-        />
+        <TemplateSelector onSelect={handleLoadTemplate} onClose={() => setShowTemplates(false)} />
       )}
 
       {showProjects && (

@@ -7,20 +7,21 @@ export type PanelTab = "preview" | "console" | "build";
 
 interface SnackPreview {
   embedUrl: string;
-  qrUrl: string;
+  qrUrl:    string;
   snackUrl: string;
 }
 
 interface PreviewPanelProps {
-  logs?: string | null;
-  isBuilding: boolean;
-  isRunning?: boolean;
-  activeTab: PanelTab;
-  onTabChange: (tab: PanelTab) => void;
-  stream?: StreamState;
-  snackPreview?: SnackPreview | null;
-  htmlPreview?: string | null;
-  projectType?: string;
+  logs?:          string | null;
+  isBuilding:     boolean;
+  isRunning?:     boolean;
+  activeTab:      PanelTab;
+  onTabChange:    (tab: PanelTab) => void;
+  stream?:        StreamState;
+  snackPreview?:  SnackPreview | null;
+  htmlPreview?:   string | null;
+  projectType?:   string;
+  runsRemaining?: number | null;
 }
 
 export function PreviewPanel({
@@ -33,11 +34,12 @@ export function PreviewPanel({
   snackPreview,
   htmlPreview,
   projectType,
+  runsRemaining,
 }: PreviewPanelProps) {
   const tabs: { id: PanelTab; label: string }[] = [
     { id: "preview", label: "Preview" },
     { id: "console", label: "Console" },
-    { id: "build", label: "Build Log" },
+    { id: "build",   label: "Build Log" },
   ];
 
   const defaultStream: StreamState = { chunks: [], result: null };
@@ -79,7 +81,11 @@ export function PreviewPanel({
           />
         )}
         {activeTab === "console" && (
-          <ConsoleOutput stream={stream ?? defaultStream} isRunning={isRunning ?? false} />
+          <ConsoleOutput
+            stream={stream ?? defaultStream}
+            isRunning={isRunning ?? false}
+            runsRemaining={runsRemaining}
+          />
         )}
         {activeTab === "build" && <BuildLog logs={logs} />}
       </div>
@@ -93,8 +99,8 @@ function PreviewContent({
   projectType,
 }: {
   snackPreview?: SnackPreview | null;
-  htmlPreview?: string | null;
-  projectType?: string;
+  htmlPreview?:  string | null;
+  projectType?:  string;
 }) {
   if (htmlPreview) {
     return (
@@ -119,8 +125,7 @@ function PreviewContent({
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-primary hover:underline"
           >
-            <ExternalLink size={11} />
-            Open
+            <ExternalLink size={11} />Open
           </a>
         </div>
         <div className="flex-1 relative overflow-hidden">
@@ -146,16 +151,12 @@ function PreviewContent({
         {projectType === "react-native" ? (
           <>
             <p>React Native preview not generated yet.</p>
-            <p className="text-primary text-xs">
-              Click <span className="font-bold">Build APK</span> to create an Expo Snack preview.
-            </p>
+            <p className="text-primary text-xs">Click <span className="font-bold">Build APK</span> to create an Expo Snack preview.</p>
           </>
         ) : projectType === "flutter" ? (
           <>
             <p>Flutter apps cannot run directly in browser preview.</p>
-            <p className="mt-2 text-primary">
-              Click <span className="font-bold">Build APK</span> to compile.
-            </p>
+            <p className="mt-2 text-primary">Click <span className="font-bold">Build APK</span> to compile.</p>
           </>
         ) : (
           <>

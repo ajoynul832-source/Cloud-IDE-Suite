@@ -14,6 +14,7 @@ import os from "os";
 import JSZip from "jszip";
 import { logger } from "../lib/logger";
 import { buildLimiter } from "../middlewares/rate-limit";
+import { checkAndIncrementBuilds, resolveUsageKey } from "../lib/usage";
 
 // Re-export job map from build route (we share the same in-memory store)
 import { jobs, queue, processQueue } from "./build-shared";
@@ -140,8 +141,19 @@ router.post("/build/project", buildLimiter, async (req, res) => {
     return;
   }
 
+  const usageKey = resolveUsageKey(req.headers["x-user-key"], req.ip);
+  const buildUsage = await checkAndIncrementBuilds(usageKey);
+  if (!buildUsage.allowed) {
+    res.status(429).json({
+      error: "Daily build limit reached (3/day). Resets at midnight UTC.",
+      code: "DAILY_LIMIT_REACHED",
+      remaining: 0,
+    });
+    return;
+  }
+
   const jobId = makeJobId();
-  logger.info({ jobId, type, fileCount: Object.keys(files).length }, "project build request");
+  logger.info({ jobId, type, fileCount: Object.keys(files).length, buildsRemaining: buildUsage.remaining }, "project build request");
 
   // ---- React Native → Expo Snack preview ----
   if (type === "react-native") {

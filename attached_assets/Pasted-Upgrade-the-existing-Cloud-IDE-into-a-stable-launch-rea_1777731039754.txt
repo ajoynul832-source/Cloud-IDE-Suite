@@ -1,0 +1,220 @@
+Upgrade the existing Cloud IDE into a stable, launch-ready product.
+
+DO NOT rebuild UI.
+DO NOT remove existing features.
+ONLY extend and harden the system.
+
+---
+
+1. PERSISTENT DAILY USAGE SYSTEM (CRITICAL)
+
+Create table:
+
+usageTable:
+
+- userKey (string)
+- date (YYYY-MM-DD)
+- runsCount (int, default 0)
+- buildsCount (int, default 0)
+
+Primary key: (userKey, date)
+
+---
+
+Backend logic
+
+On:
+POST /api/run
+POST /api/run/stream
+POST /api/build
+
+1. Get userKey from header
+2. Get today date
+3. Fetch or create row
+4. If runsCount >= 50 → return 429
+5. Else increment runsCount
+
+For builds:
+
+- limit = 3/day
+
+---
+
+Response format
+
+If limit reached:
+{
+error: "Daily limit reached",
+remaining: 0
+}
+
+Else:
+{
+remaining: X
+}
+
+---
+
+2. FRONTEND USAGE DISPLAY
+
+Show:
+
+"Runs left today: X"
+
+Add to:
+
+- Toolbar (right side)
+- Console panel header
+
+If remaining < 5:
+
+- show warning color
+
+---
+
+3. EXECUTION HARDENING
+
+Improve /api/run:
+
+- Ensure:
+  - timeout = 10s
+  - memory cap
+  - output cap (100KB)
+- Kill process safely
+- Catch all errors
+
+---
+
+4. GLOBAL ERROR HANDLING
+
+All endpoints must:
+
+- Return JSON errors
+- Never crash server
+
+Format:
+{
+error: "message",
+code: "ERROR_CODE"
+}
+
+---
+
+5. LOGGING SYSTEM
+
+Add server logs:
+
+- execution start/end
+- build start/end
+- errors
+
+Use structured logs:
+{
+type: "run",
+userKey: "...",
+duration: ...
+}
+
+---
+
+6. PROJECT SAFETY
+
+Before execution:
+
+- Validate file size
+- Prevent huge payloads
+- Reject unsafe inputs
+
+---
+
+7. PERFORMANCE IMPROVEMENTS
+
+- Cache recent execution results (optional)
+- Avoid repeated DB queries
+- Optimize API responses
+
+---
+
+8. CLEAN API STRUCTURE
+
+Refactor:
+
+languageHandlers = {
+javascript: handler,
+typescript: handler,
+python: handler
+}
+
+Each handler:
+
+- isolated
+- returns consistent output format
+
+---
+
+9. BUILD SYSTEM HARDENING
+
+Improve /api/build:
+
+- Add:
+  - retry (max 2)
+  - status updates
+- Return structured logs
+- Handle failures cleanly
+
+---
+
+10. SHARE + EXPLORE INTEGRATION
+
+Ensure:
+
+- Explore uses latest stats
+- Fork increments correctly
+- Runs increment correctly
+
+---
+
+11. SECURITY BASELINE
+
+- Sanitize all inputs
+- Prevent command injection
+- Restrict file paths
+- Do not expose system info
+
+---
+
+12. FINAL UX POLISH
+
+- Disable Run button while running
+- Show loading spinner
+- Show success/fail state clearly
+- Smooth transitions
+
+---
+
+FINAL RESULT
+
+User can:
+
+- Create project
+- Auto-save
+- Run code safely
+- See live output
+- Share project
+- Explore projects
+- Fork projects
+- Hit usage limits (with feedback)
+
+System is:
+
+- Stable
+- Safe
+- Launch-ready
+
+---
+
+DO NOT ADD NEW COMPLEX FEATURES.
+
+Focus on stability, limits, and polish.
+
+This is the final production preparation pass.
