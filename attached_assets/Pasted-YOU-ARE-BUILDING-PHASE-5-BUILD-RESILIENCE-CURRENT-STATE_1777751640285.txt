@@ -1,0 +1,59 @@
+YOU ARE BUILDING PHASE 5: BUILD RESILIENCE
+
+CURRENT STATE:
+- Single attempt per build
+- No retry logic
+- Build failures are permanent
+- Error messages unclear
+
+WHAT YOU MUST BUILD:
+
+1. RETRY LOGIC IN BULLMQ
+   - Configure queue: { attempts: 2, backoff: { type: 'exponential', delay: 5000 } }
+   - On processor error, BullMQ retries after 5s
+   - Max 2 attempts total (1 initial + 1 retry)
+   - If still fails, mark as 'failed' permanently
+
+2. ERROR CLASSIFICATION
+   In processor, catch errors and classify:
+   
+   ERROR TYPE | RETRIABLE? | ACTION
+   "flutter not found" | NO | Mark failed, return 503
+   "pub get timeout" | YES | Retry (exponential backoff)
+   "build apk timeout" | YES | Retry
+   "disk full" | NO | Mark failed, alert admin
+   "network error" | YES | Retry
+   
+   UPDATE builds table:
+   * error_type (text: 'retriable', 'permanent', 'system')
+   * error_message (text)
+   * retry_count (integer)
+   * last_error_at (timestamp)
+
+3. USER MESSAGING
+   - GET /api/status/:jobId returns:
+     * status: 'queued' | 'building' | 'failed-will-retry' | 'failed-permanent' | 'complete'
+     * retryCount: 1 of 2
+     * errorMessage (user-friendly): "Pub get timed out, retrying..." OR "Flutter not installed on server"
+   
+   - Frontend displays: "Retrying build (attempt 2 of 2)..."
+
+4. FAILED BUILD HISTORY
+   - GET /api/projects/:projectId/builds returns all builds including failed ones
+   - Include error_type + error_message
+   - UI shows: [RED] Failed | Error: "..."
+
+5. LOGGING
+   - Log all errors to file: logs/builds.log
+   - Include: jobId, userId, error_type, error_message, timestamp
+   - Admin endpoint: GET /api/admin/build-errors (requires special token)
+
+TEST:
+✅ Simulate transient error (e.g., kill flutter mid-build)
+✅ Build retries automatically
+✅ If error persists, marked 'failed-permanent'
+✅ User sees "Retrying..." message
+✅ Failed builds appear in project history
+✅ Error message is clear and not technical jargon
+
+STOP HERE. RETRY LOGIC MUST WORK WITHOUT HANGING OR INFINITE LOOPS.

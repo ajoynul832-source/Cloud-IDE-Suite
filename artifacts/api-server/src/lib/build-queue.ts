@@ -28,7 +28,8 @@ export function getBuildQueue(): Queue<BuildJobData, void> {
     _buildQueue = new Queue(BUILD_QUEUE_NAME, {
       connection: redisConnectionOpts(),
       defaultJobOptions: {
-        attempts: 1,
+        attempts: 2,
+        backoff: { type: "exponential", delay: 5_000 },
         removeOnComplete: { count: 100 },
         removeOnFail:     { count: 50  },
       },

@@ -1,13 +1,17 @@
 /**
- * BullMQ job processor for Flutter/Android APK builds.
+ * BullMQ job processor for Flutter APK builds.
  *
  * Stages (written to DB in real time so SSE log endpoint can stream them):
  *   extracting → running-pub-get → building-apk → packaging
  *
- * All log output is appended to builds.log_text via DB UPDATE.
- * The APK is copied to permanent storage on success.
+ * Phase 5 — Resilience:
+ *   - attempts: 2 (configured on queue)
+ *   - Retriable errors (timeout, network) → throw → BullMQ retries with 5 s back-off
+ *   - Permanent errors (bad project, missing SDK) → throw UnrecoverableError → no retry
+ *   - DB status tracks "failed-will-retry" during the window between attempts
  */
 import type { Job } from "bullmq";
+import { UnrecoverableError } from "bullmq";
 import fsp  from "fs/promises";
 import fs   from "fs";
 import path from "path";
@@ -16,20 +20,25 @@ import { exec } from "child_process";
 import unzipper from "unzipper";
 import { db, buildsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import { storeApk } from "../lib/apk-storage";
-import { flutterBin } from "../lib/flutter";
-import { logger } from "../lib/logger";
+import { storeApk }       from "../lib/apk-storage";
+import { flutterBin }     from "../lib/flutter";
+import { logger }         from "../lib/logger";
+import { classifyError, logBuildError } from "../lib/build-resilience";
 
 export interface BuildJobData {
-  buildId:  string;                          // UUID from builds table
-  zipPath?: string;                          // for upload-based builds
-  files?:   Record<string, string>;          // for project-based builds
+  buildId:  string;
+  zipPath?: string;
+  files?:   Record<string, string>;
   language: string;
+  userId?:  string | null;
 }
 
-const BUILD_TIMEOUT_MS = 8 * 60 * 1000; // 8 minutes
+const BUILD_TIMEOUT_MS = 8 * 60 * 1000;
+const MAX_ATTEMPTS     = 2;
 
 // ─── DB helpers ───────────────────────────────────────────────────────────────
+
+function ts(): string { return new Date().toISOString(); }
 
 async function setStage(buildId: string, stage: string) {
   await db.update(buildsTable)
@@ -50,9 +59,15 @@ async function markComplete(buildId: string, apkPath: string, apkSize: number) {
     .where(eq(buildsTable.id, buildId));
 }
 
-async function markFailed(buildId: string, errorMessage: string) {
+async function markFailed(buildId: string, errorMessage: string, errorType: string, retryCount: number) {
   await db.update(buildsTable)
-    .set({ status: "failed", stage: null, errorMessage, completedAt: new Date() })
+    .set({ status: "failed", stage: null, errorMessage, errorType, retryCount, lastErrorAt: new Date(), completedAt: new Date() })
+    .where(eq(buildsTable.id, buildId));
+}
+
+async function markWillRetry(buildId: string, errorMessage: string, errorType: string, attempt: number) {
+  await db.update(buildsTable)
+    .set({ status: "failed-will-retry", stage: null, errorMessage, errorType, retryCount: attempt - 1, lastErrorAt: new Date() })
     .where(eq(buildsTable.id, buildId));
 }
 
@@ -61,23 +76,17 @@ async function markFailed(buildId: string, errorMessage: string) {
 function runCommand(cmd: string, cwd: string, buildId: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const proc = exec(cmd, { cwd, timeout: BUILD_TIMEOUT_MS });
-
-    proc.stdout?.on("data", (data: string) => {
-      appendLog(buildId, data.trimEnd()).catch(() => {});
-    });
-    proc.stderr?.on("data", (data: string) => {
-      appendLog(buildId, data.trimEnd()).catch(() => {});
-    });
-
+    proc.stdout?.on("data", (d: string) => appendLog(buildId, d.trimEnd()).catch(() => {}));
+    proc.stderr?.on("data", (d: string) => appendLog(buildId, d.trimEnd()).catch(() => {}));
     proc.on("close", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`Command "${cmd}" exited with code ${code}`));
+      else reject(new Error(`Command "${cmd.split(" ")[0]}" exited with code ${code}`));
     });
     proc.on("error", reject);
   });
 }
 
-// ─── ZIP packaging (for project-based builds) ─────────────────────────────────
+// ─── ZIP packaging ────────────────────────────────────────────────────────────
 
 async function writeProjectZip(files: Record<string, string>, zipPath: string): Promise<void> {
   const { default: JSZip } = await import("jszip");
@@ -92,41 +101,51 @@ async function writeProjectZip(files: Record<string, string>, zipPath: string): 
 // ─── Main processor ───────────────────────────────────────────────────────────
 
 export async function buildJobProcessor(job: Job<BuildJobData>): Promise<void> {
-  const { buildId, language } = job.data;
+  const { buildId, language, userId } = job.data;
   let zipPath  = job.data.zipPath;
   const tmpDir = os.tmpdir();
 
-  logger.info({ jobId: job.id, buildId, language }, "build worker: starting");
+  // Track attempt number (BullMQ sets attemptsMade before calling processor)
+  const attemptNumber = job.attemptsMade; // 1-indexed
+  const isRetry = attemptNumber > 1;
 
-  await appendLog(buildId, `[${new Date().toISOString()}] Build started — language: ${language}`);
+  logger.info({ jobId: job.id, buildId, language, attempt: attemptNumber }, "flutter build worker: starting");
 
-  // If build came from project files (not upload), create the ZIP now
+  if (isRetry) {
+    await appendLog(buildId, `\n[${ts()}] ── Retry attempt ${attemptNumber} of ${MAX_ATTEMPTS} ──`);
+    await db.update(buildsTable)
+      .set({ status: "building", retryCount: attemptNumber - 1 })
+      .where(eq(buildsTable.id, buildId));
+  } else {
+    await appendLog(buildId, `[${ts()}] Build started — language: ${language}`);
+  }
+
+  // Create ZIP from project files if needed
   if (!zipPath && job.data.files) {
     const generatedZip = path.join(tmpDir, `build_${buildId}.zip`);
-    await appendLog(buildId, `[${new Date().toISOString()}] Packaging project files...`);
+    await appendLog(buildId, `[${ts()}] Packaging project files...`);
     await writeProjectZip(job.data.files, generatedZip);
     zipPath = generatedZip;
   }
 
   if (!zipPath || !fs.existsSync(zipPath)) {
-    await markFailed(buildId, "ZIP file missing or could not be created");
-    return;
+    await markFailed(buildId, "ZIP file missing or could not be created", "permanent", attemptNumber - 1);
+    throw new UnrecoverableError("ZIP file missing — cannot retry");
   }
 
   const projectDir = path.join(tmpDir, `build_project_${buildId}`);
 
   try {
-    // ── stage: extracting ──────────────────────────────────────────────────
+    // ── extracting ───────────────────────────────────────────────────────────
     await setStage(buildId, "extracting");
-    await appendLog(buildId, `[${new Date().toISOString()}] Extracting project archive...`);
-
+    await appendLog(buildId, `[${ts()}] Extracting project archive...`);
     await new Promise<void>((resolve, reject) => {
       fs.createReadStream(zipPath!)
         .pipe(unzipper.Extract({ path: projectDir }))
         .on("close", resolve)
         .on("error", reject);
     });
-    await appendLog(buildId, `[${new Date().toISOString()}] Extraction complete`);
+    await appendLog(buildId, `[${ts()}] Extraction complete`);
 
     // Detect Flutter project root (handle nested zip)
     let buildRoot = projectDir;
@@ -137,42 +156,67 @@ export async function buildJobProcessor(job: Job<BuildJobData>): Promise<void> {
     }
 
     // Validate structure
-    const pubspec = path.join(buildRoot, "pubspec.yaml");
-    const mainDart = path.join(buildRoot, "lib", "main.dart");
-    if (!fs.existsSync(pubspec))  throw new Error("Invalid Flutter project: pubspec.yaml not found");
-    if (!fs.existsSync(mainDart)) throw new Error("Invalid Flutter project: lib/main.dart not found");
-    await appendLog(buildId, `[${new Date().toISOString()}] Project structure valid`);
+    if (!fs.existsSync(path.join(buildRoot, "pubspec.yaml")))
+      throw new Error("Invalid Flutter project: pubspec.yaml not found");
+    if (!fs.existsSync(path.join(buildRoot, "lib", "main.dart")))
+      throw new Error("Invalid Flutter project: lib/main.dart not found");
+    await appendLog(buildId, `[${ts()}] Project structure valid`);
 
-    // ── stage: running-pub-get ────────────────────────────────────────────
+    // ── running-pub-get ──────────────────────────────────────────────────────
     await setStage(buildId, "running-pub-get");
-    await appendLog(buildId, `[${new Date().toISOString()}] Running flutter pub get...`);
+    await appendLog(buildId, `[${ts()}] Running flutter pub get...`);
     await runCommand(`${flutterBin()} pub get`, buildRoot, buildId);
 
-    // ── stage: building-apk ───────────────────────────────────────────────
+    // ── building-apk ─────────────────────────────────────────────────────────
     await setStage(buildId, "building-apk");
-    await appendLog(buildId, `[${new Date().toISOString()}] Running flutter build apk --debug...`);
+    await appendLog(buildId, `[${ts()}] Running flutter build apk --debug...`);
     await runCommand(`${flutterBin()} build apk --debug`, buildRoot, buildId);
 
-    // ── stage: packaging ──────────────────────────────────────────────────
+    // ── packaging ────────────────────────────────────────────────────────────
     await setStage(buildId, "packaging");
-    await appendLog(buildId, `[${new Date().toISOString()}] Packaging APK for download...`);
+    await appendLog(buildId, `[${ts()}] Packaging APK for download...`);
 
     const apkSrc = path.join(buildRoot, "build", "app", "outputs", "flutter-apk", "app-debug.apk");
     if (!fs.existsSync(apkSrc)) throw new Error("Build succeeded but APK file not found at expected path");
 
     const { storedPath, sizeBytes } = await storeApk(apkSrc, buildId);
     await markComplete(buildId, storedPath, sizeBytes);
-    await appendLog(buildId, `[${new Date().toISOString()}] Build SUCCESS — APK ready (${Math.round(sizeBytes / 1024)} KB)`);
+    await appendLog(buildId, `[${ts()}] Build SUCCESS — APK ready (${Math.round(sizeBytes / 1024)} KB)`);
 
-    logger.info({ buildId, storedPath, sizeBytes }, "build worker: complete");
+    logger.info({ buildId, storedPath, sizeBytes }, "flutter build worker: complete");
+
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error({ err, buildId }, "build worker: failed");
-    await appendLog(buildId, `[${new Date().toISOString()}] Build FAILED: ${msg}`);
-    await markFailed(buildId, msg);
+    const { errorType, userMessage } = classifyError(err);
+    const isLastAttempt = attemptNumber >= MAX_ATTEMPTS;
+
+    // Write to structured build error log
+    await logBuildError({
+      ts: new Date().toISOString(),
+      buildId, userId: userId ?? null, language,
+      errorType, errorMessage: userMessage,
+      attempt: attemptNumber, maxAttempts: MAX_ATTEMPTS,
+    });
+
+    if (errorType === "permanent" || errorType === "system") {
+      await appendLog(buildId, `[${ts()}] Build FAILED (${errorType}): ${userMessage}`);
+      await markFailed(buildId, userMessage, errorType, attemptNumber - 1);
+      throw new UnrecoverableError(userMessage);
+    }
+
+    // Retriable
+    if (!isLastAttempt) {
+      await appendLog(buildId, `[${ts()}] Build failed — retrying (attempt ${attemptNumber + 1} of ${MAX_ATTEMPTS}): ${userMessage}`);
+      await markWillRetry(buildId, `${userMessage} — retrying...`, errorType, attemptNumber);
+      throw err instanceof Error ? err : new Error(userMessage);
+    }
+
+    // Last attempt exhausted
+    await appendLog(buildId, `[${ts()}] Build FAILED after ${MAX_ATTEMPTS} attempts: ${userMessage}`);
+    await markFailed(buildId, userMessage, errorType, attemptNumber - 1);
+    throw err instanceof Error ? err : new Error(userMessage);
+
   } finally {
-    // Cleanup temp files
-    fsp.rm(zipPath, { force: true }).catch(() => {});
+    fsp.rm(zipPath ?? "", { force: true }).catch(() => {});
     fsp.rm(projectDir, { recursive: true, force: true }).catch(() => {});
   }
 }

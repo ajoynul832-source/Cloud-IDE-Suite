@@ -354,9 +354,63 @@ usageTable:
   date        text PK (YYYY-MM-DD)
   runs_count  integer
   builds_count integer
+buildsTable:
+  id            uuid PK
+  user_id       uuid nullable
+  project_id    uuid nullable FK → projects(id)
+  language      text (flutter | android)
+  status        text (queued | building | failed-will-retry | complete | failed)
+  stage         text nullable (extracting | running-pub-get | building-apk | packaging | assembling | etc.)
+  queue_position integer
+  log_text      text (append-only build log)
+  apk_path      text nullable
+  apk_size      integer nullable
+  error_message text nullable
+  error_type    text nullable  — Phase 5: system | permanent | retriable
+  retry_count   integer        — Phase 5: number of retries attempted
+  last_error_at timestamp      — Phase 5: when the last error occurred
+  preview_url / embed_url / qr_url  text nullable (Snack embeds)
+  created_at    timestamp
+  completed_at  timestamp nullable
 ```
 
 Run `pnpm --filter @workspace/db run push` to apply schema changes to the database.
+Always run `pnpm run typecheck:libs` after schema changes to regenerate Drizzle types before typechecking leaf packages.
+
+## Phase 5 — Build Resilience (Complete)
+
+- **Retry policy**: BullMQ configured with `attempts: 2`, exponential backoff (5 s base delay)
+- **Error classification** (`lib/build-resilience.ts`): `system` (OOM/disk) and `permanent` (bad project/missing SDK) → `UnrecoverableError` (no retry); `retriable` (timeout/network/pub-get) → re-throw → BullMQ retries
+- **Status lifecycle**: `queued → building → failed-will-retry → building (retry) → complete | failed`
+- **Status endpoint** now returns: `retryCount`, `errorType`, `willRetry`, `lastErrorAt`
+- **Admin error log**: `GET /api/admin/build-errors` (Bearer or Basic auth with `ADMIN_TOKEN ?? SESSION_SECRET`)
+- **APK filename** is now language-prefixed: `flutter-{jobId}.apk` / `android-{jobId}.apk`
+- **Build error JSONL log**: written to `/tmp/build_errors.jsonl` via `logBuildError()`
+
+## Phase 6 — Security Hardening (Complete)
+
+### Security Headers (app.ts)
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Content-Security-Policy: default-src 'self'; ...`
+- `Strict-Transport-Security` (production only)
+
+### CORS (app.ts)
+- Allows `REPLIT_DOMAINS` + `*.replit.dev` + `*.replit.app` + `localhost`
+
+### Rate Limiting (middlewares/rate-limit.ts)
+- **Global**: 100 req/hr per IP (`globalLimiter`, applied before all routes)
+- **Run**: 20 req/min per IP/user
+- **Build**: 5 uploads/min per IP/user
+
+### Code Execution Linting (lib/execution.ts)
+- `checkFilename()` — blocks `..` traversal, absolute paths, disallowed chars → HTTP 400
+- `checkForDangerousCode()` — JS/TS only, regex-based, blocks:
+  - `require()` / ESM `import` / dynamic `import()` of: `http`, `https`, `net`, `tls`, `dgram`, `dns`, `fs`, `child_process`, `cluster`, `worker_threads`, `vm`, `v8`, `module`
+  - `fetch()`, `XMLHttpRequest`, `WebSocket()`
+  - `process.env`, `process.exit()`, `__dirname`, `__filename`
+  - Returns HTTP 403
+- Code > 500 KB → HTTP 413
 
 ## Key Commands
 

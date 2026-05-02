@@ -1,6 +1,7 @@
 import rateLimit from "express-rate-limit";
+import type { Request } from "express";
 
-function keyGen(req: import("express").Request): string {
+function keyGen(req: Request): string {
   // Prefer authenticated userId → X-User-Key header → IP
   if (req.user?.userId) return `user:${req.user.userId}`;
   const userKey = req.headers["x-user-key"];
@@ -8,7 +9,29 @@ function keyGen(req: import("express").Request): string {
   return req.ip ?? "unknown";
 }
 
+/** Trust only the FIRST IP in X-Forwarded-For to defeat spoofing */
+function firstIp(req: Request): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return req.ip ?? "unknown";
+}
+
 const baseOpts = { validate: { ip: false, keyGeneratorIpFallback: false } } as const;
+
+// ─── Global: 100 requests / hour per IP (even anonymous) ──────────────────────
+export const globalLimiter = rateLimit({
+  ...baseOpts,
+  windowMs: 60 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders:  false,
+  keyGenerator:   firstIp,
+  message: { error: "Too many requests from this IP (limit: 100/hr). Try again later." },
+  skip: () => process.env["NODE_ENV"] === "test",
+});
 
 /** 30 executions / minute per user */
 export const runLimiter = rateLimit({
@@ -16,8 +39,8 @@ export const runLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
   standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: keyGen,
+  legacyHeaders:  false,
+  keyGenerator:   keyGen,
   message: { error: "Too many execution requests. Limit: 30/min. Try again shortly." },
   skip: () => process.env["NODE_ENV"] === "test",
 });
@@ -28,8 +51,8 @@ export const buildLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
   standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: keyGen,
+  legacyHeaders:  false,
+  keyGenerator:   keyGen,
   message: { error: "Too many build requests. Limit: 5/min. Try again shortly." },
   skip: () => process.env["NODE_ENV"] === "test",
 });
@@ -40,8 +63,8 @@ export const projectLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
   standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: keyGen,
+  legacyHeaders:  false,
+  keyGenerator:   keyGen,
   message: { error: "Too many requests. Try again shortly." },
 });
 
@@ -51,7 +74,7 @@ export const shareLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
   standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => req.ip ?? "unknown",
+  legacyHeaders:  false,
+  keyGenerator:   (req) => req.ip ?? "unknown",
   message: { error: "Too many share requests. Try again shortly." },
 });

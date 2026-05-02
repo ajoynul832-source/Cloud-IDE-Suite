@@ -1,11 +1,17 @@
 /**
  * Build API routes — DB-backed, BullMQ-queued.
  *
- * POST /api/build             — multipart ZIP upload → enqueue build
- * GET  /api/status/:jobId     — build status (reads DB)
- * GET  /api/download/:jobId   — stream APK file
- * GET  /api/logs/:jobId       — SSE real-time log stream from DB
- * GET  /api/projects/:id/builds — last 10 builds for a project
+ * POST /api/build                       — multipart ZIP upload → enqueue build
+ * GET  /api/status/:jobId               — build status (reads DB)
+ * GET  /api/download/:jobId             — stream APK file
+ * GET  /api/logs/:jobId                 — SSE real-time log stream from DB
+ * GET  /api/projects/:id/builds         — last 10 builds for a project
+ * GET  /api/admin/build-errors          — recent build errors (admin only)
+ *
+ * Phase 5 — Resilience:
+ *   Status includes retryCount, errorType, willRetry, and "failed-will-retry" status.
+ * Phase 6 — Security:
+ *   Admin endpoints protected by ADMIN_TOKEN / SESSION_SECRET.
  */
 import { Router }   from "express";
 import multer        from "multer";
@@ -24,6 +30,7 @@ import { buildLimiter }        from "../middlewares/rate-limit";
 import { optionalAuth }        from "../middlewares/require-auth";
 import { checkAndIncrementBuilds, resolveUsageKey } from "../lib/usage";
 import { logger }              from "../lib/logger";
+import { readBuildErrors }     from "../lib/build-resilience";
 
 const router = Router();
 
@@ -55,7 +62,6 @@ const ANDROID_503 = { error: "Android SDK / Gradle is not configured on this ser
  * Peek inside a ZIP (without extracting) to determine whether it is a
  * Flutter project (contains pubspec.yaml) or an Android project (contains
  * root-level build.gradle / build.gradle.kts).
- * Returns "flutter" | "android" | "unknown".
  */
 async function detectZipProjectType(zipPath: string): Promise<"flutter" | "android" | "unknown"> {
   return new Promise((resolve) => {
@@ -67,7 +73,6 @@ async function detectZipProjectType(zipPath: string): Promise<"flutter" | "andro
         entry.autodrain();
       })
       .on("close", () => {
-        // Strip a single top-level directory prefix (nested ZIPs)
         const norm = entries.map((e) => {
           const parts = e.replace(/\\/g, "/").split("/");
           return parts.length > 2 ? parts.slice(1).join("/") : e;
@@ -84,16 +89,32 @@ async function countActiveBuildsForUser(userId: string): Promise<number> {
   const rows = await db.select({ c: count() })
     .from(buildsTable)
     .where(and(
-      eq(buildsTable.userId, userId as unknown as string),
-      inArray(buildsTable.status, ["queued", "building"]),
+      eq(buildsTable.userId, userId),
+      or(inArray(buildsTable.status, ["queued", "building", "failed-will-retry"])),
     ));
   return Number(rows[0]?.c ?? 0);
+}
+
+// ─── Admin auth check ──────────────────────────────────────────────────────────
+
+function isAdminAuthorized(authHeader: string): boolean {
+  const secret = process.env["ADMIN_TOKEN"] ?? process.env["SESSION_SECRET"] ?? "";
+  if (!secret) return false;
+
+  if (authHeader.startsWith("Bearer ")) {
+    return authHeader.slice(7).trim() === secret;
+  }
+  if (authHeader.startsWith("Basic ")) {
+    const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf8");
+    const password = decoded.includes(":") ? decoded.split(":").slice(1).join(":") : decoded;
+    return password === secret;
+  }
+  return false;
 }
 
 // ─── POST /api/build — multipart ZIP upload ───────────────────────────────────
 
 router.post("/build", optionalAuth, buildLimiter, (req, res, next) => {
-  // Guard: at least one build type must be available
   if (!isFlutterAvailable() && !isAndroidAvailable()) {
     res.status(503).json({
       error: "No build backends configured on this server (Flutter SDK and Android SDK are both missing).",
@@ -136,8 +157,6 @@ router.post("/build", optionalAuth, buildLimiter, (req, res, next) => {
     try {
       const buildId = randomUUID();
       const zipPath = req.file.path;
-
-      // Peek inside the ZIP to route to the right build backend
       const projectType = await detectZipProjectType(zipPath);
 
       if (projectType === "android") {
@@ -149,13 +168,13 @@ router.post("/build", optionalAuth, buildLimiter, (req, res, next) => {
         });
         const queue = getBuildQueue();
         const waiting = await queue.getWaitingCount();
-        await queue.add("android-build", { buildId, zipPath, language: "android" });
+        await queue.add("android-build", { buildId, zipPath, language: "android", userId: req.user?.userId });
         logger.info({ buildId, zipPath, projectType }, "android build queued (upload)");
         res.json({ jobId: buildId, status: "queued", queuePosition: waiting, language: "android" });
         return;
       }
 
-      // Default: Flutter (also for "unknown" — let Flutter validator catch bad ZIPs)
+      // Default: Flutter (also for "unknown" — Flutter validator will catch bad ZIPs)
       if (!isFlutterAvailable()) { res.status(503).json(FLUTTER_503); return; }
 
       await db.insert(buildsTable).values({
@@ -164,7 +183,7 @@ router.post("/build", optionalAuth, buildLimiter, (req, res, next) => {
       });
       const queue = getBuildQueue();
       const waiting = await queue.getWaitingCount();
-      await queue.add("flutter-build", { buildId, zipPath, language: "flutter" });
+      await queue.add("flutter-build", { buildId, zipPath, language: "flutter", userId: req.user?.userId });
       logger.info({ buildId, zipPath, projectType }, "flutter build queued (upload)");
       res.json({ jobId: buildId, status: "queued", queuePosition: waiting, language: "flutter" });
     } catch (e) {
@@ -176,10 +195,7 @@ router.post("/build", optionalAuth, buildLimiter, (req, res, next) => {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function isValidBuildId(id: string): boolean {
-  return UUID_RE.test(id);
-}
+function isValidBuildId(id: string): boolean { return UUID_RE.test(id); }
 
 // ─── GET /api/status/:jobId ───────────────────────────────────────────────────
 
@@ -192,14 +208,17 @@ router.get("/status/:jobId", async (req, res) => {
 
   const rows = await db.select().from(buildsTable).where(eq(buildsTable.id, jobId)).limit(1);
   const build = rows[0];
-
   if (!build) {
     res.status(404).json({ error: `Job ${jobId} not found` });
     return;
   }
 
-  // Map "complete" → "success" for backward compat with existing frontend
-  const statusOut = build.status === "complete" ? "success" : build.status;
+  // Friendly status mapping
+  let statusOut: string = build.status;
+  if (build.status === "complete") statusOut = "success";
+
+  // Determine if the build will be retried
+  const willRetry = build.status === "failed-will-retry";
 
   res.json({
     jobId:        build.id,
@@ -207,11 +226,16 @@ router.get("/status/:jobId", async (req, res) => {
     stage:        build.stage ?? null,
     logs:         build.logText || null,
     queuePosition: build.queuePosition,
-    startedAt:    null,
     completedAt:  build.completedAt?.toISOString() ?? null,
     download:     build.status === "complete" && build.apkPath ? `/api/download/${jobId}` : null,
     apkSize:      build.apkSize ?? null,
+    // Phase 5 resilience fields
     errorMessage: build.errorMessage ?? null,
+    errorType:    build.errorType ?? null,
+    retryCount:   build.retryCount ?? 0,
+    willRetry,
+    lastErrorAt:  build.lastErrorAt?.toISOString() ?? null,
+    // Snack extras
     previewUrl:   build.previewUrl ?? null,
     embedUrl:     build.embedUrl   ?? null,
     qrUrl:        build.qrUrl      ?? null,
@@ -229,21 +253,16 @@ router.get("/download/:jobId", async (req, res) => {
 
   const rows = await db.select().from(buildsTable).where(eq(buildsTable.id, jobId)).limit(1);
   const build = rows[0];
-
-  if (!build) {
-    res.status(404).json({ error: `Job ${jobId} not found` });
-    return;
-  }
+  if (!build) { res.status(404).json({ error: `Job ${jobId} not found` }); return; }
   if (build.status !== "complete" || !build.apkPath) {
-    res.status(404).json({ error: `Build not complete or APK not available. Status: ${build.status}` });
-    return;
+    res.status(404).json({ error: `Build not complete or APK not available. Status: ${build.status}` }); return;
   }
   if (!apkExists(build.apkPath)) {
-    res.status(404).json({ error: "APK file no longer available on disk" });
-    return;
+    res.status(404).json({ error: "APK file no longer available on disk" }); return;
   }
 
-  res.download(build.apkPath, `flutter-${jobId}.apk`);
+  const filename = `${build.language ?? "flutter"}-${jobId}.apk`;
+  res.download(build.apkPath, filename);
 });
 
 // ─── GET /api/logs/:jobId — SSE real-time log stream ─────────────────────────
@@ -256,12 +275,8 @@ router.get("/logs/:jobId", async (req, res) => {
   }
 
   const rows = await db.select().from(buildsTable).where(eq(buildsTable.id, jobId)).limit(1);
-  if (!rows[0]) {
-    res.status(404).json({ error: `Job ${jobId} not found` });
-    return;
-  }
+  if (!rows[0]) { res.status(404).json({ error: `Job ${jobId} not found` }); return; }
 
-  // If not an SSE request — return JSON snapshot
   const accept = String(req.headers["accept"] ?? "");
   if (!accept.includes("text/event-stream")) {
     const build = rows[0];
@@ -269,7 +284,6 @@ router.get("/logs/:jobId", async (req, res) => {
     return;
   }
 
-  // SSE mode — poll DB every 1 second and emit new log text
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
@@ -282,7 +296,6 @@ router.get("/logs/:jobId", async (req, res) => {
 
   const poll = async () => {
     if (aborted) return;
-
     try {
       const fresh = await db.select().from(buildsTable).where(eq(buildsTable.id, jobId)).limit(1);
       const build = fresh[0];
@@ -297,8 +310,11 @@ router.get("/logs/:jobId", async (req, res) => {
 
       const terminal = build.status === "complete" || build.status === "failed";
       if (terminal) {
-        const doneEvent = { type: "done", status: build.status, stage: build.stage,
-          apkSize: build.apkSize, errorMessage: build.errorMessage };
+        const doneEvent = {
+          type: "done", status: build.status, stage: build.stage,
+          apkSize: build.apkSize, errorMessage: build.errorMessage,
+          errorType: build.errorType, retryCount: build.retryCount,
+        };
         res.write(`data: ${JSON.stringify(doneEvent)}\n\n`);
         res.end();
         return;
@@ -306,7 +322,6 @@ router.get("/logs/:jobId", async (req, res) => {
     } catch (err) {
       logger.warn({ err, jobId }, "log SSE poll error");
     }
-
     if (!aborted) setTimeout(poll, 1_000);
   };
 
@@ -330,7 +345,11 @@ router.get("/projects/:projectId/builds", optionalAuth, async (req, res) => {
     createdAt:    buildsTable.createdAt,
     completedAt:  buildsTable.completedAt,
     apkSize:      buildsTable.apkSize,
+    // Phase 5 fields
     errorMessage: buildsTable.errorMessage,
+    errorType:    buildsTable.errorType,
+    retryCount:   buildsTable.retryCount,
+    lastErrorAt:  buildsTable.lastErrorAt,
   })
     .from(buildsTable)
     .where(eq(buildsTable.projectId, projectId))
@@ -341,6 +360,25 @@ router.get("/projects/:projectId/builds", optionalAuth, async (req, res) => {
     ...b,
     status: b.status === "complete" ? "success" : b.status,
   })));
+});
+
+// ─── GET /api/admin/build-errors ──────────────────────────────────────────────
+
+router.get("/admin/build-errors", async (req, res) => {
+  const authHeader = String(req.headers["authorization"] ?? "");
+  if (!isAdminAuthorized(authHeader)) {
+    res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');
+    res.status(401).json({ error: "Unauthorized — provide ADMIN_TOKEN as Bearer or Basic Auth password" });
+    return;
+  }
+
+  try {
+    const errors = await readBuildErrors(200);
+    res.json({ count: errors.length, errors });
+  } catch (err) {
+    logger.error({ err }, "admin/build-errors: read failed");
+    res.status(500).json({ error: "Failed to read build errors" });
+  }
 });
 
 export default router;

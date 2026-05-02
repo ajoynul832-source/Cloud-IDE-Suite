@@ -2,10 +2,10 @@
  * /api/run        — JSON response (backward-compatible, buffered)
  * /api/run/stream — SSE response (real-time, polled from Redis chunk list)
  *
- * Jobs are queued in BullMQ ("codeRuns" queue, max 8 concurrent).
- * The worker (workers/runJob.ts) pushes ExecEvent objects to a Redis list
- * keyed by runId.  The SSE endpoint polls that list at 50 ms intervals and
- * forwards events to the client with zero format changes.
+ * Phase 6 — Security:
+ *   - Filename traversal check via checkFilename()
+ *   - Dangerous module/API linting via checkForDangerousCode()
+ *     Blocks: require('http/https/fs/child_process'), fetch, process.env, etc.
  */
 import { Router } from "express";
 import { randomBytes } from "crypto";
@@ -13,7 +13,7 @@ import { logger } from "../lib/logger";
 import { runLimiter } from "../middlewares/rate-limit";
 import { checkAndIncrementRuns, resolveUsageKey } from "../lib/usage";
 import { optionalAuth } from "../middlewares/require-auth";
-import { resolveHandler, withTempDir, type ExecEvent } from "../lib/execution";
+import { resolveHandler, withTempDir, checkForDangerousCode, checkFilename, type ExecEvent } from "../lib/execution";
 import { getQueue, getQueueEvents } from "../lib/queue";
 import { getSharedRedis } from "../lib/redis";
 import { chunksKey } from "../workers/runJob";
@@ -21,28 +21,49 @@ import { chunksKey } from "../workers/runJob";
 const router = Router();
 
 const SSE_POLL_INTERVAL_MS = 50;
-const SSE_MAX_WAIT_MS      = 60_000; // 60 s total max
+const SSE_MAX_WAIT_MS      = 60_000;
+
+// ─── Shared input validation ──────────────────────────────────────────────────
+
+function validateRunInput(
+  language: string | undefined,
+  code: string | undefined,
+  filename: string | undefined,
+): { error: string; status: number } | null {
+  if (!language || !code) {
+    return { error: '"language" and "code" are required', status: 400 };
+  }
+  if (code.length > 500_000) {
+    return { error: "Code too large (max 500 KB)", status: 413 };
+  }
+  const filenameErr = checkFilename(filename);
+  if (filenameErr) {
+    return { error: filenameErr, status: 400 };
+  }
+  if (!resolveHandler(language, filename)) {
+    return {
+      error: `Language "${language}" is not supported. Supported: JavaScript, TypeScript, Python, HTML`,
+      status: 400,
+    };
+  }
+  // Phase 6: dangerous code lint (JS/TS only)
+  const dangerErr = checkForDangerousCode(code, language);
+  if (dangerErr) {
+    return { error: dangerErr, status: 403 };
+  }
+  return null;
+}
 
 // ─── SSE streaming endpoint ───────────────────────────────────────────────────
-// POST /api/run/stream
-// BullMQ queues the job; this handler polls run:chunks:{runId} until "done".
+
 router.post("/run/stream", optionalAuth, runLimiter, async (req, res) => {
   const { language, code, filename } = req.body as {
     language?: string; code?: string; filename?: string;
   };
 
-  if (!language || !code) {
-    res.status(400).json({ error: '"language" and "code" are required' });
-    return;
-  }
-  if (code.length > 500_000) {
-    res.status(400).json({ error: "Code too large (max 500 KB)" });
-    return;
-  }
-  if (!resolveHandler(language, filename)) {
-    res.status(400).json({
-      error: `Language "${language}" is not supported. Supported: JavaScript, TypeScript, Python, HTML`,
-    });
+  const validationErr = validateRunInput(language, code, filename);
+  if (validationErr) {
+    res.status(validationErr.status).json({ error: validationErr.error });
     return;
   }
 
@@ -57,25 +78,21 @@ router.post("/run/stream", optionalAuth, runLimiter, async (req, res) => {
   }
 
   const runId = randomBytes(8).toString("hex");
-
-  // Enqueue the job
   const queue = getQueue();
   const job   = await queue.add("run", {
     runId,
     userId:   req.user?.userId ?? usageKey,
-    language, code, filename,
+    language: language!, code: code!, filename,
   });
 
   logger.info({ jobId: job.id, runId, language }, "stream: job queued");
 
-  // SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
-  // Poll Redis chunk list until "done" or client disconnects
   const redis    = getSharedRedis();
   const key      = chunksKey(runId);
   let offset     = 0;
@@ -116,14 +133,12 @@ router.post("/run/stream", optionalAuth, runLimiter, async (req, res) => {
     }
 
     offset += newChunks.length;
-
     if (!done && !aborted) {
       await new Promise((r) => setTimeout(r, SSE_POLL_INTERVAL_MS));
     }
   }
 
   if (!done && !aborted) {
-    // Timeout — let the client know
     sendEvent({ type: "error", error: "timeout", chunk: "\n[Stream timeout — no response from worker]\n" });
     sendEvent({ type: "done", exitCode: -1, duration: SSE_MAX_WAIT_MS });
   }
@@ -131,25 +146,16 @@ router.post("/run/stream", optionalAuth, runLimiter, async (req, res) => {
   res.end();
 });
 
-// ─── Buffered JSON endpoint (backward-compat) ─────────────────────────────────
-// POST /api/run — same format as before; waits for job completion
+// ─── Buffered JSON endpoint ───────────────────────────────────────────────────
+
 router.post("/run", optionalAuth, runLimiter, async (req, res) => {
   const { language, code, filename } = req.body as {
     language?: string; code?: string; filename?: string;
   };
 
-  if (!language || !code) {
-    res.status(400).json({ error: '"language" and "code" are required' });
-    return;
-  }
-  if (code.length > 500_000) {
-    res.status(400).json({ error: "Code too large (max 500 KB)" });
-    return;
-  }
-  if (!resolveHandler(language, filename)) {
-    res.status(400).json({
-      error: `Language "${language}" is not supported. Supported: JavaScript, TypeScript, Python, HTML`,
-    });
+  const validationErr = validateRunInput(language, code, filename);
+  if (validationErr) {
+    res.status(validationErr.status).json({ error: validationErr.error });
     return;
   }
 
@@ -168,7 +174,7 @@ router.post("/run", optionalAuth, runLimiter, async (req, res) => {
   const job    = await queue.add("run", {
     runId,
     userId:   req.user?.userId ?? usageKey,
-    language, code, filename,
+    language: language!, code: code!, filename,
   });
 
   logger.info({ jobId: job.id, runId, language }, "buffered: job queued");
@@ -176,8 +182,6 @@ router.post("/run", optionalAuth, runLimiter, async (req, res) => {
   try {
     const queueEvents = getQueueEvents();
     const result      = await job.waitUntilFinished(queueEvents, 30_000);
-
-    // Return identical shape to the old synchronous endpoint
     res.json({
       stdout:    result.stdout,
       stderr:    result.stderr,
@@ -193,7 +197,5 @@ router.post("/run", optionalAuth, runLimiter, async (req, res) => {
   }
 });
 
-// Re-export withTempDir for backward-compat with any existing callers
 export { withTempDir };
-
 export default router;
