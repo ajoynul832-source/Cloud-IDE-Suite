@@ -1,0 +1,224 @@
+Build a COMPLETE mobile-first cloud IDE (not just an APK builder). The system must feel like a simplified Replit/VS Code running in the browser and be usable on mobile.
+
+---
+
+PRODUCT GOAL
+
+Users can:
+
+- Create projects
+- Edit code (multiple files)
+- Preview web apps instantly
+- Build Flutter APK via cloud
+
+All inside ONE interface.
+
+---
+
+STACK
+
+Frontend:
+
+- React (or Next.js)
+- CodeMirror 6 (mobile-friendly editor)
+
+Backend:
+
+- Node.js (Express)
+- Multer (file upload)
+- Child process (for build execution)
+
+---
+
+FRONTEND REQUIREMENTS (CRITICAL)
+
+Layout (IDE style)
+
+- Top bar:
+  
+  - Project name
+  - Buttons: Run | Build APK | Save
+
+- Left panel:
+  
+  - File explorer (tree view)
+  - Create / rename / delete files
+
+- Center:
+  
+  - Code editor (tabs supported)
+
+- Bottom panel:
+  
+  - Console / logs output
+
+- Responsive for mobile
+
+---
+
+CODE EDITOR
+
+Use CodeMirror 6.
+
+Features:
+
+- Syntax highlighting:
+  - Dart
+  - JavaScript
+  - HTML/CSS
+- Tabs for multiple files
+- Auto-save to local storage
+- Basic autocomplete (optional)
+
+---
+
+PROJECT SYSTEM
+
+- Create new project
+- Default templates:
+
+Web template:
+
+index.html
+style.css
+script.js
+
+Flutter template:
+
+lib/main.dart
+pubspec.yaml
+
+- Store files in browser memory (localStorage or IndexedDB)
+
+---
+
+RUN FEATURE
+
+Web projects:
+
+- Render HTML in iframe
+- Inject CSS + JS
+- Auto refresh on run
+
+Flutter projects:
+
+- Show message:
+  "Preview not supported. Use Build APK."
+
+---
+
+BUILD APK FEATURE
+
+Button: “Build APK”
+
+Flow:
+
+1. Collect project files
+
+2. Zip project in browser (use JS zip library)
+
+3. Send ZIP to backend:
+   POST /build
+
+4. Receive jobId
+
+5. Poll:
+   GET /status/:jobId
+
+6. Show:
+   
+   - queued
+   - building
+   - success
+   - failed
+
+7. If success:
+   show download button
+
+---
+
+BACKEND REQUIREMENTS
+
+POST /build
+
+- Accept ZIP file
+
+- Save to /tmp
+
+- Extract
+
+- Validate Flutter project:
+  
+  - pubspec.yaml exists
+  - lib/main.dart exists
+
+- Run:
+  flutter pub get
+  flutter build apk --debug
+
+- Store:
+  APK path
+  logs
+
+---
+
+GET /status/:jobId
+
+Return:
+{
+status: "queued | building | success | failed",
+logs: "..."
+}
+
+---
+
+GET /download/:jobId
+
+- Return APK file
+
+---
+
+QUEUE SYSTEM
+
+- Only 1 build at a time
+- Queue jobs
+- Process sequentially
+
+---
+
+CONSOLE PANEL
+
+- Show real-time logs:
+  - flutter pub get
+  - build output
+  - errors
+
+---
+
+UI STYLE
+
+- Dark theme
+- Neon green accent (terminal style)
+- Clean spacing
+- Developer-focused
+
+---
+
+IMPORTANT
+
+- DO NOT build just a form
+- MUST include full editor + file system
+- MUST feel like mini IDE
+
+---
+
+FINAL RESULT
+
+User can:
+
+- Create project
+- Write code
+- Run web preview instantly
+- Build real APK (via backend)
+
+All inside one mobile-friendly app.
