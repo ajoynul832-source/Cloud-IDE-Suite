@@ -420,6 +420,54 @@ Always run `pnpm run typecheck:libs` after schema changes to regenerate Drizzle 
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 
+## Phase 9 — Final Integration & Polish (Complete)
+
+### DB Performance Indexes (lib/db/src/schema/)
+9 new indexes pushed to Postgres (previously only PKs existed):
+| Index | Table | Columns |
+|-------|-------|---------|
+| `builds_user_id_idx` | builds | user_id |
+| `builds_status_idx` | builds | status |
+| `builds_created_at_idx` | builds | created_at |
+| `builds_project_id_idx` | builds | project_id |
+| `projects_user_id_idx` | projects | user_id |
+| `projects_updated_at_idx` | projects | updated_at |
+| `versions_project_id_idx` | versions | project_id |
+| `versions_created_at_idx` | versions | created_at |
+| `shares_project_id_idx` | shares | project_id |
+
+### API Response Compression (`artifacts/api-server/src/app.ts`)
+- `compression` middleware added (after CORS, before rate limiting)
+- SSE streams (`text/event-stream`) explicitly excluded — they must not be buffered
+- `Vary: Accept-Encoding` header now present on all JSON responses
+
+### ShareModal Credential Fix (`artifacts/cloud-ide/src/components/ShareModal.tsx`)
+- **Bug**: `POST /api/projects/:id/share` was missing `credentials: "include"` → 401 for all authenticated users trying to share
+- **Fix**: Added `credentials: "include"`, removed stale `X-User-Key` header
+
+### Logout Response Consistency (`artifacts/api-server/src/routes/auth.ts`)
+- Changed `{ ok: true }` → `{ success: true }` for consistency with the OpenAPI spec
+
+### Session Expiry Handling (`artifacts/cloud-ide/src/contexts/AuthContext.tsx`)
+- Added `sessionExpired` state + `dismissSessionExpiry()` to `AuthContextValue`
+- `AuthProvider` listens for custom DOM event `cloud-ide:session-expired`
+- When a previously-valid session returns 401, shows a sticky bottom banner:
+  *"Session expired — sign in again to save your work."*
+- Banner disappears on dismiss or successful re-login
+
+### Session Expiry Dispatch (`artifacts/cloud-ide/src/hooks/useProjects.ts`)
+- `authFetch()` now dispatches `cloud-ide:session-expired` event on any 401 response
+- AuthContext catches it and surfaces the banner without page reload
+
+### Vite Code Splitting (`artifacts/cloud-ide/vite.config.ts`)
+- `rollupOptions.output.manualChunks` splits Monaco editor, react-dom, and tanstack into separate chunks for faster initial page load
+
+### Load Test Results
+10 concurrent JS executions via `/api/run`: **10/10 succeeded, 0 failures** in 197ms total wall time
+
+### Smoke Test
+39/39 tests pass after all Phase 9 changes.
+
 ## Phase 7 — Monitoring & Observability (Complete)
 
 ### Structured Logging (`lib/logger.ts`)

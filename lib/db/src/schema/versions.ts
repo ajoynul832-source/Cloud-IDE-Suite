@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { projectsTable } from "./projects";
 
 /**
@@ -11,7 +11,10 @@ export const versionsTable = pgTable("versions", {
   files:     jsonb("files").notNull().$type<Record<string, string>>(),
   label:     text("label").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  index("versions_project_id_idx").on(t.projectId),
+  index("versions_created_at_idx").on(t.createdAt),
+]);
 
 export const MAX_VERSIONS_PER_PROJECT = 10;
 

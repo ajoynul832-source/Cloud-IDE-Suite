@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Copy, Check, ExternalLink, Loader2, Share2, Eye } from "lucide-react";
 import { Button } from "./ui/button";
-import { getUserKey } from "@/lib/user-key";
 
 interface ShareStats {
   totalViews:  number;
@@ -52,11 +51,9 @@ export function ShareModal({ projectId, projectName, onClose }: ShareModalProps)
     setError(null);
     try {
       const res  = await fetch(`/api/projects/${projectId}/share`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Key": getUserKey(),
-        },
+        method:      "POST",
+        credentials: "include",
+        headers:     { "Content-Type": "application/json" },
       });
       const data = await res.json() as {
         shareUrl?: string;

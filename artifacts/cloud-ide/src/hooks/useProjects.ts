@@ -1,10 +1,16 @@
 import { useState, useCallback } from "react";
+import { SESSION_EXPIRED_EVENT } from "@/contexts/AuthContext";
 
 const BASE = "/api";
 
+/** Dispatch the session-expired event so AuthContext can show the re-auth banner */
+function notifySessionExpired() {
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+}
+
 /** All project API calls send the session cookie and no user-key header */
-function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(url, {
+async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(url, {
     ...init,
     credentials: "include",
     headers: {
@@ -12,6 +18,8 @@ function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
       ...(init.headers as Record<string, string> | undefined),
     },
   });
+  if (res.status === 401) notifySessionExpired();
+  return res;
 }
 
 export interface ProjectSummary {

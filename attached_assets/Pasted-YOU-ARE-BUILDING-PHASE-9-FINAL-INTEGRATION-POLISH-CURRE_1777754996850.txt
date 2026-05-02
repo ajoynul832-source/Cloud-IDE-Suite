@@ -1,0 +1,121 @@
+YOU ARE BUILDING PHASE 9: FINAL INTEGRATION & POLISH
+
+CURRENT STATE:
+- All features implemented
+- Untested edge cases may exist
+- Performance not optimized
+- Minor bugs need squashing
+
+WHAT YOU MUST BUILD:
+
+1. END-TO-END TEST FLOW (Critical Path)
+   Run this flow 5 times without errors:
+   
+   a) Register new user (email/password)
+   b) Create "Hello World" JavaScript project
+   c) Add file: main.py with print("Hello")
+   d) Run JavaScript (expect "Hello World")
+   e) Run Python (expect "Hello")
+   f) Save project
+   g) Share project
+   h) Copy share link
+   i) Open incognito browser, paste link
+   j) Verify read-only + run works
+   k) Fork project (creates copy in your account)
+   l) Return to main IDE
+   m) Create Flutter project from template
+   n) Submit APK build
+   o) Wait for completion
+   p) Download APK
+   q) Check project history (versions + builds)
+   r) Restore old version
+   s) Explore feed, find shared project
+   t) Fork again
+   u) Check user project list (should be 3+ projects)
+   v) Check usage: /api/usage (runs + builds remaining)
+   w) Hit run limit (submit 50+ runs), verify 429 error
+   x) Reset limit (wait for midnight or test with test data)
+
+2. EDGE CASES & ERROR HANDLING
+   Test and fix:
+   
+   CASE | EXPECTED BEHAVIOR
+   Empty code file | "No output" message
+   Code with syntax error | Error printed to console
+   Network timeout | Retry or 504 error
+   Database disconnects mid-request | 500 error, logged
+   User deletes project while viewing | 404 page
+   Shared link deleted by owner | 404 page
+   Try to edit shared project | Read-only error
+   Submit 2 builds simultaneously | Queue both, run sequentially
+   Build while already building | Queue new build
+   Interrupt build (refresh page) | Job continues, can check status
+   Browser offline during autosave | Queue autosave, retry when online
+   Session expires mid-edit | Show "Re-authenticate" modal, keep work
+   Try to run disabled language | "Not supported" message
+   Code uses require('fs') | "Access denied" error
+
+3. PERFORMANCE OPTIMIZATION
+   Measure and fix (use browser DevTools + server logs):
+   
+   METRIC | TARGET | ACTION
+   Page load (IDE) | < 2s | Lazy-load editor, split chunks
+   Run response | < 1s (cached) | Cache simple runs
+   Build APK | < 5min | Parallel builds if possible
+   Database query | < 100ms | Index on user_id, created_at
+   API response | < 500ms | Reduce payload, compress
+   Memory (Node) | < 512MB | Limit history, cap queue size
+   Memory (worker) | < 256MB per execution | Already limited
+
+4. BUG SWEEP
+   Test every button/link:
+   - Projects modal (load/save/rename/delete/duplicate)
+   - Share modal (generate link, copy, stats)
+   - Explore page (infinite scroll, fork, open)
+   - Shared project (read-only, run, fork)
+   - Build log (stream updates, completion, error)
+   - Versions (create snapshot, restore, list)
+   - Console (clear, expand, collapse)
+   - File tree (create, rename, delete, switch tabs)
+   - Autosave indicator (shows/hides correctly)
+   - Run counter badge (accurate remaining)
+   
+   Fix any broken links, missing error messages, or UI glitches.
+
+5. BROWSER COMPATIBILITY
+   Test on:
+   - Chrome 120+ (latest)
+   - Firefox 121+ (latest)
+   - Safari 17+ (if on Mac)
+   - Mobile Chrome (Android)
+   
+   Ensure:
+   - Editor scrolls smoothly
+   - Console readable
+   - Share link copyable
+   - Build logs stream properly
+
+6. LOAD TEST (FINAL)
+   Simulate:
+   - 10 concurrent users running code
+   - 2 concurrent builds
+   - 1 user exploring + forking
+   
+   Expected:
+   - No crashes
+   - Queue depth < 50
+   - Response time < 1s
+   - Database healthy
+
+TEST CHECKLIST:
+✅ E2E flow passes 5 times (no errors)
+✅ All edge cases handled gracefully
+✅ Page load < 2s
+✅ Run response < 1s
+✅ No 500 errors
+✅ No console errors
+✅ All links work
+✅ Mobile responsive
+✅ Load test stable
+
+STOP HERE. SYSTEM READY FOR PRODUCTION.

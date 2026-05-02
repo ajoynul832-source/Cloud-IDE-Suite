@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, timestamp, index } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 import { projectsTable } from "./projects";
 
@@ -39,7 +39,12 @@ export const buildsTable = pgTable("builds", {
 
   createdAt:     timestamp("created_at",   { withTimezone: true }).notNull().defaultNow(),
   completedAt:   timestamp("completed_at", { withTimezone: true }),
-});
+}, (t) => [
+  index("builds_user_id_idx").on(t.userId),
+  index("builds_status_idx").on(t.status),
+  index("builds_created_at_idx").on(t.createdAt),
+  index("builds_project_id_idx").on(t.projectId),
+]);
 
 export type Build          = typeof buildsTable.$inferSelect;
 export type BuildStatus    = "queued" | "building" | "failed-will-retry" | "complete" | "failed";

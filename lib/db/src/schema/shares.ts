@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, integer, primaryKey, index } from "drizzle-orm/pg-core";
 import { projectsTable } from "./projects";
 
 export const sharesTable = pgTable("shares", {
@@ -9,7 +9,9 @@ export const sharesTable = pgTable("shares", {
   uniqueViews: integer("unique_views").notNull().default(0),
   forksCount: integer("forks_count").notNull().default(0),
   runsCount:  integer("runs_count").notNull().default(0),
-});
+}, (t) => [
+  index("shares_project_id_idx").on(t.projectId),
+]);
 
 /**
  * Tracks which viewer keys have seen a share (for unique-view deduplication).

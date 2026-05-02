@@ -1,5 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
@@ -53,6 +54,15 @@ app.use(
     credentials: true,
   }),
 );
+
+// ─── Response compression ─────────────────────────────────────────────────────
+// Skip SSE streams (text/event-stream) — they must not be buffered/compressed.
+app.use(compression({
+  filter: (req, res) => {
+    if (res.getHeader("Content-Type") === "text/event-stream") return false;
+    return compression.filter(req, res);
+  },
+}));
 
 // ─── Global per-IP rate limit ──────────────────────────────────────────────────
 app.use(globalLimiter);

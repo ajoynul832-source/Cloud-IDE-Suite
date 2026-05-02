@@ -57,6 +57,19 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/monaco-editor")) return "monaco-editor";
+          if (id.includes("node_modules/@monaco-editor")) return "monaco-editor";
+          if (id.includes("node_modules/react-dom")) return "react-dom";
+          if (
+            id.includes("node_modules/react-query") ||
+            id.includes("node_modules/@tanstack")
+          ) return "tanstack";
+        },
+      },
+    },
   },
   server: {
     port,

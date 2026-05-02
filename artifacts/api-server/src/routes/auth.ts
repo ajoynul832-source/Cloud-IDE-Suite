@@ -186,7 +186,7 @@ router.post("/auth/google", async (req, res) => {
 
 router.post("/auth/logout", (req, res) => {
   clearAuthCookie(res);
-  res.json({ ok: true });
+  res.json({ success: true });
 });
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────
