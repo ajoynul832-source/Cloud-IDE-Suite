@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import IDE from "@/pages/IDE";
 import SharedProject from "@/pages/SharedProject";
+import Explore from "@/pages/Explore";
 
 const queryClient = new QueryClient();
 
@@ -12,6 +13,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={IDE} />
+      <Route path="/explore" component={Explore} />
       <Route path="/p/:shareId" component={SharedProject} />
       <Route component={NotFound} />
     </Switch>

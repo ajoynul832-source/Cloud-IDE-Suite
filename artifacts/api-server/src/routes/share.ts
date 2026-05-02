@@ -2,12 +2,13 @@
  * Project sharing API
  *
  * POST /api/projects/:id/share          — generate/reuse a share link (idempotent)
+ * GET  /api/explore                     — public ranked list of shared projects
  * GET  /api/share/:shareId              — public: load project + increment view counters
  * GET  /api/share/:shareId/stats        — public: read view counts without incrementing
  * POST /api/share/:shareId/event        — record a fork or run event
  */
 import { Router, type Request, type Response } from "express";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import crypto from "crypto";
 import { db, projectsTable, sharesTable, shareViewersTable } from "@workspace/db";
 import { logger } from "../lib/logger";
@@ -88,6 +89,43 @@ async function countView(shareId: string, key: string): Promise<void> {
       .where(eq(sharesTable.shareId, shareId));
   }
 }
+
+// ─── GET /api/explore ─────────────────────────────────────────────────────────
+
+router.get("/explore", shareLimiter, async (req, res) => {
+  const MAX_LIMIT = 20;
+  const rawLimit  = parseInt(String(req.query["limit"] ?? "20"), 10);
+  const rawOffset = parseInt(String(req.query["offset"] ?? "0"), 10);
+  const limit     = Math.min(isNaN(rawLimit)  ? MAX_LIMIT : Math.max(1, rawLimit),  MAX_LIMIT);
+  const offset    = isNaN(rawOffset) ? 0 : Math.max(0, rawOffset);
+
+  try {
+    const scoreExpr = sql<number>`(${sharesTable.forksCount} * 5) + (${sharesTable.runsCount} * 2) + ${sharesTable.uniqueViews}`;
+
+    const rows = await db
+      .select({
+        shareId:     sharesTable.shareId,
+        title:       projectsTable.name,
+        projectType: projectsTable.projectType,
+        totalViews:  sharesTable.totalViews,
+        uniqueViews: sharesTable.uniqueViews,
+        forksCount:  sharesTable.forksCount,
+        runsCount:   sharesTable.runsCount,
+        score:       scoreExpr,
+        createdAt:   sharesTable.createdAt,
+      })
+      .from(sharesTable)
+      .innerJoin(projectsTable, eq(sharesTable.projectId, projectsTable.id))
+      .orderBy(desc(scoreExpr), desc(sharesTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    res.json({ projects: rows, hasMore: rows.length === limit });
+  } catch (err) {
+    logger.error({ err }, "explore fetch failed");
+    res.status(500).json({ error: "Failed to load explore feed" });
+  }
+});
 
 // ─── POST /api/projects/:id/share ─────────────────────────────────────────────
 

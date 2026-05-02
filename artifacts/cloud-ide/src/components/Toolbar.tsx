@@ -1,4 +1,5 @@
-import { Play, Box, Download, Loader2, FolderOpen, ChevronDown, Database, Share2 } from "lucide-react";
+import { Play, Box, Download, Loader2, FolderOpen, ChevronDown, Database, Share2, Compass } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "./ui/button";
 
 interface ToolbarProps {
@@ -66,6 +67,15 @@ export function Toolbar({
           <Database size={13} />
           <span className="hidden md:block">Projects</span>
         </button>
+
+        {/* Explore */}
+        <Link
+          href="/explore"
+          className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded hover:bg-primary/10 shrink-0"
+        >
+          <Compass size={13} />
+          <span className="hidden md:block">Explore</span>
+        </Link>
 
         {/* Share — only shown when a project is saved */}
         {canShare && onShare && (
