@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: builds
     description: Flutter APK build operations
+  - name: execution
+    description: Code execution engine
 paths:
   /healthz:
     get:
@@ -27,11 +29,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
+  /run:
+    post:
+      operationId: runCode
+      tags: [execution]
+      summary: Execute code
+      description: Run JavaScript or Python code and return output
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunRequest"
+      responses:
+        "200":
+          description: Execution result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResult"
+        "400":
+          description: Missing or invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /build:
     post:
       operationId: startBuild
       tags: [builds]
-      summary: Start a Flutter APK build
+      summary: Start a Flutter APK build (ZIP upload)
       description: Accept a ZIP file of a Flutter project and queue it for APK compilation
       requestBody:
         required: true
@@ -55,6 +83,36 @@ paths:
                 $ref: "#/components/schemas/BuildResponse"
         "400":
           description: Invalid request (not a zip, too large, missing fields)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /build/project:
+    post:
+      operationId: buildProject
+      tags: [builds]
+      summary: Build or preview a project from file map
+      description: |
+        Build or preview a project given a file map and a build type.
+        - react-native → creates an Expo Snack and returns a live preview URL + QR
+        - flutter → packages files as ZIP and builds APK
+        - android → triggers Android Gradle build
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectBuildRequest"
+      responses:
+        "200":
+          description: Build started or preview ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectBuildResponse"
+        "400":
+          description: Invalid request
           content:
             application/json:
               schema:
@@ -147,6 +205,90 @@ components:
         status:
           type: string
       required:
+        - status
+
+    RunRequest:
+      type: object
+      properties:
+        language:
+          type: string
+          description: "Programming language: javascript, python, typescript, html"
+        code:
+          type: string
+          description: Source code to execute
+        filename:
+          type: string
+          description: Optional filename hint for language detection
+      required:
+        - language
+        - code
+
+    RunResult:
+      type: object
+      properties:
+        stdout:
+          type: string
+        stderr:
+          type: string
+        exitCode:
+          type: integer
+        duration:
+          type: integer
+          description: Execution time in milliseconds
+        error:
+          type: string
+          nullable: true
+      required:
+        - stdout
+        - stderr
+        - exitCode
+        - duration
+
+    ProjectBuildRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [flutter, react-native, android, ios]
+          description: Project/build type
+        files:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map of filename to file content
+        name:
+          type: string
+          description: Project name (used for Snack)
+      required:
+        - type
+        - files
+
+    ProjectBuildResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [queued, building, success, failed, preview_ready]
+        previewUrl:
+          type: string
+          nullable: true
+          description: Live preview URL (for react-native Expo Snack)
+        embedUrl:
+          type: string
+          nullable: true
+          description: Embeddable iframe URL
+        qrUrl:
+          type: string
+          nullable: true
+          description: QR code image URL for opening on device
+        message:
+          type: string
+          nullable: true
+          description: Status or error message
+      required:
+        - jobId
         - status
 
     BuildResponse:

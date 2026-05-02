@@ -3,22 +3,26 @@ import { Button } from "./ui/button";
 
 interface ToolbarProps {
   isBuilding: boolean;
+  isRunning?: boolean;
   onRun: () => void;
   onBuild: () => void;
   onNewProject: () => void;
   buildStatus?: string | null;
   jobId?: string | null;
   currentLanguage?: string;
+  canRun?: boolean;
 }
 
 export function Toolbar({
   isBuilding,
+  isRunning,
   onRun,
   onBuild,
   onNewProject,
   buildStatus,
   jobId,
   currentLanguage,
+  canRun,
 }: ToolbarProps) {
   const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -59,10 +63,26 @@ export function Toolbar({
           variant="outline"
           size="sm"
           onClick={onRun}
-          className="font-mono text-xs h-7 px-3 hover:text-primary hover:border-primary"
+          disabled={isRunning}
+          title={canRun ? "Run current file" : "Open a JS, TS, Python, or HTML file to run"}
+          className={[
+            "font-mono text-xs h-7 px-3",
+            canRun
+              ? "hover:text-primary hover:border-primary"
+              : "opacity-50 cursor-not-allowed",
+          ].join(" ")}
         >
-          <Play size={12} className="mr-1.5" />
-          Run
+          {isRunning ? (
+            <>
+              <Loader2 size={12} className="mr-1.5 animate-spin" />
+              Running...
+            </>
+          ) : (
+            <>
+              <Play size={12} className="mr-1.5" />
+              Run
+            </>
+          )}
         </Button>
 
         <Button

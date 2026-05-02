@@ -9,6 +9,75 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface RunRequest {
+  /** Programming language: javascript, python, typescript, html */
+  language: string;
+  /** Source code to execute */
+  code: string;
+  /** Optional filename hint for language detection */
+  filename?: string;
+}
+
+export interface RunResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  /** Execution time in milliseconds */
+  duration: number;
+  error?: string | null;
+}
+
+/**
+ * Project/build type
+ */
+export type ProjectBuildRequestType =
+  (typeof ProjectBuildRequestType)[keyof typeof ProjectBuildRequestType];
+
+export const ProjectBuildRequestType = {
+  flutter: "flutter",
+  "react-native": "react-native",
+  android: "android",
+  ios: "ios",
+} as const;
+
+/**
+ * Map of filename to file content
+ */
+export type ProjectBuildRequestFiles = { [key: string]: string };
+
+export interface ProjectBuildRequest {
+  /** Project/build type */
+  type: ProjectBuildRequestType;
+  /** Map of filename to file content */
+  files: ProjectBuildRequestFiles;
+  /** Project name (used for Snack) */
+  name?: string;
+}
+
+export type ProjectBuildResponseStatus =
+  (typeof ProjectBuildResponseStatus)[keyof typeof ProjectBuildResponseStatus];
+
+export const ProjectBuildResponseStatus = {
+  queued: "queued",
+  building: "building",
+  success: "success",
+  failed: "failed",
+  preview_ready: "preview_ready",
+} as const;
+
+export interface ProjectBuildResponse {
+  jobId: string;
+  status: ProjectBuildResponseStatus;
+  /** Live preview URL (for react-native Expo Snack) */
+  previewUrl?: string | null;
+  /** Embeddable iframe URL */
+  embedUrl?: string | null;
+  /** QR code image URL for opening on device */
+  qrUrl?: string | null;
+  /** Status or error message */
+  message?: string | null;
+}
+
 export type BuildResponseStatus =
   (typeof BuildResponseStatus)[keyof typeof BuildResponseStatus];
 
@@ -61,5 +130,5 @@ export interface ErrorResponse {
 
 export type StartBuildBody = {
   /** ZIP file of the Flutter project (max 10MB) */
-  project: unknown;
+  project: Blob;
 };

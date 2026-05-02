@@ -16,12 +16,35 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
+ * Run JavaScript or Python code and return output
+ * @summary Execute code
+ */
+export const RunCodeBody = zod.object({
+  language: zod
+    .string()
+    .describe("Programming language: javascript, python, typescript, html"),
+  code: zod.string().describe("Source code to execute"),
+  filename: zod
+    .string()
+    .optional()
+    .describe("Optional filename hint for language detection"),
+});
+
+export const RunCodeResponse = zod.object({
+  stdout: zod.string(),
+  stderr: zod.string(),
+  exitCode: zod.number(),
+  duration: zod.number().describe("Execution time in milliseconds"),
+  error: zod.string().nullish(),
+});
+
+/**
  * Accept a ZIP file of a Flutter project and queue it for APK compilation
- * @summary Start a Flutter APK build
+ * @summary Start a Flutter APK build (ZIP upload)
  */
 export const StartBuildBody = zod.object({
   project: zod
-    .any()
+    .instanceof(File)
     .describe("ZIP file of the Flutter project (max 10MB)"),
 });
 
@@ -32,6 +55,45 @@ export const StartBuildResponse = zod.object({
     .number()
     .optional()
     .describe("Position in queue (0 = currently building)"),
+});
+
+/**
+ * Build or preview a project given a file map and a build type.
+- react-native → creates an Expo Snack and returns a live preview URL + QR
+- flutter → packages files as ZIP and builds APK
+- android → triggers Android Gradle build
+
+ * @summary Build or preview a project from file map
+ */
+export const BuildProjectBody = zod.object({
+  type: zod
+    .enum(["flutter", "react-native", "android", "ios"])
+    .describe("Project\/build type"),
+  files: zod
+    .record(zod.string(), zod.string())
+    .describe("Map of filename to file content"),
+  name: zod.string().optional().describe("Project name (used for Snack)"),
+});
+
+export const BuildProjectResponse = zod.object({
+  jobId: zod.string(),
+  status: zod.enum([
+    "queued",
+    "building",
+    "success",
+    "failed",
+    "preview_ready",
+  ]),
+  previewUrl: zod
+    .string()
+    .nullish()
+    .describe("Live preview URL (for react-native Expo Snack)"),
+  embedUrl: zod.string().nullish().describe("Embeddable iframe URL"),
+  qrUrl: zod
+    .string()
+    .nullish()
+    .describe("QR code image URL for opening on device"),
+  message: zod.string().nullish().describe("Status or error message"),
 });
 
 /**

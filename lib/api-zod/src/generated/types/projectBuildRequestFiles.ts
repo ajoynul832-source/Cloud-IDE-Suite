@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type StartBuildBody = {
-  /** ZIP file of the Flutter project (max 10MB) */
-  project: Blob;
-};
+/**
+ * Map of filename to file content
+ */
+export type ProjectBuildRequestFiles = { [key: string]: string };

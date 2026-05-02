@@ -22,6 +22,10 @@ import type {
   ErrorResponse,
   HealthStatus,
   JobStatus,
+  ProjectBuildRequest,
+  ProjectBuildResponse,
+  RunRequest,
+  RunResult,
   StartBuildBody,
 } from "./api.schemas";
 
@@ -111,8 +115,95 @@ export function useHealthCheck<
 }
 
 /**
+ * Run JavaScript or Python code and return output
+ * @summary Execute code
+ */
+export const getRunCodeUrl = () => {
+  return `/api/run`;
+};
+
+export const runCode = async (
+  runRequest: RunRequest,
+  options?: RequestInit,
+): Promise<RunResult> => {
+  return customFetch<RunResult>(getRunCodeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(runRequest),
+  });
+};
+
+export const getRunCodeMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runCode>>,
+    TError,
+    { data: BodyType<RunRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof runCode>>,
+  TError,
+  { data: BodyType<RunRequest> },
+  TContext
+> => {
+  const mutationKey = ["runCode"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof runCode>>,
+    { data: BodyType<RunRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return runCode(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RunCodeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof runCode>>
+>;
+export type RunCodeMutationBody = BodyType<RunRequest>;
+export type RunCodeMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Execute code
+ */
+export const useRunCode = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runCode>>,
+    TError,
+    { data: BodyType<RunRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof runCode>>,
+  TError,
+  { data: BodyType<RunRequest> },
+  TContext
+> => {
+  return useMutation(getRunCodeMutationOptions(options));
+};
+
+/**
  * Accept a ZIP file of a Flutter project and queue it for APK compilation
- * @summary Start a Flutter APK build
+ * @summary Start a Flutter APK build (ZIP upload)
  */
 export const getStartBuildUrl = () => {
   return `/api/build`;
@@ -123,7 +214,7 @@ export const startBuild = async (
   options?: RequestInit,
 ): Promise<BuildResponse> => {
   const formData = new FormData();
-  formData.append(`project`, startBuildBody.project as string | Blob);
+  formData.append(`project`, startBuildBody.project);
 
   return customFetch<BuildResponse>(getStartBuildUrl(), {
     ...options,
@@ -177,7 +268,7 @@ export type StartBuildMutationBody = BodyType<StartBuildBody>;
 export type StartBuildMutationError = ErrorType<ErrorResponse>;
 
 /**
- * @summary Start a Flutter APK build
+ * @summary Start a Flutter APK build (ZIP upload)
  */
 export const useStartBuild = <
   TError = ErrorType<ErrorResponse>,
@@ -197,6 +288,97 @@ export const useStartBuild = <
   TContext
 > => {
   return useMutation(getStartBuildMutationOptions(options));
+};
+
+/**
+ * Build or preview a project given a file map and a build type.
+- react-native → creates an Expo Snack and returns a live preview URL + QR
+- flutter → packages files as ZIP and builds APK
+- android → triggers Android Gradle build
+
+ * @summary Build or preview a project from file map
+ */
+export const getBuildProjectUrl = () => {
+  return `/api/build/project`;
+};
+
+export const buildProject = async (
+  projectBuildRequest: ProjectBuildRequest,
+  options?: RequestInit,
+): Promise<ProjectBuildResponse> => {
+  return customFetch<ProjectBuildResponse>(getBuildProjectUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(projectBuildRequest),
+  });
+};
+
+export const getBuildProjectMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof buildProject>>,
+    TError,
+    { data: BodyType<ProjectBuildRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof buildProject>>,
+  TError,
+  { data: BodyType<ProjectBuildRequest> },
+  TContext
+> => {
+  const mutationKey = ["buildProject"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof buildProject>>,
+    { data: BodyType<ProjectBuildRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return buildProject(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BuildProjectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof buildProject>>
+>;
+export type BuildProjectMutationBody = BodyType<ProjectBuildRequest>;
+export type BuildProjectMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Build or preview a project from file map
+ */
+export const useBuildProject = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof buildProject>>,
+    TError,
+    { data: BodyType<ProjectBuildRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof buildProject>>,
+  TError,
+  { data: BodyType<ProjectBuildRequest> },
+  TContext
+> => {
+  return useMutation(getBuildProjectMutationOptions(options));
 };
 
 /**
