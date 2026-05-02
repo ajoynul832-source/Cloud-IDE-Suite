@@ -1,0 +1,90 @@
+YOU ARE BUILDING PHASE 2: EXECUTION QUEUE & SCALING
+
+CURRENT STATE:
+- In-memory semaphore (8 concurrent runs)
+- Daily limits: 50 runs/day per user
+- No retry logic
+- No job persistence
+- Execution results lost on crash
+
+WHAT YOU MUST BUILD:
+
+1. INFRASTRUCTURE
+   - Add Redis connection (use ioredis package)
+   - Connect to Redis instance (local or managed URL)
+   - Test connection with PING command
+
+2. BULLMQ QUEUE SETUP
+   - Create Queue('codeRuns', { connection: redis })
+   - Configure:
+     * Max concurrent: 8
+     * Max attempts: 1 (no retries for now)
+     * Remove on complete: false (keep last 100 jobs)
+
+3. JOB SCHEMA
+   Job data: {
+     jobId: string (uuid)
+     userId: string
+     code: string
+     language: string
+     filename: string
+     runId: string (tracks unique runs)
+   }
+   
+   Job result: {
+     stdout: string
+     stderr: string
+     exitCode: number
+     duration: number
+     timestamp: string
+   }
+
+4. REPLACE POST /api/run LOGIC
+   OLD: Execute immediately, return buffered result
+   NEW:
+   - Check daily limit (SELECT COUNT(*) FROM usage WHERE user_key=userId AND date=TODAY)
+   - If limit reached, return 429 { remaining: 0 }
+   - Add job to queue: await queue.add('run', jobData)
+   - Poll job.progress() until job.isCompleted()
+   - Return { jobId, status, stdout, stderr, exitCode, duration }
+   
+   IMPORTANT: Return SAME response format as before (for API compatibility)
+
+5. REPLACE POST /api/run/stream LOGIC
+   OLD: Stream SSE directly from execution
+   NEW:
+   - Add job to queue
+   - SSE loop: poll job.progress() every 100ms
+   - Stream { type: 'progress', data: ... } as progress updates arrive
+   - On completion, stream final { type: 'complete', stdout, stderr, exitCode }
+   - On failure, stream { type: 'error', message }
+
+6. JOB PROCESSOR
+   - Create worker file (processors/runJob.ts)
+   - For each job:
+     * Execute code (same logic as before: Node/tsx/python3)
+     * Capture stdout/stderr
+     * Store result in job.progress({ stdout, stderr, exitCode })
+     * Mark job complete
+   - Handle timeout: if job exceeds 10s, kill process and mark failed
+
+7. DAILY USAGE TRACKING
+   - On job completion, UPDATE usage SET runs_count = runs_count + 1
+   - Check before queuing: if runs >= 50, reject with 429
+   - Reset usage table at midnight (cron job or scheduled task)
+
+8. GET /api/status/:jobId (NEW)
+   - Look up job in BullMQ
+   - Return { jobId, status, queuePosition, progress, stdout, stderr, exitCode }
+   - If job not found, return 404
+
+TEST:
+✅ Submit 10 runs, confirm max 8 concurrent
+✅ Run 50 executions in one day, 51st is rejected
+✅ Job persists in queue after page refresh
+✅ Stream endpoint returns SSE updates
+✅ Job completes and stdout captured
+
+KEEP /api/run RESPONSE FORMAT IDENTICAL (backward compatibility).
+
+STOP HERE. ALL /api/run TESTS MUST PASS BEFORE PHASE 3.

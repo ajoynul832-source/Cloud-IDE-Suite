@@ -118,9 +118,43 @@ A mobile-first cloud IDE system with two frontends:
 | Go gomobile | Go | golang.org/x/mobile |
 | C++ NDK | C++ | Android NDK |
 
+## Execution Queue — Phase 2 (Complete)
+
+### Infrastructure
+- **Redis** installed via Nix (`pkgs.redis`), auto-started as a background subprocess by the API server on boot if no `REDIS_URL` env var is set (default: `redis://localhost:6379`)
+- **BullMQ** (`bullmq` + `ioredis`) replaces the old in-memory semaphore
+- Queue name: `codeRuns`, max 8 concurrent workers, max 1 attempt, retain last 100 completed / 50 failed
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `lib/execution.ts` | All language handlers, `spawnStream`, `resolveHandler` — shared by routes and worker |
+| `lib/redis.ts` | `ensureRedis()`, `getSharedRedis()`, `redisConnectionOpts()` |
+| `lib/queue.ts` | `getQueue()`, `getQueueEvents()`, `startWorker()` |
+| `workers/runJob.ts` | BullMQ processor — executes code, streams chunks to Redis list |
+
+### Streaming Architecture
+- Worker pushes `ExecEvent` JSON objects to Redis list `run:chunks:{runId}` as they arrive
+- SSE endpoint polls the list with `LRANGE` every 50 ms, forwarding new events to the client
+- Max SSE wait: 60 s; client disconnect detected via `req.on('close')`
+- Chunk list TTL: 5 minutes after job completion
+
+### New Endpoint
+`GET /api/run/job/:jobId` — look up a BullMQ job by ID; returns `{ jobId, runId, status, result, failedReason, timestamp }`
+
+### Spec Tests (all pass)
+| Test | Result |
+|------|--------|
+| Buffered `/api/run` — stdout captured, backward-compat format | ✅ |
+| SSE `/api/run/stream` — `stdout` + `done` events arrive | ✅ |
+| Job status endpoint returns 404 for unknown jobId | ✅ |
+| Python SSE execution returns correct output | ✅ |
+| 10 concurrent runs all complete (queue cap = 8) | ✅ |
+| Daily usage endpoint returns remaining counts | ✅ |
+
 ## Execution Engine
 
-Language handler plugin map in `artifacts/api-server/src/routes/run.ts`:
+Language handler plugin map in `artifacts/api-server/src/lib/execution.ts`:
 
 | Language | Handler | Approach |
 |----------|---------|----------|
