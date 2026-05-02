@@ -1,22 +1,27 @@
 import { useState, useCallback, useRef } from "react";
 
 export interface StreamChunk {
-  type: "stdout" | "stderr" | "error";
-  text: string;
+  type:      "stdout" | "stderr" | "error";
+  text:      string;
+  timestamp: number;
 }
 
 export interface RunOutput {
-  stdout:    string;
-  stderr:    string;
-  exitCode:  number;
-  duration:  number;
-  error?:    string;
-  html?:     string;
+  stdout:   string;
+  stderr:   string;
+  exitCode: number;
+  duration: number;
+  error?:   string;
+  html?:    string;
 }
 
 export interface StreamState {
   chunks: StreamChunk[];
   result: RunOutput | null;
+}
+
+function makeChunk(type: StreamChunk["type"], text: string): StreamChunk {
+  return { type, text, timestamp: Date.now() };
 }
 
 export function useRun() {
@@ -41,7 +46,7 @@ export function useRun() {
       const res = await fetch("/api/run/stream", {
         method:      "POST",
         headers:     { "Content-Type": "application/json" },
-        credentials: "include",   // sends session cookie for usage tracking
+        credentials: "include",
         body:        JSON.stringify({ language, code, filename }),
         signal:      controller.signal,
       });
@@ -51,7 +56,7 @@ export function useRun() {
         const msg = errorData.error ?? `HTTP ${res.status}`;
         if (typeof errorData.remaining === "number") setRunsRemaining(errorData.remaining);
         setStream({
-          chunks: [{ type: "stderr", text: msg }],
+          chunks: [makeChunk("stderr", msg)],
           result: { stdout: "", stderr: msg, exitCode: -1, duration: 0, error: "request_failed" },
         });
         return;
@@ -63,9 +68,9 @@ export function useRun() {
 
       let stdout        = "";
       let stderr        = "";
-      let htmlContent: string | undefined;
+      let htmlContent:  string | undefined;
       let isHtmlPreview = false;
-      let execError:  string | undefined;
+      let execError:    string | undefined;
 
       outer: while (true) {
         const { done, value } = await reader.read();
@@ -99,17 +104,17 @@ export function useRun() {
               isHtmlPreview = true;
             } else {
               stdout += chunk;
-              setStream((prev) => ({ ...prev, chunks: [...prev.chunks, { type: "stdout", text: chunk }] }));
+              setStream((prev) => ({ ...prev, chunks: [...prev.chunks, makeChunk("stdout", chunk)] }));
             }
           } else if (event.type === "stderr") {
             const chunk = event.chunk ?? "";
             stderr += chunk;
-            setStream((prev) => ({ ...prev, chunks: [...prev.chunks, { type: "stderr", text: chunk }] }));
+            setStream((prev) => ({ ...prev, chunks: [...prev.chunks, makeChunk("stderr", chunk)] }));
           } else if (event.type === "error") {
             execError = event.error;
             if (event.chunk && event.chunk !== "__HTML_PREVIEW__") {
               stderr += event.chunk;
-              setStream((prev) => ({ ...prev, chunks: [...prev.chunks, { type: "error", text: event.chunk! }] }));
+              setStream((prev) => ({ ...prev, chunks: [...prev.chunks, makeChunk("error", event.chunk!)] }));
             }
           } else if (event.type === "done") {
             if (isHtmlPreview) htmlContent = event.chunk;
@@ -131,7 +136,7 @@ export function useRun() {
       if ((err as Error).name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "Network error";
       setStream({
-        chunks: [{ type: "error", text: msg }],
+        chunks: [makeChunk("error", msg)],
         result: { stdout: "", stderr: msg, exitCode: -1, duration: 0, error: "network" },
       });
     } finally {
@@ -145,10 +150,9 @@ export function useRun() {
     setStream({ chunks: [], result: null });
   }, []);
 
-  /** Show a client-side error in the console without making an API call */
   const showClientError = useCallback((message: string) => {
     setStream({
-      chunks: [{ type: "error", text: message }],
+      chunks: [makeChunk("error", message)],
       result: { stdout: "", stderr: message, exitCode: 1, duration: 0, error: "client" },
     });
   }, []);

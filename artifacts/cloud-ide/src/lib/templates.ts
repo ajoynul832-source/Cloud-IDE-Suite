@@ -4,10 +4,561 @@ export interface ProjectTemplate {
   description: string;
   icon: string;
   language: string;
+  runnable?: boolean;
   files: Record<string, string>;
 }
 
 export const PROJECT_TEMPLATES: ProjectTemplate[] = [
+  // ── Web / Runnable — execute instantly in the sandbox ─────────────────────
+  {
+    id: "js-starter",
+    name: "JavaScript",
+    description: "Vanilla JS with async/await, array methods, and modern syntax",
+    icon: "⚡",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "index.js": `// JavaScript Starter — click Run ▶ or press Ctrl+Enter
+
+// Arrays & higher-order functions
+const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+console.log("Evens:  ", numbers.filter(n => n % 2 === 0));
+console.log("Squares:", numbers.map(n => n ** 2));
+console.log("Sum:    ", numbers.reduce((a, b) => a + b, 0));
+
+// Async / await
+async function fetchData(id) {
+  await new Promise(r => setTimeout(r, 100)); // simulate async work
+  return { id, name: \`Item \${id}\`, value: Math.random().toFixed(4) };
+}
+
+async function main() {
+  const items = await Promise.all([1, 2, 3].map(fetchData));
+  items.forEach(({ id, name, value }) => {
+    console.log(\`[\${id}] \${name} → \${value}\`);
+  });
+}
+
+main();
+
+// Destructuring & spread
+const { filter, map } = Array.prototype;
+const user = { name: "Alice", role: "admin", age: 30 };
+const { name, ...rest } = user;
+console.log("User:", name, "| rest:", rest);
+`,
+    },
+  },
+
+  {
+    id: "ts-starter",
+    name: "TypeScript",
+    description: "TypeScript with interfaces, generics, and type guards",
+    icon: "📘",
+    language: "TypeScript",
+    runnable: true,
+    files: {
+      "index.ts": `// TypeScript Starter — click Run ▶ or press Ctrl+Enter
+
+// Interfaces & types
+interface User {
+  id:    number;
+  name:  string;
+  email: string;
+  role:  "admin" | "user" | "guest";
+}
+
+interface ApiResponse<T> {
+  data:    T;
+  status:  number;
+  message: string;
+}
+
+// Generic function
+function createResponse<T>(data: T, status = 200): ApiResponse<T> {
+  return { data, status, message: status === 200 ? "OK" : "Error" };
+}
+
+// Type guard
+function isAdmin(user: User): user is User & { role: "admin" } {
+  return user.role === "admin";
+}
+
+// Usage
+const users: User[] = [
+  { id: 1, name: "Alice",   email: "alice@example.com", role: "admin" },
+  { id: 2, name: "Bob",     email: "bob@example.com",   role: "user"  },
+  { id: 3, name: "Charlie", email: "charlie@example.com", role: "guest"},
+];
+
+const response = createResponse(users);
+console.log("Response status:", response.status);
+console.log("Users loaded:   ", response.data.length);
+
+const admins = users.filter(isAdmin);
+console.log("Admins:", admins.map(u => u.name));
+
+// Utility types
+type PartialUser  = Partial<User>;
+type ReadonlyUser = Readonly<User>;
+type UserKeys     = keyof User;
+
+console.log("User fields:", ["id", "name", "email", "role"] as UserKeys[]);
+`,
+    },
+  },
+
+  {
+    id: "python-starter",
+    name: "Python",
+    description: "Python script with classes, comprehensions, and stdlib",
+    icon: "🐍",
+    language: "Python",
+    runnable: true,
+    files: {
+      "main.py": `# Python Starter — click Run ▶ or press Ctrl+Enter
+
+# List comprehensions
+squares   = [x**2 for x in range(1, 11)]
+evens     = [x for x in range(20) if x % 2 == 0]
+print("Squares:", squares)
+print("Evens:  ", evens)
+
+# Functions & closures
+def make_counter(start=0, step=1):
+    count = [start]
+    def increment():
+        val = count[0]
+        count[0] += step
+        return val
+    return increment
+
+counter = make_counter(step=5)
+print("Counter:", [counter() for _ in range(5)])
+
+# Classes
+class Stack:
+    def __init__(self):
+        self._data = []
+
+    def push(self, item):
+        self._data.append(item)
+        return self
+
+    def pop(self):
+        if not self._data:
+            raise IndexError("Stack is empty")
+        return self._data.pop()
+
+    def peek(self):
+        return self._data[-1] if self._data else None
+
+    def __len__(self):
+        return len(self._data)
+
+    def __repr__(self):
+        return f"Stack({self._data})"
+
+s = Stack()
+for i in [10, 20, 30, 40]:
+    s.push(i)
+print("Stack:", s)
+print("Pop:", s.pop())
+print("Peek:", s.peek())
+print("Size:", len(s))
+
+# Dictionary operations
+words = "the quick brown fox jumps over the lazy dog".split()
+freq  = {}
+for w in words:
+    freq[w] = freq.get(w, 0) + 1
+print("\\nWord frequencies:")
+for word, count in sorted(freq.items(), key=lambda x: -x[1]):
+    print(f"  {word:<8} {count}")
+`,
+    },
+  },
+
+  {
+    id: "python-data",
+    name: "Python Data",
+    description: "Data analysis, statistics, and visualization with Python stdlib",
+    icon: "📊",
+    language: "Python",
+    runnable: true,
+    files: {
+      "data.py": `# Python Data Analysis — click Run ▶ or press Ctrl+Enter
+import statistics
+import collections
+import random
+
+# Generate sample dataset
+random.seed(42)
+scores = [random.gauss(75, 15) for _ in range(100)]
+scores = [round(max(0, min(100, s)), 1) for s in scores]
+
+# Descriptive statistics
+print("=== Exam Score Analysis ===")
+print(f"Count:   {len(scores)}")
+print(f"Mean:    {statistics.mean(scores):.2f}")
+print(f"Median:  {statistics.median(scores):.2f}")
+print(f"Stdev:   {statistics.stdev(scores):.2f}")
+print(f"Min:     {min(scores):.1f}")
+print(f"Max:     {max(scores):.1f}")
+
+# Grade distribution
+def grade(score):
+    if score >= 90: return "A"
+    if score >= 80: return "B"
+    if score >= 70: return "C"
+    if score >= 60: return "D"
+    return "F"
+
+grades = collections.Counter(grade(s) for s in scores)
+print("\\n=== Grade Distribution ===")
+for letter in "ABCDF":
+    count = grades[letter]
+    bar   = "█" * (count // 2)
+    print(f"  {letter}  {bar:<25} {count:>3} students")
+
+# Quartiles
+q1 = statistics.quantiles(scores, n=4)[0]
+q3 = statistics.quantiles(scores, n=4)[2]
+iqr = q3 - q1
+print(f"\\nQ1={q1:.1f}  Q3={q3:.1f}  IQR={iqr:.1f}")
+
+outliers = [s for s in scores if s < q1 - 1.5*iqr or s > q3 + 1.5*iqr]
+print(f"Outliers ({len(outliers)}): {sorted(outliers)}")
+`,
+    },
+  },
+
+  {
+    id: "html-page",
+    name: "HTML Page",
+    description: "Interactive HTML page with CSS and JavaScript — live preview",
+    icon: "🌐",
+    language: "HTML",
+    runnable: true,
+    files: {
+      "index.html": `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CloudIDE Preview</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      gap: 1.5rem;
+    }
+    h1 { font-size: 2rem; font-weight: 700; }
+    h1 span { color: #4ade80; }
+    .card {
+      background: #161b22;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 420px;
+    }
+    label { display: block; font-size: .85rem; color: #8b949e; margin-bottom: .5rem; }
+    input[type="text"] {
+      width: 100%;
+      padding: .6rem .85rem;
+      background: #0d1117;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 8px;
+      color: #e6edf3;
+      font-size: .95rem;
+      margin-bottom: 1rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    input[type="text"]:focus { border-color: #4ade80; }
+    button {
+      width: 100%;
+      padding: .65rem 1rem;
+      background: #4ade80;
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-size: .95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+    }
+    button:hover  { background: #22c55e; }
+    button:active { transform: scale(.98); }
+    #output {
+      margin-top: 1rem;
+      padding: .75rem 1rem;
+      background: #0d1117;
+      border: 1px solid rgba(74,222,128,.2);
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: .9rem;
+      color: #4ade80;
+      min-height: 2.5rem;
+    }
+    .counter-row {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-top: 1rem;
+    }
+    .counter-btn {
+      width: 40px;
+      height: 40px;
+      font-size: 1.3rem;
+      font-weight: 700;
+      border-radius: 8px;
+    }
+    #count-display {
+      flex: 1;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #4ade80;
+    }
+  </style>
+</head>
+<body>
+  <h1>HTML <span>Live Preview</span></h1>
+
+  <div class="card">
+    <label for="name-input">Say hello to…</label>
+    <input type="text" id="name-input" placeholder="Your name" />
+    <button onclick="greet()">Greet me!</button>
+    <div id="output">Output will appear here.</div>
+  </div>
+
+  <div class="card">
+    <label>Counter</label>
+    <div class="counter-row">
+      <button class="counter-btn" onclick="delta(-1)">−</button>
+      <div id="count-display">0</div>
+      <button class="counter-btn" onclick="delta(1)">+</button>
+    </div>
+  </div>
+
+  <script>
+    function greet() {
+      const name = document.getElementById('name-input').value.trim() || 'World';
+      document.getElementById('output').textContent =
+        'Hello, ' + name + '! 👋 — ' + new Date().toLocaleTimeString();
+    }
+
+    let count = 0;
+    function delta(n) {
+      count += n;
+      document.getElementById('count-display').textContent = count;
+    }
+  </script>
+</body>
+</html>
+`,
+    },
+  },
+
+  {
+    id: "html-canvas",
+    name: "HTML Canvas",
+    description: "Canvas 2D animation — bouncing balls with physics",
+    icon: "🎨",
+    language: "HTML",
+    runnable: true,
+    files: {
+      "canvas.html": `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Canvas Animation</title>
+  <style>
+    body { margin: 0; background: #0d1117; overflow: hidden; }
+    canvas { display: block; }
+    #info {
+      position: absolute;
+      top: 10px; left: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      color: rgba(255,255,255,.4);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="info">Click to add a ball</div>
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx    = canvas.getContext('2d');
+    const W = canvas.width  = window.innerWidth;
+    const H = canvas.height = window.innerHeight;
+
+    const COLORS = ['#4ade80','#60a5fa','#f472b6','#facc15','#fb923c','#a78bfa'];
+    const balls  = [];
+
+    function Ball(x, y) {
+      this.x  = x; this.y = y;
+      this.r  = 8 + Math.random() * 22;
+      this.vx = (Math.random() - .5) * 6;
+      this.vy = (Math.random() - .5) * 6;
+      this.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+      this.alpha = 0.85;
+    }
+
+    Ball.prototype.update = function() {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.18; // gravity
+      if (this.x - this.r < 0)  { this.x = this.r;   this.vx *= -0.8; }
+      if (this.x + this.r > W)  { this.x = W - this.r; this.vx *= -0.8; }
+      if (this.y + this.r > H)  { this.y = H - this.r; this.vy *= -0.75; this.vx *= 0.98; }
+    };
+
+    Ball.prototype.draw = function() {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.fillStyle = this.color + 'cc';
+      ctx.fill();
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    };
+
+    // Spawn initial balls
+    for (let i = 0; i < 12; i++) {
+      balls.push(new Ball(Math.random() * W, Math.random() * H * .4));
+    }
+
+    canvas.addEventListener('click', e => {
+      balls.push(new Ball(e.clientX, e.clientY));
+    });
+
+    function loop() {
+      ctx.fillStyle = 'rgba(13,17,23,0.25)';
+      ctx.fillRect(0, 0, W, H);
+      balls.forEach(b => { b.update(); b.draw(); });
+      requestAnimationFrame(loop);
+    }
+    loop();
+  </script>
+</body>
+</html>
+`,
+    },
+  },
+
+  {
+    id: "js-algorithms",
+    name: "JS Algorithms",
+    description: "Sorting algorithms, binary search, and data structures",
+    icon: "🔢",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "algorithms.js": `// Algorithms & Data Structures — click Run ▶
+
+// ── Sorting ────────────────────────────────────────────────────────
+function bubbleSort(arr) {
+  const a = [...arr];
+  for (let i = 0; i < a.length; i++)
+    for (let j = 0; j < a.length - i - 1; j++)
+      if (a[j] > a[j+1]) [a[j], a[j+1]] = [a[j+1], a[j]];
+  return a;
+}
+
+function mergeSort(arr) {
+  if (arr.length <= 1) return arr;
+  const mid   = Math.floor(arr.length / 2);
+  const left  = mergeSort(arr.slice(0, mid));
+  const right = mergeSort(arr.slice(mid));
+  const result = [];
+  let i = 0, j = 0;
+  while (i < left.length && j < right.length)
+    result.push(left[i] <= right[j] ? left[i++] : right[j++]);
+  return [...result, ...left.slice(i), ...right.slice(j)];
+}
+
+function quickSort(arr) {
+  if (arr.length <= 1) return arr;
+  const pivot = arr[Math.floor(arr.length / 2)];
+  return [
+    ...quickSort(arr.filter(x => x < pivot)),
+    ...arr.filter(x => x === pivot),
+    ...quickSort(arr.filter(x => x > pivot)),
+  ];
+}
+
+const data = [64, 34, 25, 12, 22, 11, 90, 45, 78, 3];
+console.log("Input:      ", data);
+console.log("Bubble sort:", bubbleSort(data));
+console.log("Merge sort: ", mergeSort(data));
+console.log("Quick sort: ", quickSort(data));
+
+// ── Binary Search ──────────────────────────────────────────────────
+function binarySearch(sorted, target) {
+  let lo = 0, hi = sorted.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] === target) return mid;
+    sorted[mid] < target ? (lo = mid + 1) : (hi = mid - 1);
+  }
+  return -1;
+}
+
+const sorted = mergeSort(data);
+console.log("\\nBinary search for 45:", binarySearch(sorted, 45));
+console.log("Binary search for 99:", binarySearch(sorted, 99));
+
+// ── Linked List ────────────────────────────────────────────────────
+class Node { constructor(val) { this.val = val; this.next = null; } }
+class LinkedList {
+  constructor() { this.head = null; this.size = 0; }
+  push(val) {
+    const node = new Node(val);
+    if (!this.head) { this.head = node; }
+    else {
+      let cur = this.head;
+      while (cur.next) cur = cur.next;
+      cur.next = node;
+    }
+    this.size++;
+  }
+  toArray() {
+    const out = []; let cur = this.head;
+    while (cur) { out.push(cur.val); cur = cur.next; }
+    return out;
+  }
+}
+
+const list = new LinkedList();
+[5, 10, 15, 20].forEach(v => list.push(v));
+console.log("\\nLinked list:", list.toArray(), "size:", list.size);
+
+// ── Fibonacci (memoized) ───────────────────────────────────────────
+function fib(n, memo = {}) {
+  if (n in memo) return memo[n];
+  if (n <= 1) return n;
+  return memo[n] = fib(n-1, memo) + fib(n-2, memo);
+}
+
+const fibs = Array.from({ length: 10 }, (_, i) => fib(i));
+console.log("\\nFibonacci[0..9]:", fibs);
+`,
+    },
+  },
+
+  // ── Mobile / Build Required ────────────────────────────────────────────────
   {
     id: "flutter",
     name: "Flutter",

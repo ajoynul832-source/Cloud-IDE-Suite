@@ -19,13 +19,17 @@ import { bracketMatching, indentOnInput } from "@codemirror/language";
 
 export interface EditorRef {
   getContent: () => string;
+  getCursorPosition: () => { line: number; col: number };
 }
 
 interface EditorProps {
   initialContent: string;
   filename: string;
   onChange: (content: string) => void;
-  /** When true, the editor is non-editable (read-only view). Default: false */
+  onRun?: () => void;
+  onCursorChange?: (line: number, col: number) => void;
+  fontSize?: number;
+  wordWrap?: boolean;
   readOnly?: boolean;
 }
 
@@ -41,34 +45,41 @@ function getLanguageExtension(filename: string): Extension {
     case "xml": case "plist": case "xcconfig": case "gradle": return xml();
     case "md": case "markdown": return markdown();
     case "java": return java();
-    case "kt": case "kts": return java();
-    case "groovy": return java();
+    case "kt": case "kts": case "groovy": return java();
     case "c": case "h": case "cc": case "cpp": case "cxx": case "hpp": case "hxx": return cpp();
-    case "cs": return cpp();
-    case "m": case "mm": return cpp();
-    case "swift": return javascript();
+    case "cs": case "m": case "mm": return cpp();
     case "py": return python();
     case "rs": return rust();
     case "go": return go();
-    case "dart": return javascript();
-    case "yaml": case "yml": return javascript();
-    case "toml": case "ini": case "properties": return javascript();
-    case "sh": case "bash": case "zsh": return javascript();
     default: return javascript();
   }
 }
 
 export const Editor = forwardRef<EditorRef, EditorProps>(
-  ({ initialContent, filename, onChange, readOnly = false }, ref) => {
+  ({ initialContent, filename, onChange, onRun, onCursorChange, fontSize = 13, wordWrap = false, readOnly = false }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const viewRef = useRef<EditorView | null>(null);
+    const viewRef      = useRef<EditorView | null>(null);
+
+    const onRunRef            = useRef(onRun);
+    const onCursorChangeRef   = useRef(onCursorChange);
+    useEffect(() => { onRunRef.current = onRun; }, [onRun]);
+    useEffect(() => { onCursorChangeRef.current = onCursorChange; }, [onCursorChange]);
 
     useImperativeHandle(ref, () => ({
-      getContent: () => viewRef.current?.state.doc.toString() || "",
+      getContent: () => viewRef.current?.state.doc.toString() ?? "",
+      getCursorPosition: () => {
+        const view = viewRef.current;
+        if (!view) return { line: 1, col: 1 };
+        const pos  = view.state.selection.main.head;
+        const line = view.state.doc.lineAt(pos);
+        return { line: line.number, col: pos - line.from + 1 };
+      },
     }));
 
     useEffect(() => {
       if (!containerRef.current) return;
+
+      const savedContent = viewRef.current?.state.doc.toString() ?? initialContent;
 
       const extensions: Extension[] = [
         lineNumbers(),
@@ -78,16 +89,31 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
         bracketMatching(),
         closeBrackets(),
         indentOnInput(),
-        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+        keymap.of([
+          ...defaultKeymap,
+          ...historyKeymap,
+          indentWithTab,
+          {
+            key: "Ctrl-Enter",
+            mac: "Cmd-Enter",
+            run: () => { onRunRef.current?.(); return true; },
+          },
+        ]),
         getLanguageExtension(filename),
         vscodeDark,
         autocompletion(),
         EditorView.theme({
-          "&": { height: "100%", fontSize: "13px", fontFamily: "Menlo, Monaco, 'Courier New', monospace" },
+          "&": {
+            height: "100%",
+            fontSize: `${fontSize}px`,
+            fontFamily: "Menlo, Monaco, 'Courier New', monospace",
+          },
           ".cm-scroller": { overflow: "auto", height: "100%" },
-          ".cm-content": { padding: "8px 0" },
+          ".cm-content":  { padding: "8px 0" },
         }),
       ];
+
+      if (wordWrap) extensions.push(EditorView.lineWrapping);
 
       if (readOnly) {
         extensions.push(EditorView.editable.of(false));
@@ -95,12 +121,22 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
       } else {
         extensions.push(
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) onChange(update.state.doc.toString());
+            if (update.docChanged) {
+              onChange(update.state.doc.toString());
+            }
+            if (update.selectionSet) {
+              const pos  = update.state.selection.main.head;
+              const line = update.state.doc.lineAt(pos);
+              onCursorChangeRef.current?.(line.number, pos - line.from + 1);
+            }
           }),
         );
       }
 
-      const state = EditorState.create({ doc: initialContent, extensions });
+      const state = EditorState.create({
+        doc: readOnly ? initialContent : savedContent,
+        extensions,
+      });
       const view = new EditorView({ state, parent: containerRef.current });
       viewRef.current = view;
 
@@ -108,7 +144,8 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
         view.destroy();
         viewRef.current = null;
       };
-    }, [filename, readOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filename, readOnly, fontSize, wordWrap]);
 
     return <div className="w-full h-full overflow-hidden" ref={containerRef} />;
   },

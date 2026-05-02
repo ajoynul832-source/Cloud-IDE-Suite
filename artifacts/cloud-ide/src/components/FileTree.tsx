@@ -1,19 +1,11 @@
 import { useState } from "react";
 import {
-  FileCode,
-  FileJson,
-  FileText,
-  File,
-  FileType,
-  X,
-  Braces,
-  Terminal,
-  Globe,
-  Cpu,
+  FileCode, FileJson, FileText, File, FileType, X,
+  Braces, Terminal, Globe, Cpu, ChevronRight, ChevronDown,
 } from "lucide-react";
 
 interface FileTreeProps {
-  files: Record<string, string>;
+  files:    Record<string, string>;
   activeFile: string | null;
   onSelect: (path: string) => void;
   onCreate: (path: string) => void;
@@ -22,67 +14,62 @@ interface FileTreeProps {
 }
 
 function getIcon(path: string) {
-  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const ext  = path.split(".").pop()?.toLowerCase() ?? "";
   const base = path.split("/").pop() ?? "";
 
-  // Config/manifest files
   if (base === "pubspec.yaml" || base === "buildozer.spec") return <FileJson size={13} className="text-yellow-400" />;
   if (base === "AndroidManifest.xml") return <FileCode size={13} className="text-green-400" />;
   if (base === "go.mod" || base === "Cargo.toml" || base === "package.json") return <FileJson size={13} className="text-orange-400" />;
   if (base === "CMakeLists.txt") return <Cpu size={13} className="text-cyan-400" />;
 
   switch (ext) {
-    // Dart / Flutter
-    case "dart": return <FileCode size={13} className="text-sky-400" />;
-    // Kotlin
+    case "dart":  return <FileCode size={13} className="text-sky-400" />;
     case "kt": case "kts": return <FileCode size={13} className="text-purple-400" />;
-    // Java
-    case "java": return <FileCode size={13} className="text-orange-400" />;
-    // Swift / Obj-C
+    case "java":  return <FileCode size={13} className="text-orange-400" />;
     case "swift": return <FileCode size={13} className="text-orange-300" />;
     case "m": case "mm": return <FileCode size={13} className="text-orange-300" />;
-    // C / C++ / NDK
-    case "c": case "h": return <Cpu size={13} className="text-blue-300" />;
+    case "c": case "h":  return <Cpu size={13} className="text-blue-300" />;
     case "cpp": case "cxx": case "cc": case "hpp": case "hxx": return <Cpu size={13} className="text-blue-400" />;
-    // C#
-    case "cs": return <FileCode size={13} className="text-violet-400" />;
-    // Web
+    case "cs":   return <FileCode size={13} className="text-violet-400" />;
     case "html": case "htm": return <Globe size={13} className="text-orange-400" />;
     case "css": case "scss": case "less": return <FileType size={13} className="text-blue-400" />;
-    case "js": case "jsx": return <Braces size={13} className="text-yellow-400" />;
-    case "ts": case "tsx": return <Braces size={13} className="text-blue-400" />;
-    // Rust
-    case "rs": return <FileCode size={13} className="text-orange-500" />;
-    // Go
-    case "go": return <FileCode size={13} className="text-cyan-400" />;
-    // Python
-    case "py": return <FileCode size={13} className="text-green-400" />;
-    // Data / config
+    case "js": case "jsx":   return <Braces size={13} className="text-yellow-400" />;
+    case "ts": case "tsx":   return <Braces size={13} className="text-blue-400" />;
+    case "rs":   return <FileCode size={13} className="text-orange-500" />;
+    case "go":   return <FileCode size={13} className="text-cyan-400" />;
+    case "py":   return <FileCode size={13} className="text-green-400" />;
     case "json": return <FileJson size={13} className="text-yellow-300" />;
     case "xml": case "plist": return <FileJson size={13} className="text-pink-400" />;
     case "yaml": case "yml": return <FileJson size={13} className="text-yellow-400" />;
     case "toml": return <FileJson size={13} className="text-amber-400" />;
     case "gradle": return <Terminal size={13} className="text-green-500" />;
-    // Docs
     case "md": case "markdown": case "txt": case "rst": return <FileText size={13} className="text-gray-400" />;
-    // Shell
     case "sh": case "bash": case "zsh": return <Terminal size={13} className="text-green-400" />;
     default: return <File size={13} className="text-gray-500" />;
   }
 }
 
 export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRename }: FileTreeProps) {
-  const [editingPath, setEditingPath] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const [editingPath,       setEditingPath]       = useState<string | null>(null);
+  const [editValue,         setEditValue]         = useState("");
+  const [collapsedFolders,  setCollapsedFolders]  = useState<Set<string>>(new Set());
 
   const handleCreate = () => {
     const name = prompt("File name (e.g. lib/feature.dart, src/main.rs):");
     if (name?.trim()) onCreate(name.trim());
   };
 
+  const toggleFolder = (folder: string) => {
+    setCollapsedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(folder)) next.delete(folder);
+      else next.add(folder);
+      return next;
+    });
+  };
+
   const paths = Object.keys(files).sort();
 
-  // Group into folders
   const folderMap: Record<string, string[]> = {};
   const rootFiles: string[] = [];
   paths.forEach((p) => {
@@ -96,7 +83,7 @@ export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRe
     }
   });
 
-  const renderFile = (path: string) => {
+  const renderFile = (path: string, indent = false) => {
     const isActive = activeFile === path;
     const filename = path.split("/").pop() || path;
 
@@ -105,7 +92,8 @@ export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRe
         key={path}
         data-testid={`item-file-${path}`}
         className={[
-          "group flex items-center pl-5 pr-2 py-[3px] cursor-pointer text-xs font-mono truncate",
+          "group flex items-center pr-2 py-[3px] cursor-pointer text-xs font-mono truncate",
+          indent ? "pl-7" : "pl-5",
           isActive
             ? "bg-sidebar-accent text-primary"
             : "text-sidebar-foreground hover:bg-sidebar-accent/40 hover:text-white",
@@ -151,8 +139,6 @@ export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRe
     );
   };
 
-  const renderedFolders = new Set<string>();
-
   return (
     <div className="h-full bg-sidebar border-r border-sidebar-border flex flex-col select-none">
       <div className="px-3 py-2 border-b border-sidebar-border flex justify-between items-center">
@@ -170,26 +156,32 @@ export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRe
       </div>
 
       <div className="flex-1 overflow-y-auto py-1">
-        {/* Folders first */}
+        {/* Folders */}
         {Object.entries(folderMap)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([folder, filePaths]) => {
-            if (renderedFolders.has(folder)) return null;
-            renderedFolders.add(folder);
-            const folderName = folder.split("/").pop() || folder;
+            const isCollapsed  = collapsedFolders.has(folder);
+            const folderName   = folder.split("/").pop() || folder;
             return (
               <div key={folder}>
-                <div className="flex items-center px-3 py-[3px] text-[10px] font-mono font-semibold tracking-wider uppercase text-muted-foreground/60">
-                  <span className="mr-1">▸</span>
+                <button
+                  className="w-full flex items-center px-3 py-[4px] text-[10px] font-mono font-semibold tracking-wider uppercase text-muted-foreground/60 hover:text-muted-foreground hover:bg-sidebar-accent/20 transition-colors"
+                  onClick={() => toggleFolder(folder)}
+                  title={isCollapsed ? `Expand ${folderName}` : `Collapse ${folderName}`}
+                >
+                  {isCollapsed
+                    ? <ChevronRight size={11} className="mr-1 shrink-0" />
+                    : <ChevronDown  size={11} className="mr-1 shrink-0" />
+                  }
                   {folderName}
-                </div>
-                {filePaths.sort().map(renderFile)}
+                </button>
+                {!isCollapsed && filePaths.sort().map((p) => renderFile(p, true))}
               </div>
             );
           })}
 
         {/* Root files */}
-        {rootFiles.sort().map(renderFile)}
+        {rootFiles.sort().map((p) => renderFile(p, false))}
       </div>
     </div>
   );

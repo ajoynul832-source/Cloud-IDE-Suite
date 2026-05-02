@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, Loader2, AlertCircle } from "lucide-react";
+import { Box, Loader2, AlertCircle, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -37,91 +37,118 @@ export default function AuthPage({ onSuccess }: AuthPageProps = {}) {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center bg-background rounded-lg px-6 py-8 w-full">
-      <div className="w-full max-w-sm">
+    <div className="flex flex-col items-center justify-center bg-[#0d1117] min-h-screen px-4">
+      {/* Ambient glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#4ade80]/5 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative w-full max-w-sm">
         {/* Brand */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <Box className="text-primary" size={22} />
-          <span className="font-mono font-bold text-foreground text-lg tracking-widest uppercase">
+        <div className="flex items-center justify-center gap-2.5 mb-8">
+          <div className="w-8 h-8 rounded-lg bg-[#4ade80]/15 border border-[#4ade80]/30 flex items-center justify-center">
+            <Box className="text-[#4ade80]" size={17} />
+          </div>
+          <span className="font-mono font-bold text-white text-lg tracking-widest uppercase">
             CloudIDE
           </span>
         </div>
 
         {/* Card */}
-        <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-          <h1 className="font-mono text-sm font-semibold text-foreground mb-5">
-            {mode === "login" ? "Sign in to your account" : "Create an account"}
-          </h1>
+        <div className="bg-[#161b22] border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+          {/* Tab switcher */}
+          <div className="grid grid-cols-2 border-b border-white/8">
+            {(["login", "register"] as AuthMode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => { setMode(m); setError(null); }}
+                className={[
+                  "py-3 font-mono text-xs font-semibold tracking-widest uppercase transition-colors",
+                  mode === m
+                    ? "text-[#4ade80] border-b-2 border-[#4ade80]"
+                    : "text-white/40 hover:text-white/70",
+                ].join(" ")}
+              >
+                {m === "login" ? "Sign In" : "Register"}
+              </button>
+            ))}
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-mono text-muted-foreground mb-1 uppercase tracking-wider">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoFocus
-                autoComplete="email"
-                placeholder="you@example.com"
-                className="w-full bg-background border border-border rounded px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-mono text-muted-foreground mb-1 uppercase tracking-wider">
-                Password{mode === "register" && " (min. 8 characters)"}
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
-                placeholder="••••••••"
-                className="w-full bg-background border border-border rounded px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
-              />
-            </div>
-
-            {error && (
-              <div className="flex items-start gap-2 p-3 rounded bg-destructive/10 border border-destructive/20 text-destructive text-xs font-mono">
-                <AlertCircle size={13} className="shrink-0 mt-0.5" />
-                <span>{error}</span>
+          <div className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Email */}
+              <div>
+                <label className="block text-[10px] font-mono text-white/40 mb-1.5 uppercase tracking-widest">
+                  Email
+                </label>
+                <div className="relative">
+                  <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoFocus
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    className="w-full bg-[#0d1117] border border-white/10 rounded-lg pl-9 pr-3 py-2.5 font-mono text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#4ade80]/60 transition-colors"
+                  />
+                </div>
               </div>
-            )}
 
-            <Button
-              type="submit"
-              disabled={loading || !email.trim() || !password}
-              className="w-full font-mono text-sm h-9 bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {loading ? (
-                <><Loader2 size={14} className="mr-2 animate-spin" />
-                  {mode === "login" ? "Signing in…" : "Creating account…"}
-                </>
-              ) : (
-                mode === "login" ? "Sign in" : "Create account"
+              {/* Password */}
+              <div>
+                <label className="block text-[10px] font-mono text-white/40 mb-1.5 uppercase tracking-widest">
+                  {mode === "register" ? "Password (min. 8 chars)" : "Password"}
+                </label>
+                <div className="relative">
+                  <Lock size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete={mode === "login" ? "current-password" : "new-password"}
+                    placeholder="••••••••"
+                    className="w-full bg-[#0d1117] border border-white/10 rounded-lg pl-9 pr-3 py-2.5 font-mono text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#4ade80]/60 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
+                  <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
               )}
-            </Button>
-          </form>
 
-          <div className="mt-5 pt-4 border-t border-border text-center">
-            <span className="font-mono text-xs text-muted-foreground">
-              {mode === "login" ? "Don't have an account? " : "Already have an account? "}
-            </span>
-            <button
-              onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }}
-              className="font-mono text-xs text-primary hover:underline"
-            >
-              {mode === "login" ? "Sign up" : "Sign in"}
-            </button>
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading || !email.trim() || !password}
+                className={[
+                  "w-full h-10 rounded-lg font-mono text-sm font-bold transition-all",
+                  loading || !email.trim() || !password
+                    ? "bg-white/8 text-white/30 cursor-not-allowed"
+                    : "bg-[#4ade80] text-black hover:bg-[#4ade80]/90 shadow-[0_0_20px_rgba(74,222,128,0.3)]",
+                ].join(" ")}
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 size={14} className="animate-spin" />
+                    {mode === "login" ? "Signing in…" : "Creating account…"}
+                  </span>
+                ) : (
+                  mode === "login" ? "Sign In →" : "Create Account →"
+                )}
+              </button>
+            </form>
           </div>
         </div>
 
-        <p className="text-center font-mono text-[10px] text-muted-foreground/50 mt-4">
-          Projects are private and tied to your account.
+        {/* Footer note */}
+        <p className="text-center font-mono text-[10px] text-white/25 mt-5 leading-relaxed">
+          Projects and saved files are private to your account.<br />
+          No email verification required.
         </p>
       </div>
     </div>

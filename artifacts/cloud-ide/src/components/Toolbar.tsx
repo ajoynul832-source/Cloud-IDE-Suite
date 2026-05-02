@@ -1,6 +1,7 @@
 import {
   Play, Box, Download, Loader2, FolderOpen, ChevronDown,
   Database, Share2, Compass, CheckCircle2, LogOut, User, RotateCcw,
+  Settings, HelpCircle,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "./ui/button";
@@ -9,22 +10,24 @@ import { useAuth } from "@/contexts/AuthContext";
 export type AutosaveStatus = "idle" | "saving" | "saved";
 
 interface ToolbarProps {
-  isBuilding:       boolean;
-  isRunning?:       boolean;
-  onRun:            () => void;
-  onBuild:          () => void;
-  onNewProject:     () => void;
-  onOpenProjects:   () => void;
-  onShare?:         () => void;
-  onReset?:         () => void;
-  buildStatus?:     string | null;
-  jobId?:           string | null;
-  currentLanguage?: string;
-  canRun?:          boolean;
-  canShare?:        boolean;
-  projectName?:     string;
-  autosaveStatus?:  AutosaveStatus;
-  runsRemaining?:   number | null;
+  isBuilding:        boolean;
+  isRunning?:        boolean;
+  onRun:             () => void;
+  onBuild:           () => void;
+  onNewProject:      () => void;
+  onOpenProjects:    () => void;
+  onShare?:          () => void;
+  onReset?:          () => void;
+  onShowSettings?:   () => void;
+  onShowShortcuts?:  () => void;
+  buildStatus?:      string | null;
+  jobId?:            string | null;
+  currentLanguage?:  string;
+  canRun?:           boolean;
+  canShare?:         boolean;
+  projectName?:      string;
+  autosaveStatus?:   AutosaveStatus;
+  runsRemaining?:    number | null;
 }
 
 export function Toolbar({
@@ -36,6 +39,8 @@ export function Toolbar({
   onOpenProjects,
   onShare,
   onReset,
+  onShowSettings,
+  onShowShortcuts,
   buildStatus,
   jobId,
   currentLanguage,
@@ -51,9 +56,8 @@ export function Toolbar({
   return (
     <div className="h-11 bg-[#161b22] border-b border-white/8 flex items-center justify-between px-3 shrink-0 gap-2">
 
-      {/* ── Left: brand + nav ─────────────────────────────────────────────── */}
+      {/* ── Left: brand + nav ─────────────────────────────────────────── */}
       <div className="flex items-center gap-1 min-w-0">
-        {/* Logo */}
         <Link href="/" className="flex items-center gap-1.5 shrink-0 mr-1 group" title="Home">
           <Box className="text-[#4ade80] group-hover:scale-110 transition-transform" size={17} />
           <span className="font-mono font-bold text-white text-xs tracking-widest uppercase hidden sm:block">
@@ -118,7 +122,6 @@ export function Toolbar({
           </button>
         )}
 
-        {/* Project name + autosave */}
         {projectName && (
           <>
             <div className="w-px h-3.5 bg-white/10 shrink-0 mx-1" />
@@ -139,10 +142,10 @@ export function Toolbar({
         )}
       </div>
 
-      {/* ── Right: actions + user ─────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 shrink-0">
+      {/* ── Right: actions + user ─────────────────────────────────────── */}
+      <div className="flex items-center gap-1.5 shrink-0">
 
-        {/* Run — prominent green when active */}
+        {/* Run */}
         <button
           data-testid="button-run"
           onClick={onRun}
@@ -204,10 +207,34 @@ export function Toolbar({
           <span className="text-xs font-mono text-red-400">Build failed</span>
         )}
 
+        <div className="w-px h-5 bg-white/10 mx-0.5" />
+
+        {/* Settings */}
+        {onShowSettings && (
+          <button
+            onClick={onShowSettings}
+            title="Editor settings"
+            className="w-7 h-7 flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/8 transition-colors"
+          >
+            <Settings size={13} />
+          </button>
+        )}
+
+        {/* Keyboard shortcuts */}
+        {onShowShortcuts && (
+          <button
+            onClick={onShowShortcuts}
+            title="Keyboard shortcuts (?)"
+            className="w-7 h-7 flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/8 transition-colors font-mono text-xs font-bold"
+          >
+            <HelpCircle size={13} />
+          </button>
+        )}
+
         {/* User */}
         {user && (
           <>
-            <div className="w-px h-5 bg-white/10 hidden md:block" />
+            <div className="w-px h-5 bg-white/10 hidden md:block mx-0.5" />
             <div className="hidden md:flex items-center gap-1.5">
               <User size={11} className="text-white/40" />
               <span className="font-mono text-[10px] text-white/40 max-w-[110px] truncate" title={user.email}>

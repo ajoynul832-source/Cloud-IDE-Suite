@@ -1,19 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
-  Compass,
-  Eye,
-  GitFork,
-  Play,
-  Loader2,
-  AlertCircle,
-  ArrowLeft,
-  Box,
+  Compass, Eye, GitFork, Play, Loader2,
+  AlertCircle, ArrowLeft, Box, Search, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProjects } from "@/hooks/useProjects";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ExploreProject {
   shareId:     string;
@@ -33,20 +25,24 @@ interface ExploreResponse {
   error?:   string;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 const LANG_META: Record<string, { label: string; color: string }> = {
-  javascript:   { label: "JavaScript",   color: "bg-yellow-500/15 text-yellow-400 border-yellow-500/25" },
-  typescript:   { label: "TypeScript",   color: "bg-blue-500/15   text-blue-400   border-blue-500/25"   },
-  python:       { label: "Python",       color: "bg-green-500/15  text-green-400  border-green-500/25"  },
-  flutter:      { label: "Flutter",      color: "bg-cyan-500/15   text-cyan-400   border-cyan-500/25"   },
-  "react-native": { label: "React Native", color: "bg-cyan-500/15 text-cyan-400   border-cyan-500/25"   },
-  android:      { label: "Android",      color: "bg-green-600/15  text-green-500  border-green-600/25"  },
-  html:         { label: "HTML",         color: "bg-orange-500/15 text-orange-400 border-orange-500/25" },
+  javascript:     { label: "JavaScript",   color: "bg-yellow-500/15 text-yellow-400 border-yellow-500/25" },
+  typescript:     { label: "TypeScript",   color: "bg-blue-500/15   text-blue-400   border-blue-500/25"   },
+  python:         { label: "Python",       color: "bg-green-500/15  text-green-400  border-green-500/25"  },
+  flutter:        { label: "Flutter",      color: "bg-cyan-500/15   text-cyan-400   border-cyan-500/25"   },
+  "react-native": { label: "React Native", color: "bg-cyan-500/15   text-cyan-400   border-cyan-500/25"   },
+  android:        { label: "Android",      color: "bg-green-600/15  text-green-500  border-green-600/25"  },
+  html:           { label: "HTML",         color: "bg-orange-500/15 text-orange-400 border-orange-500/25" },
+  web:            { label: "Web",          color: "bg-orange-500/15 text-orange-400 border-orange-500/25" },
 };
 
+const FILTER_LANGS = ["javascript", "typescript", "python", "html", "flutter", "react-native", "android"];
+
 function langMeta(projectType: string) {
-  return LANG_META[projectType.toLowerCase()] ?? { label: projectType, color: "bg-primary/15 text-primary border-primary/25" };
+  return LANG_META[projectType.toLowerCase()] ?? {
+    label: projectType,
+    color: "bg-primary/15 text-primary border-primary/25",
+  };
 }
 
 function fmtCount(n: number): string {
@@ -56,8 +52,6 @@ function fmtCount(n: number): string {
 
 const PAGE_SIZE = 20;
 
-// ─── Explore Card ─────────────────────────────────────────────────────────────
-
 function ExploreCard({
   project,
   onForkDone,
@@ -65,7 +59,7 @@ function ExploreCard({
   project:    ExploreProject;
   onForkDone: () => void;
 }) {
-  const [, navigate]   = useLocation();
+  const [, navigate]    = useLocation();
   const { saveProject } = useProjects();
   const [isForking, setIsForking] = useState(false);
   const [forkError, setForkError] = useState<string | null>(null);
@@ -91,15 +85,14 @@ function ExploreCard({
       );
       if (!saved) throw new Error("Could not save fork");
 
-      // record event (non-blocking)
       fetch(`/api/share/${project.shareId}/event`, {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event: "fork" }),
+        body:    JSON.stringify({ event: "fork" }),
       }).catch(() => {});
 
       onForkDone();
-      navigate("/");
+      navigate("/ide");
     } catch (err) {
       setForkError(err instanceof Error ? err.message : "Fork failed");
     } finally {
@@ -112,7 +105,6 @@ function ExploreCard({
       onClick={handleOpen}
       className="group flex flex-col bg-card border border-border rounded-lg overflow-hidden hover:border-primary/50 hover:shadow-md hover:shadow-primary/5 transition-all duration-200 cursor-pointer"
     >
-      {/* Card header */}
       <div className="px-4 pt-4 pb-3 flex items-start justify-between gap-2">
         <h3
           className="font-mono text-sm font-semibold text-foreground truncate leading-tight group-hover:text-primary transition-colors"
@@ -120,14 +112,11 @@ function ExploreCard({
         >
           {project.title}
         </h3>
-        <span
-          className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full border shrink-0 ${meta.color}`}
-        >
+        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full border shrink-0 ${meta.color}`}>
           {meta.label}
         </span>
       </div>
 
-      {/* Stats */}
       <div className="px-4 pb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground">
           <Eye size={10} className="shrink-0" />
@@ -147,10 +136,8 @@ function ExploreCard({
         )}
       </div>
 
-      {/* Divider */}
       <div className="border-t border-border mx-4" />
 
-      {/* Actions */}
       <div className="px-4 py-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
         <Button
           variant="outline"
@@ -166,11 +153,10 @@ function ExploreCard({
           onClick={handleFork}
           className="font-mono text-xs h-7 px-3 bg-primary text-primary-foreground hover:bg-primary/90"
         >
-          {isForking ? (
-            <Loader2 size={11} className="animate-spin" />
-          ) : (
-            <><GitFork size={11} className="mr-1" />Fork</>
-          )}
+          {isForking
+            ? <Loader2 size={11} className="animate-spin" />
+            : <><GitFork size={11} className="mr-1" />Fork</>
+          }
         </Button>
       </div>
 
@@ -181,15 +167,16 @@ function ExploreCard({
   );
 }
 
-// ─── Explore Page ─────────────────────────────────────────────────────────────
-
 export default function Explore() {
   const [, navigate] = useLocation();
 
-  const [items,     setItems]     = useState<ExploreProject[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error,     setError]     = useState<string | null>(null);
-  const [hasMore,   setHasMore]   = useState(true);
+  const [items,       setItems]       = useState<ExploreProject[]>([]);
+  const [isLoading,   setIsLoading]   = useState(false);
+  const [error,       setError]       = useState<string | null>(null);
+  const [hasMore,     setHasMore]     = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [langFilter,  setLangFilter]  = useState<string | null>(null);
+
   const offsetRef   = useRef(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -211,21 +198,17 @@ export default function Explore() {
     }
   }, [isLoading]);
 
-  // Initial load
   useEffect(() => {
     fetchPage(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Infinite scroll via IntersectionObserver
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && hasMore && !isLoading) {
-          fetchPage(offsetRef.current);
-        }
+        if (entries[0]?.isIntersecting && hasMore && !isLoading) fetchPage(offsetRef.current);
       },
       { threshold: 0.1 },
     );
@@ -233,7 +216,13 @@ export default function Explore() {
     return () => observer.disconnect();
   }, [hasMore, isLoading, fetchPage]);
 
-  const isEmpty = !isLoading && items.length === 0 && !error;
+  const filteredItems = items.filter((item) => {
+    const matchesSearch = !searchQuery || item.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesLang   = !langFilter  || item.projectType.toLowerCase() === langFilter.toLowerCase();
+    return matchesSearch && matchesLang;
+  });
+
+  const isEmpty = !isLoading && filteredItems.length === 0 && !error;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -252,7 +241,7 @@ export default function Explore() {
         </div>
         <div className="flex-1" />
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/ide")}
           className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted/50 transition-colors"
         >
           <ArrowLeft size={12} />
@@ -260,17 +249,78 @@ export default function Explore() {
         </button>
       </div>
 
-      {/* Content */}
       <div className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="font-mono text-xl font-bold text-foreground">
-            Explore Projects
-          </h1>
+        <div className="mb-5">
+          <h1 className="font-mono text-xl font-bold text-foreground">Explore Projects</h1>
           <p className="mt-1 font-mono text-sm text-muted-foreground">
             Discover shared projects from the community. Open, run, or fork anything.
           </p>
         </div>
+
+        {/* Search + filter bar */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-5">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search projects…"
+              className="w-full bg-card border border-border rounded px-9 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors h-9"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Language filter chips */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => setLangFilter(null)}
+              className={[
+                "px-2.5 py-1 rounded-full font-mono text-[11px] border transition-colors",
+                !langFilter
+                  ? "bg-primary/20 text-primary border-primary/30"
+                  : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+              ].join(" ")}
+            >
+              All
+            </button>
+            {FILTER_LANGS.map((lang) => {
+              const meta = langMeta(lang);
+              return (
+                <button
+                  key={lang}
+                  onClick={() => setLangFilter(langFilter === lang ? null : lang)}
+                  className={[
+                    "px-2.5 py-1 rounded-full font-mono text-[11px] border transition-colors",
+                    langFilter === lang
+                      ? meta.color
+                      : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {meta.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Result count */}
+        {(searchQuery || langFilter) && (
+          <p className="font-mono text-xs text-muted-foreground/60 mb-4">
+            {filteredItems.length} result{filteredItems.length !== 1 ? "s" : ""}
+            {searchQuery ? ` for "${searchQuery}"` : ""}
+            {langFilter ? ` in ${langMeta(langFilter).label}` : ""}
+          </p>
+        )}
 
         {/* Error */}
         {error && (
@@ -284,14 +334,18 @@ export default function Explore() {
         {isEmpty && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Compass size={48} className="text-muted-foreground/30 mb-4" />
-            <p className="font-mono text-muted-foreground text-sm">No shared projects yet.</p>
+            <p className="font-mono text-muted-foreground text-sm">
+              {searchQuery || langFilter ? "No projects match your search." : "No shared projects yet."}
+            </p>
             <p className="font-mono text-muted-foreground/60 text-xs mt-1">
-              Create and share a project to see it here.
+              {searchQuery || langFilter
+                ? "Try a different search term or filter."
+                : "Create and share a project to see it here."}
             </p>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/ide")}
               className="mt-4 font-mono text-xs"
             >
               Open IDE
@@ -300,9 +354,9 @@ export default function Explore() {
         )}
 
         {/* Grid */}
-        {items.length > 0 && (
+        {filteredItems.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((project) => (
+            {filteredItems.map((project) => (
               <ExploreCard
                 key={project.shareId}
                 project={project}
@@ -312,10 +366,8 @@ export default function Explore() {
           </div>
         )}
 
-        {/* Infinite scroll sentinel */}
         <div ref={sentinelRef} className="h-1" />
 
-        {/* Loading indicator */}
         {isLoading && (
           <div className="flex justify-center py-8">
             <div className="flex items-center gap-2 font-mono text-sm text-muted-foreground">
@@ -325,7 +377,6 @@ export default function Explore() {
           </div>
         )}
 
-        {/* End of feed */}
         {!hasMore && items.length > 0 && !isLoading && (
           <p className="text-center font-mono text-xs text-muted-foreground/50 py-6">
             — end of results —
