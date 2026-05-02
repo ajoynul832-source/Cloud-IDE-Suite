@@ -5,18 +5,35 @@ import { Editor, EditorRef } from "@/components/Editor";
 import { TabBar } from "@/components/TabBar";
 import { PreviewPanel } from "@/components/PreviewPanel";
 import { Toolbar } from "@/components/Toolbar";
+import { TemplateSelector } from "@/components/TemplateSelector";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useBuild } from "@/hooks/useBuild";
+import { ProjectTemplate } from "@/lib/templates";
 
 export default function IDE() {
-  const { files, saveFile, createFile, renameFile, deleteFile } = useFileSystem();
+  const { files, saveFile, createFile, renameFile, deleteFile, loadTemplate } = useFileSystem();
   const { isBuilding, startBuild, status, logs, jobId } = useBuild();
-  
+
   const [openFiles, setOpenFiles] = useState<string[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [rightPanelTab, setRightPanelTab] = useState<"preview" | "build">("preview");
-  
+  const [showTemplates, setShowTemplates] = useState(false);
+
   const editorRef = useRef<EditorRef>(null);
+
+  // Detect current language from open files
+  const currentLanguage = (() => {
+    const f = activeFile ?? Object.keys(files)[0] ?? "";
+    const ext = f.split(".").pop()?.toLowerCase() ?? "";
+    const extMap: Record<string, string> = {
+      dart: "Dart", kt: "Kotlin", kts: "Kotlin", java: "Java",
+      swift: "Swift", py: "Python", rs: "Rust", go: "Go",
+      cs: "C#", cpp: "C++", c: "C", h: "C/C++",
+      ts: "TypeScript", tsx: "TypeScript", js: "JavaScript", jsx: "JavaScript",
+      html: "HTML", css: "CSS", json: "JSON", xml: "XML", md: "Markdown",
+    };
+    return extMap[ext] ?? undefined;
+  })();
 
   const handleSelectFile = (path: string) => {
     if (!openFiles.includes(path)) {
@@ -40,33 +57,44 @@ export default function IDE() {
   };
 
   const handleBuild = () => {
-    // If there is an active file, make sure we save its latest content from the editor
     if (activeFile && editorRef.current) {
       const content = editorRef.current.getContent();
       saveFile(activeFile, content);
-      
-      // Update local copy so we zip the freshest
-      const currentFiles = { ...files, [activeFile]: content };
-      startBuild(currentFiles);
+      startBuild({ ...files, [activeFile]: content });
     } else {
       startBuild(files);
     }
     setRightPanelTab("build");
   };
 
+  const handleLoadTemplate = (template: ProjectTemplate) => {
+    loadTemplate(template.files);
+    setOpenFiles([]);
+    setActiveFile(null);
+    setShowTemplates(false);
+    // Auto-open first file
+    const first = Object.keys(template.files).sort()[0];
+    if (first) {
+      setOpenFiles([first]);
+      setActiveFile(first);
+    }
+  };
+
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
-      <Toolbar 
-        isBuilding={isBuilding} 
-        onRun={handleRun} 
-        onBuild={handleBuild} 
+      <Toolbar
+        isBuilding={isBuilding}
+        onRun={handleRun}
+        onBuild={handleBuild}
+        onNewProject={() => setShowTemplates(true)}
         buildStatus={status?.status}
         jobId={jobId}
+        currentLanguage={currentLanguage}
       />
-      
+
       <div className="flex-1 overflow-hidden">
-        <ResizablePanelGroup direction="horizontal">
-          <ResizablePanel defaultSize={20} minSize={10} maxSize={40}>
+        <ResizablePanelGroup direction="horizontal" className="h-full">
+          <ResizablePanel defaultSize={20} minSize={12} maxSize={40}>
             <FileTree
               files={files}
               activeFile={activeFile}
@@ -76,10 +104,10 @@ export default function IDE() {
               onRename={renameFile}
             />
           </ResizablePanel>
-          
-          <ResizableHandle className="bg-border w-1 hover:bg-primary transition-colors" />
-          
-          <ResizablePanel defaultSize={50} minSize={30}>
+
+          <ResizableHandle className="bg-border w-[1px] hover:bg-primary transition-colors" />
+
+          <ResizablePanel defaultSize={50} minSize={25}>
             <div className="h-full flex flex-col bg-background">
               <TabBar
                 openFiles={openFiles}
@@ -91,31 +119,45 @@ export default function IDE() {
                 {activeFile && files[activeFile] !== undefined ? (
                   <Editor
                     ref={editorRef}
+                    key={activeFile}
                     initialContent={files[activeFile]}
                     filename={activeFile}
                     onChange={(content) => saveFile(activeFile, content)}
                   />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground font-mono text-sm">
-                    Select a file to edit
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground font-mono text-sm gap-3">
+                    <span>Select a file to edit</span>
+                    <button
+                      onClick={() => setShowTemplates(true)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      or start a new project
+                    </button>
                   </div>
                 )}
               </div>
             </div>
           </ResizablePanel>
-          
-          <ResizableHandle className="bg-border w-1 hover:bg-primary transition-colors" />
-          
-          <ResizablePanel defaultSize={30} minSize={20}>
-            <PreviewPanel 
-              logs={logs} 
-              isBuilding={isBuilding} 
+
+          <ResizableHandle className="bg-border w-[1px] hover:bg-primary transition-colors" />
+
+          <ResizablePanel defaultSize={30} minSize={18}>
+            <PreviewPanel
+              logs={logs}
+              isBuilding={isBuilding}
               activeTab={rightPanelTab}
               onTabChange={setRightPanelTab}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+
+      {showTemplates && (
+        <TemplateSelector
+          onSelect={handleLoadTemplate}
+          onClose={() => setShowTemplates(false)}
+        />
+      )}
     </div>
   );
 }

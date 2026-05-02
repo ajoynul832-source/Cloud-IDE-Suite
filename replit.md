@@ -2,11 +2,14 @@
 
 ## Overview
 
-A mobile-first cloud IDE system that allows users to submit Flutter projects (as ZIP files) and compile real Android APKs on the server. The Expo mobile app provides a sleek dark-terminal interface for uploading, tracking builds, and downloading APKs.
+A mobile-first cloud IDE system with two frontends:
+1. **Expo mobile app** — for submitting Flutter ZIPs via URL and tracking builds
+2. **Web Cloud IDE** — full browser-based code editor supporting 10+ mobile development languages with APK build pipeline
 
 ## Architecture
 
 - **Expo Mobile App** (`artifacts/mobile`) — Frontend app at `/` (served via REPLIT_EXPO_DEV_DOMAIN)
+- **Web Cloud IDE** (`artifacts/cloud-ide`) — React+Vite IDE at `/ide/`
 - **API Server** (`artifacts/api-server`) — Express backend at `/api`
 - **Shared API Client** (`lib/api-client-react`) — React Query hooks generated from OpenAPI spec
 
@@ -22,6 +25,53 @@ A mobile-first cloud IDE system that allows users to submit Flutter projects (as
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 - **Mobile**: Expo SDK 54, Expo Router, React Native 0.81.5
+
+## Cloud IDE Features (`artifacts/cloud-ide`)
+
+- **CodeMirror 6 editor** with syntax highlighting for 15+ languages
+- **Multi-tab editor** with localStorage-based file persistence
+- **File tree** with folder grouping, language icons, inline rename, create/delete
+- **Project templates** for 10 mobile stacks (see below)
+- **APK Build pipeline**: zips files in-browser → uploads to `/api/build` → polls status → streams logs
+- **Resizable panels**: file tree, editor, preview/log panel
+- **Language badge** in toolbar shows detected language of active file
+
+### Supported Languages (CodeMirror 6)
+
+| Language | Extension | Package |
+|----------|-----------|---------|
+| Dart/Flutter | .dart | JS fallback |
+| Kotlin | .kt, .kts | @codemirror/lang-java |
+| Java | .java | @codemirror/lang-java |
+| Swift | .swift | JS fallback |
+| Python | .py | @codemirror/lang-python |
+| C# | .cs | @codemirror/lang-cpp |
+| C/C++ | .c/.cpp/.h | @codemirror/lang-cpp |
+| Rust | .rs | @codemirror/lang-rust |
+| Go | .go | @codemirror/lang-go |
+| JavaScript/JSX | .js/.jsx | @codemirror/lang-javascript |
+| TypeScript/TSX | .ts/.tsx | @codemirror/lang-javascript |
+| HTML | .html | @codemirror/lang-html |
+| CSS/SCSS | .css | @codemirror/lang-css |
+| JSON | .json | @codemirror/lang-json |
+| XML | .xml | @codemirror/lang-xml |
+| Markdown | .md | @codemirror/lang-markdown |
+
+### Project Templates
+
+| Template | Language | Framework |
+|----------|----------|-----------|
+| Flutter | Dart | Flutter SDK |
+| React Native (TypeScript) | TypeScript | React Native 0.73 |
+| Android Kotlin | Kotlin | Android SDK |
+| Android Java | Java | Android SDK |
+| iOS Swift | Swift | SwiftUI |
+| Python Kivy | Python | Kivy + buildozer |
+| .NET MAUI | C# | .NET 8 |
+| Ionic / Capacitor | TypeScript | Ionic Angular |
+| Rust Tauri Mobile | Rust | Tauri 2.0 |
+| Go gomobile | Go | golang.org/x/mobile |
+| C++ NDK | C++ | Android NDK |
 
 ## Core API Endpoints
 

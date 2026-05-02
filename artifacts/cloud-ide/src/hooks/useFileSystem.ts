@@ -158,11 +158,17 @@ export function useFileSystem() {
     });
   }, []);
 
+  const loadTemplate = useCallback((templateFiles: Record<string, string>) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(templateFiles));
+    setFiles(templateFiles);
+  }, []);
+
   return {
     files,
     saveFile,
     createFile,
     renameFile,
     deleteFile,
+    loadTemplate,
   };
 }
