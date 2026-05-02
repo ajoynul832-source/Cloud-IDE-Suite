@@ -420,6 +420,63 @@ Always run `pnpm run typecheck:libs` after schema changes to regenerate Drizzle 
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 
+## Phase 7 — Monitoring & Observability (Complete)
+
+### Structured Logging (`lib/logger.ts`)
+Pino with multistream — every entry carries `{ time, level, service: "api-server", env, ...fields }`:
+- **Console**: pino-pretty (dev) / raw JSON (prod)
+- **`logs/app.log`**: INFO and above, async, JSON
+- **`logs/errors.log`**: ERROR and above, async, JSON
+- Redacts `authorization`, `cookie`, `set-cookie`, `*.password`, `*.token`
+- Debug level active in dev (`LOG_LEVEL` env override supported)
+
+### Metrics Singleton (`lib/metrics.ts`)
+In-memory counters with Redis HINCRBY write-through for crash recovery.
+Daily-scoped Redis hash key: `metrics:{YYYY-MM-DD}` with 48h TTL.
+Queue depths and active-user counts refreshed every 30 seconds.
+
+Recorded events:
+| Caller | Method | What it tracks |
+|--------|--------|----------------|
+| `workers/runJob.ts` | `metrics.recordRun()` | language, durationMs, success/error |
+| `workers/buildJob.ts` | `metrics.recordBuild()` | language, durationMs, success/error |
+| `workers/androidJob.ts` | `metrics.recordBuild()` | same |
+| Both build workers | `metrics.recordBuildRetry()` | Phase 5 retry events |
+| All rate limiters | `metrics.recordRateLimitHit()` | every 429 response |
+
+### Metrics Endpoint (`routes/metrics.ts`)
+`GET /api/metrics` — admin-gated (same `ADMIN_TOKEN ?? SESSION_SECRET` Bearer/Basic auth).
+
+Response shape:
+```json
+{
+  "generatedAt": "ISO timestamp",
+  "period": "YYYY-MM-DD",
+  "uptimeSeconds": 3600,
+  "runs": {
+    "total": 142, "errors": 4, "errorRate": "2.8%",
+    "byLanguage": { "javascript": { "count": 100, "durationSum": 5000 } },
+    "avgDurationMs": { "javascript": 50, "typescript": 200, "python": 80 }
+  },
+  "builds": {
+    "total": 8, "errors": 1, "retries": 2,
+    "errorRate": "12.5%", "avgDurationMs": 30000
+  },
+  "rateLimitHits": 17,
+  "queues": { "runs": { "waiting": 0, "active": 2 }, "builds": { "waiting": 1, "active": 1 } },
+  "activeUsers24h": 23,
+  "logFiles": {
+    "app":    { "path": "logs/app.log",    "sizeBytes": 51200 },
+    "errors": { "path": "logs/errors.log", "sizeBytes": 1024  }
+  }
+}
+```
+
+### Rate Limiter Observability (`middlewares/rate-limit.ts`)
+All 5 limiters now use a custom `handler` that:
+1. Logs `WARN` with `{ limiter, ip, path, method, userId }` — appears in both console and `logs/app.log`
+2. Calls `metrics.recordRateLimitHit()` for the metrics counter
+
 ## Flutter SDK Requirement
 
 The build pipeline requires Flutter SDK, Android SDK, and Java to be installed on the server. These must be added to PATH:

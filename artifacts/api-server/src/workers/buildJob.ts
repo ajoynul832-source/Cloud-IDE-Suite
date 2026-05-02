@@ -9,6 +9,10 @@
  *   - Retriable errors (timeout, network) → throw → BullMQ retries with 5 s back-off
  *   - Permanent errors (bad project, missing SDK) → throw UnrecoverableError → no retry
  *   - DB status tracks "failed-will-retry" during the window between attempts
+ *
+ * Phase 7 — Observability:
+ *   Records build metrics (duration, success, retries) via metrics singleton.
+ *   WARN-logs retries; ERROR-logs final failures.
  */
 import type { Job } from "bullmq";
 import { UnrecoverableError } from "bullmq";
@@ -23,6 +27,7 @@ import { eq, sql } from "drizzle-orm";
 import { storeApk }       from "../lib/apk-storage";
 import { flutterBin }     from "../lib/flutter";
 import { logger }         from "../lib/logger";
+import { metrics }        from "../lib/metrics";
 import { classifyError, logBuildError } from "../lib/build-resilience";
 
 export interface BuildJobData {
@@ -105,13 +110,17 @@ export async function buildJobProcessor(job: Job<BuildJobData>): Promise<void> {
   let zipPath  = job.data.zipPath;
   const tmpDir = os.tmpdir();
 
-  // Track attempt number (BullMQ sets attemptsMade before calling processor)
-  const attemptNumber = job.attemptsMade; // 1-indexed
-  const isRetry = attemptNumber > 1;
+  const attemptNumber = job.attemptsMade;
+  const isRetry       = attemptNumber > 1;
+  const buildStart    = Date.now();
 
-  logger.info({ jobId: job.id, buildId, language, attempt: attemptNumber }, "flutter build worker: starting");
+  logger.info({ jobId: job.id, buildId, language, userId, attempt: attemptNumber },
+    isRetry ? "flutter build worker: retry attempt" : "flutter build worker: starting");
 
   if (isRetry) {
+    metrics.recordBuildRetry();
+    logger.warn({ jobId: job.id, buildId, language, userId, attempt: attemptNumber },
+      "flutter build: retrying after previous failure");
     await appendLog(buildId, `\n[${ts()}] ── Retry attempt ${attemptNumber} of ${MAX_ATTEMPTS} ──`);
     await db.update(buildsTable)
       .set({ status: "building", retryCount: attemptNumber - 1 })
@@ -120,7 +129,6 @@ export async function buildJobProcessor(job: Job<BuildJobData>): Promise<void> {
     await appendLog(buildId, `[${ts()}] Build started — language: ${language}`);
   }
 
-  // Create ZIP from project files if needed
   if (!zipPath && job.data.files) {
     const generatedZip = path.join(tmpDir, `build_${buildId}.zip`);
     await appendLog(buildId, `[${ts()}] Packaging project files...`);
@@ -130,6 +138,8 @@ export async function buildJobProcessor(job: Job<BuildJobData>): Promise<void> {
 
   if (!zipPath || !fs.existsSync(zipPath)) {
     await markFailed(buildId, "ZIP file missing or could not be created", "permanent", attemptNumber - 1);
+    logger.error({ buildId, language, userId }, "flutter build: ZIP file missing");
+    metrics.recordBuild({ language, durationMs: Date.now() - buildStart, success: false });
     throw new UnrecoverableError("ZIP file missing — cannot retry");
   }
 
@@ -147,7 +157,6 @@ export async function buildJobProcessor(job: Job<BuildJobData>): Promise<void> {
     });
     await appendLog(buildId, `[${ts()}] Extraction complete`);
 
-    // Detect Flutter project root (handle nested zip)
     let buildRoot = projectDir;
     const entries = await fsp.readdir(projectDir);
     if (entries.length === 1) {
@@ -155,7 +164,6 @@ export async function buildJobProcessor(job: Job<BuildJobData>): Promise<void> {
       if ((await fsp.stat(sub)).isDirectory()) buildRoot = sub;
     }
 
-    // Validate structure
     if (!fs.existsSync(path.join(buildRoot, "pubspec.yaml")))
       throw new Error("Invalid Flutter project: pubspec.yaml not found");
     if (!fs.existsSync(path.join(buildRoot, "lib", "main.dart")))
@@ -181,15 +189,17 @@ export async function buildJobProcessor(job: Job<BuildJobData>): Promise<void> {
 
     const { storedPath, sizeBytes } = await storeApk(apkSrc, buildId);
     await markComplete(buildId, storedPath, sizeBytes);
+    const durationMs = Date.now() - buildStart;
     await appendLog(buildId, `[${ts()}] Build SUCCESS — APK ready (${Math.round(sizeBytes / 1024)} KB)`);
 
-    logger.info({ buildId, storedPath, sizeBytes }, "flutter build worker: complete");
+    metrics.recordBuild({ language, durationMs, success: true });
+    logger.info({ buildId, language, userId, durationMs, sizeBytes }, "flutter build worker: complete");
 
   } catch (err) {
+    const durationMs = Date.now() - buildStart;
     const { errorType, userMessage } = classifyError(err);
     const isLastAttempt = attemptNumber >= MAX_ATTEMPTS;
 
-    // Write to structured build error log
     await logBuildError({
       ts: new Date().toISOString(),
       buildId, userId: userId ?? null, language,
@@ -200,19 +210,25 @@ export async function buildJobProcessor(job: Job<BuildJobData>): Promise<void> {
     if (errorType === "permanent" || errorType === "system") {
       await appendLog(buildId, `[${ts()}] Build FAILED (${errorType}): ${userMessage}`);
       await markFailed(buildId, userMessage, errorType, attemptNumber - 1);
+      logger.error({ buildId, language, userId, errorType, durationMs, attempt: attemptNumber },
+        `flutter build: permanent/system failure — ${userMessage}`);
+      metrics.recordBuild({ language, durationMs, success: false });
       throw new UnrecoverableError(userMessage);
     }
 
-    // Retriable
     if (!isLastAttempt) {
       await appendLog(buildId, `[${ts()}] Build failed — retrying (attempt ${attemptNumber + 1} of ${MAX_ATTEMPTS}): ${userMessage}`);
       await markWillRetry(buildId, `${userMessage} — retrying...`, errorType, attemptNumber);
+      logger.warn({ buildId, language, userId, errorType, durationMs, attempt: attemptNumber, maxAttempts: MAX_ATTEMPTS },
+        `flutter build: retriable failure, will retry — ${userMessage}`);
       throw err instanceof Error ? err : new Error(userMessage);
     }
 
-    // Last attempt exhausted
     await appendLog(buildId, `[${ts()}] Build FAILED after ${MAX_ATTEMPTS} attempts: ${userMessage}`);
     await markFailed(buildId, userMessage, errorType, attemptNumber - 1);
+    logger.error({ buildId, language, userId, errorType, durationMs, attempts: MAX_ATTEMPTS },
+      `flutter build: failed after all retries — ${userMessage}`);
+    metrics.recordBuild({ language, durationMs, success: false });
     throw err instanceof Error ? err : new Error(userMessage);
 
   } finally {

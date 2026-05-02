@@ -8,6 +8,10 @@
  *   - attempts: 2 (configured on queue)
  *   - Retriable errors (timeout, network, gradle transient) → throw → BullMQ retries
  *   - Permanent errors (missing SDK, bad project) → throw UnrecoverableError → no retry
+ *
+ * Phase 7 — Observability:
+ *   Records build metrics (duration, success, retries) via metrics singleton.
+ *   WARN-logs retries; ERROR-logs final failures.
  */
 import type { Job } from "bullmq";
 import { UnrecoverableError } from "bullmq";
@@ -22,6 +26,7 @@ import { eq, sql } from "drizzle-orm";
 import { storeApk }       from "../lib/apk-storage";
 import { gradleBin, androidSdkRoot } from "../lib/android";
 import { logger }         from "../lib/logger";
+import { metrics }        from "../lib/metrics";
 import { classifyError, logBuildError } from "../lib/build-resilience";
 
 export interface AndroidJobData {
@@ -135,11 +140,16 @@ export async function androidJobProcessor(job: Job<AndroidJobData>): Promise<voi
   const tmpDir = os.tmpdir();
 
   const attemptNumber = job.attemptsMade;
-  const isRetry = attemptNumber > 1;
+  const isRetry       = attemptNumber > 1;
+  const buildStart    = Date.now();
 
-  logger.info({ jobId: job.id, buildId, language, attempt: attemptNumber }, "android build worker: starting");
+  logger.info({ jobId: job.id, buildId, language, userId, attempt: attemptNumber },
+    isRetry ? "android build worker: retry attempt" : "android build worker: starting");
 
   if (isRetry) {
+    metrics.recordBuildRetry();
+    logger.warn({ jobId: job.id, buildId, language, userId, attempt: attemptNumber },
+      "android build: retrying after previous failure");
     await appendLog(buildId, `\n[${ts()}] ── Retry attempt ${attemptNumber} of ${MAX_ATTEMPTS} ──`);
     await db.update(buildsTable)
       .set({ status: "building", retryCount: attemptNumber - 1 })
@@ -151,6 +161,8 @@ export async function androidJobProcessor(job: Job<AndroidJobData>): Promise<voi
   const sdkDir = androidSdkRoot();
   if (!sdkDir) {
     await markFailed(buildId, "Android SDK not configured (ANDROID_HOME not set)", "permanent", attemptNumber - 1);
+    logger.error({ buildId, language, userId }, "android build: Android SDK not configured");
+    metrics.recordBuild({ language, durationMs: Date.now() - buildStart, success: false });
     throw new UnrecoverableError("Android SDK not configured — cannot retry");
   }
 
@@ -169,6 +181,8 @@ export async function androidJobProcessor(job: Job<AndroidJobData>): Promise<voi
 
   if (!zipPath || !fs.existsSync(zipPath)) {
     await markFailed(buildId, "ZIP file missing or could not be created", "permanent", attemptNumber - 1);
+    logger.error({ buildId, language, userId }, "android build: ZIP file missing");
+    metrics.recordBuild({ language, durationMs: Date.now() - buildStart, success: false });
     throw new UnrecoverableError("ZIP file missing — cannot retry");
   }
 
@@ -193,7 +207,6 @@ export async function androidJobProcessor(job: Job<AndroidJobData>): Promise<voi
       if ((await fsp.stat(sub)).isDirectory()) buildRoot = sub;
     }
 
-    // Validate Android project structure
     const hasRootGradle     = fs.existsSync(path.join(buildRoot, "build.gradle")) || fs.existsSync(path.join(buildRoot, "build.gradle.kts"));
     const hasSettingsGradle = fs.existsSync(path.join(buildRoot, "settings.gradle")) || fs.existsSync(path.join(buildRoot, "settings.gradle.kts"));
     const hasAppDir         = fs.existsSync(path.join(buildRoot, "app"));
@@ -242,11 +255,14 @@ export async function androidJobProcessor(job: Job<AndroidJobData>): Promise<voi
     await appendLog(buildId, `[${ts()}] Found APK: ${path.relative(buildRoot, apkSrc)}`);
     const { storedPath, sizeBytes } = await storeApk(apkSrc, buildId);
     await markComplete(buildId, storedPath, sizeBytes);
+    const durationMs = Date.now() - buildStart;
     await appendLog(buildId, `[${ts()}] Build SUCCESS — APK ready (${Math.round(sizeBytes / 1024)} KB)`);
 
-    logger.info({ buildId, storedPath, sizeBytes }, "android build worker: complete");
+    metrics.recordBuild({ language, durationMs, success: true });
+    logger.info({ buildId, language, userId, durationMs, sizeBytes }, "android build worker: complete");
 
   } catch (err) {
+    const durationMs = Date.now() - buildStart;
     const { errorType, userMessage } = classifyError(err);
     const isLastAttempt = attemptNumber >= MAX_ATTEMPTS;
 
@@ -260,17 +276,25 @@ export async function androidJobProcessor(job: Job<AndroidJobData>): Promise<voi
     if (errorType === "permanent" || errorType === "system") {
       await appendLog(buildId, `[${ts()}] Build FAILED (${errorType}): ${userMessage}`);
       await markFailed(buildId, userMessage, errorType, attemptNumber - 1);
+      logger.error({ buildId, language, userId, errorType, durationMs, attempt: attemptNumber },
+        `android build: permanent/system failure — ${userMessage}`);
+      metrics.recordBuild({ language, durationMs, success: false });
       throw new UnrecoverableError(userMessage);
     }
 
     if (!isLastAttempt) {
       await appendLog(buildId, `[${ts()}] Build failed — retrying (attempt ${attemptNumber + 1} of ${MAX_ATTEMPTS}): ${userMessage}`);
       await markWillRetry(buildId, `${userMessage} — retrying...`, errorType, attemptNumber);
+      logger.warn({ buildId, language, userId, errorType, durationMs, attempt: attemptNumber, maxAttempts: MAX_ATTEMPTS },
+        `android build: retriable failure, will retry — ${userMessage}`);
       throw err instanceof Error ? err : new Error(userMessage);
     }
 
     await appendLog(buildId, `[${ts()}] Build FAILED after ${MAX_ATTEMPTS} attempts: ${userMessage}`);
     await markFailed(buildId, userMessage, errorType, attemptNumber - 1);
+    logger.error({ buildId, language, userId, errorType, durationMs, attempts: MAX_ATTEMPTS },
+      `android build: failed after all retries — ${userMessage}`);
+    metrics.recordBuild({ language, durationMs, success: false });
     throw err instanceof Error ? err : new Error(userMessage);
 
   } finally {
