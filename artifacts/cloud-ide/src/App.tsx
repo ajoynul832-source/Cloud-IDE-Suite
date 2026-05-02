@@ -6,9 +6,11 @@ import { lazy, Suspense } from "react";
 import NotFound      from "@/pages/not-found";
 import IDE          from "@/pages/IDE";
 import SharedProject from "@/pages/SharedProject";
+import LandingPage   from "@/pages/LandingPage";
 import { AuthProvider } from "@/contexts/AuthContext";
 
-const Explore = lazy(() => import("@/pages/Explore"));
+const Explore  = lazy(() => import("@/pages/Explore"));
+const AuthPage = lazy(() => import("@/pages/AuthPage"));
 
 const queryClient = new QueryClient();
 
@@ -22,11 +24,19 @@ function Router() {
   return (
     <Switch>
       <Route path="/">
+        <LandingPage />
+      </Route>
+      <Route path="/ide">
         <IDE />
       </Route>
       <Route path="/explore">
         <Suspense fallback={LoadingScreen}>
           <Explore />
+        </Suspense>
+      </Route>
+      <Route path="/auth">
+        <Suspense fallback={LoadingScreen}>
+          <AuthPage />
         </Suspense>
       </Route>
       <Route path="/p/:shareId" component={SharedProject} />

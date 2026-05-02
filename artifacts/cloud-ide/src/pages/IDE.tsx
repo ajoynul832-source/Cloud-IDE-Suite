@@ -5,6 +5,7 @@ import { Editor, EditorRef } from "@/components/Editor";
 import { TabBar } from "@/components/TabBar";
 import { PreviewPanel, PanelTab } from "@/components/PreviewPanel";
 import { Toolbar, AutosaveStatus } from "@/components/Toolbar";
+import { StatusBar } from "@/components/StatusBar";
 import { TemplateSelector } from "@/components/TemplateSelector";
 import { ProjectsModal } from "@/components/ProjectsModal";
 import { ShareModal } from "@/components/ShareModal";
@@ -15,6 +16,7 @@ import { useRun } from "@/hooks/useRun";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProjectTemplate } from "@/lib/templates";
+import { Zap, Code2, Globe, Terminal } from "lucide-react";
 
 const AUTOSAVE_DEBOUNCE_MS = 3_000;
 
@@ -220,7 +222,7 @@ export default function IDE() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#0d1117]">
       <Toolbar
         isBuilding={isBuilding}
         isRunning={isRunning}
@@ -260,10 +262,10 @@ export default function IDE() {
             />
           </ResizablePanel>
 
-          <ResizableHandle className="bg-border w-[1px] hover:bg-primary transition-colors" />
+          <ResizableHandle className="bg-white/8 w-[1px] hover:bg-[#4ade80]/60 transition-colors" />
 
           <ResizablePanel defaultSize={50} minSize={25}>
-            <div className="h-full flex flex-col bg-background">
+            <div className="h-full flex flex-col bg-[#0d1117]">
               <TabBar
                 openFiles={openFiles}
                 activeFile={activeFile}
@@ -280,18 +282,17 @@ export default function IDE() {
                     onChange={(content) => saveFile(activeFile, content)}
                   />
                 ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground font-mono text-sm gap-3">
-                    <span>Select a file to edit</span>
-                    <button onClick={() => setShowTemplates(true)} className="text-xs text-primary hover:underline">
-                      or start a new project
-                    </button>
-                  </div>
+                  <WelcomeScreen
+                    onNewProject={() => setShowTemplates(true)}
+                    onSelectFile={(f) => handleSelectFile(Object.keys(files).find(k => k.includes(f)) ?? Object.keys(files)[0])}
+                    files={files}
+                  />
                 )}
               </div>
             </div>
           </ResizablePanel>
 
-          <ResizableHandle className="bg-border w-[1px] hover:bg-primary transition-colors" />
+          <ResizableHandle className="bg-white/8 w-[1px] hover:bg-[#4ade80]/60 transition-colors" />
 
           <ResizablePanel defaultSize={30} minSize={18}>
             <PreviewPanel
@@ -309,6 +310,14 @@ export default function IDE() {
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+
+      <StatusBar
+        language={currentLanguage}
+        filename={activeFile ?? undefined}
+        runsRemaining={localRunsRemaining}
+        isRunning={isRunning}
+        isBuilding={isBuilding}
+      />
 
       {showTemplates && (
         <TemplateSelector onSelect={handleLoadTemplate} onClose={() => setShowTemplates(false)} />
@@ -338,7 +347,7 @@ export default function IDE() {
           <div className="relative w-full max-w-md">
             <button
               onClick={() => setShowSignIn(false)}
-              className="absolute -top-8 right-0 text-muted-foreground hover:text-foreground text-sm font-mono"
+              className="absolute -top-8 right-0 text-white/50 hover:text-white text-sm font-mono"
             >
               ✕ close
             </button>
@@ -346,6 +355,64 @@ export default function IDE() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Welcome screen shown when no file is open ─────────────────────────────────
+const QUICK_START = [
+  { ext: "js",   label: "JavaScript", icon: <Zap size={20} className="text-yellow-400" />,  bg: "bg-yellow-400/8 border-yellow-400/20 hover:border-yellow-400/50" },
+  { ext: "ts",   label: "TypeScript", icon: <Code2 size={20} className="text-blue-400" />,   bg: "bg-blue-400/8 border-blue-400/20 hover:border-blue-400/50" },
+  { ext: "py",   label: "Python",     icon: <Terminal size={20} className="text-green-400" />,bg: "bg-green-400/8 border-green-400/20 hover:border-green-400/50" },
+  { ext: "html", label: "HTML",       icon: <Globe size={20} className="text-orange-400" />,  bg: "bg-orange-400/8 border-orange-400/20 hover:border-orange-400/50" },
+] as const;
+
+function WelcomeScreen({
+  onNewProject,
+  onSelectFile,
+  files,
+}: {
+  onNewProject: () => void;
+  onSelectFile: (ext: string) => void;
+  files: Record<string, string>;
+}) {
+  const fileKeys = Object.keys(files);
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0d1117] text-white/50 select-none p-8">
+      <div className="w-full max-w-sm space-y-6">
+        {/* Header */}
+        <div className="text-center">
+          <p className="text-sm font-mono text-white/30 mb-1">CloudIDE</p>
+          <h2 className="text-white/80 font-semibold text-base">Open a file to start editing</h2>
+          <p className="text-xs text-white/30 mt-1">or pick a quick-start below</p>
+        </div>
+
+        {/* Quick-start tiles */}
+        <div className="grid grid-cols-2 gap-2">
+          {QUICK_START.map(({ ext, label, icon, bg }) => {
+            const match = fileKeys.find(k => k.endsWith(`.${ext}`));
+            return (
+              <button
+                key={ext}
+                onClick={() => match ? onSelectFile(ext) : onNewProject()}
+                className={`flex flex-col items-center gap-2 p-4 rounded-lg border ${bg} transition-all hover:scale-105`}
+              >
+                {icon}
+                <span className="text-xs font-mono text-white/60">{label}</span>
+                {match && <span className="text-[9px] text-white/30 font-mono truncate max-w-full">{match}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* New project CTA */}
+        <button
+          onClick={onNewProject}
+          className="w-full py-2 rounded border border-white/10 text-xs font-mono text-white/40 hover:border-white/30 hover:text-white/70 transition-colors"
+        >
+          + New project from template
+        </button>
+      </div>
     </div>
   );
 }
