@@ -6,41 +6,25 @@
  * GET  /api/projects/:id/versions/:versionId          — get snapshot with files
  * POST /api/projects/:id/versions/:versionId/restore  — restore snapshot → update project
  */
-import { Router, type Request, type Response } from "express";
+import { Router, type Response } from "express";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { db, projectsTable, versionsTable, MAX_VERSIONS_PER_PROJECT } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { projectLimiter } from "../middlewares/rate-limit";
+import { requireAuth } from "../middlewares/require-auth";
 
 const router = Router();
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function validateUserKey(req: Request, res: Response): string | null {
-  const raw = req.headers["x-user-key"];
-  const key = Array.isArray(raw) ? raw[0] : raw;
-  if (!key || key.trim().length < 8 || !/^[a-f0-9-]{8,64}$/i.test(key.trim())) {
-    res.status(401).json({ error: "Missing or invalid X-User-Key header." });
-    return null;
-  }
-  return key.trim();
-}
 
 function validateId(id: unknown): string | null {
   if (typeof id !== "string" || !/^[a-f0-9-]{8,64}$/.test(id)) return null;
   return id;
 }
 
-/** Verify ownership then return the project, or send 401/404 and return null */
-async function requireOwnedProject(
-  projectId: string,
-  userKey: string,
-  res: Response,
-) {
+async function requireOwnedProject(projectId: string, userId: string, res: Response) {
   const [project] = await db
     .select({ id: projectsTable.id })
     .from(projectsTable)
-    .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userKey, userKey)))
+    .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, userId)))
     .limit(1);
 
   if (!project) {
@@ -52,14 +36,11 @@ async function requireOwnedProject(
 
 // ─── GET /api/projects/:id/versions ───────────────────────────────────────────
 
-router.get("/projects/:id/versions", projectLimiter, async (req, res) => {
-  const userKey = validateUserKey(req, res);
-  if (!userKey) return;
-
+router.get("/projects/:id/versions", requireAuth, projectLimiter, async (req, res) => {
   const projectId = validateId(req.params["id"]);
   if (!projectId) { res.status(400).json({ error: "Invalid project ID" }); return; }
 
-  const project = await requireOwnedProject(projectId, userKey, res);
+  const project = await requireOwnedProject(projectId, req.user!.userId, res);
   if (!project) return;
 
   try {
@@ -84,14 +65,11 @@ router.get("/projects/:id/versions", projectLimiter, async (req, res) => {
 
 // ─── POST /api/projects/:id/versions ──────────────────────────────────────────
 
-router.post("/projects/:id/versions", projectLimiter, async (req, res) => {
-  const userKey = validateUserKey(req, res);
-  if (!userKey) return;
-
+router.post("/projects/:id/versions", requireAuth, projectLimiter, async (req, res) => {
   const projectId = validateId(req.params["id"]);
   if (!projectId) { res.status(400).json({ error: "Invalid project ID" }); return; }
 
-  const project = await requireOwnedProject(projectId, userKey, res);
+  const project = await requireOwnedProject(projectId, req.user!.userId, res);
   if (!project) return;
 
   const label = typeof (req.body as Record<string, unknown>)["label"] === "string"
@@ -99,7 +77,6 @@ router.post("/projects/:id/versions", projectLimiter, async (req, res) => {
     : "";
 
   try {
-    // Load current files
     const [full] = await db
       .select({ files: projectsTable.files })
       .from(projectsTable)
@@ -108,13 +85,11 @@ router.post("/projects/:id/versions", projectLimiter, async (req, res) => {
 
     if (!full) { res.status(404).json({ error: "Project not found" }); return; }
 
-    // Insert snapshot
     const [version] = await db
       .insert(versionsTable)
       .values({ projectId, files: full.files, label })
       .returning({ id: versionsTable.id, label: versionsTable.label, createdAt: versionsTable.createdAt });
 
-    // Prune oldest beyond cap — keep newest MAX_VERSIONS_PER_PROJECT
     const allVersions = await db
       .select({ id: versionsTable.id })
       .from(versionsTable)
@@ -135,15 +110,12 @@ router.post("/projects/:id/versions", projectLimiter, async (req, res) => {
 
 // ─── GET /api/projects/:id/versions/:versionId ────────────────────────────────
 
-router.get("/projects/:id/versions/:versionId", projectLimiter, async (req, res) => {
-  const userKey = validateUserKey(req, res);
-  if (!userKey) return;
-
-  const projectId   = validateId(req.params["id"]);
-  const versionId   = validateId(req.params["versionId"]);
+router.get("/projects/:id/versions/:versionId", requireAuth, projectLimiter, async (req, res) => {
+  const projectId  = validateId(req.params["id"]);
+  const versionId  = validateId(req.params["versionId"]);
   if (!projectId || !versionId) { res.status(400).json({ error: "Invalid ID" }); return; }
 
-  const project = await requireOwnedProject(projectId, userKey, res);
+  const project = await requireOwnedProject(projectId, req.user!.userId, res);
   if (!project) return;
 
   try {
@@ -163,15 +135,12 @@ router.get("/projects/:id/versions/:versionId", projectLimiter, async (req, res)
 
 // ─── POST /api/projects/:id/versions/:versionId/restore ───────────────────────
 
-router.post("/projects/:id/versions/:versionId/restore", projectLimiter, async (req, res) => {
-  const userKey = validateUserKey(req, res);
-  if (!userKey) return;
-
-  const projectId   = validateId(req.params["id"]);
-  const versionId   = validateId(req.params["versionId"]);
+router.post("/projects/:id/versions/:versionId/restore", requireAuth, projectLimiter, async (req, res) => {
+  const projectId  = validateId(req.params["id"]);
+  const versionId  = validateId(req.params["versionId"]);
   if (!projectId || !versionId) { res.status(400).json({ error: "Invalid ID" }); return; }
 
-  const project = await requireOwnedProject(projectId, userKey, res);
+  const project = await requireOwnedProject(projectId, req.user!.userId, res);
   if (!project) return;
 
   try {
@@ -183,18 +152,23 @@ router.post("/projects/:id/versions/:versionId/restore", projectLimiter, async (
 
     if (!version) { res.status(404).json({ error: "Version not found" }); return; }
 
-    // Snapshot current state before restoring (so user can undo the restore)
+    // Snapshot current state before restoring
+    const [current] = await db
+      .select({ files: projectsTable.files })
+      .from(projectsTable)
+      .where(eq(projectsTable.id, projectId))
+      .limit(1);
+
     await db.insert(versionsTable).values({
       projectId,
-      files: (await db.select({ files: projectsTable.files }).from(projectsTable).where(eq(projectsTable.id, projectId)).limit(1))[0]?.files ?? {},
+      files: current?.files ?? {},
       label: "Before restore",
     });
 
-    // Apply the restored files
     const [updated] = await db
       .update(projectsTable)
       .set({ files: version.files, updatedAt: new Date() })
-      .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userKey, userKey)))
+      .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, req.user!.userId)))
       .returning();
 
     res.json({ project: updated, restoredFrom: versionId });

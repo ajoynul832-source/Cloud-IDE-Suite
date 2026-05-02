@@ -141,7 +141,7 @@ router.post("/build/project", buildLimiter, async (req, res) => {
     return;
   }
 
-  const usageKey = resolveUsageKey(req.headers["x-user-key"], req.ip);
+  const usageKey = resolveUsageKey(req.user?.userId, req.headers["x-user-key"], req.ip);
   const buildUsage = await checkAndIncrementBuilds(usageKey);
   if (!buildUsage.allowed) {
     res.status(429).json({

@@ -14,6 +14,7 @@ import os from "os";
 import { logger } from "../lib/logger";
 import { runLimiter } from "../middlewares/rate-limit";
 import { checkAndIncrementRuns, resolveUsageKey } from "../lib/usage";
+import { optionalAuth } from "../middlewares/require-auth";
 
 const router = Router();
 
@@ -295,7 +296,7 @@ function resolveHandler(language: string, filename?: string): LanguageHandler | 
 
 // ─── SSE streaming endpoint ───────────────────────────────────────────────────
 // POST /api/run/stream — real-time line-by-line output via Server-Sent Events
-router.post("/run/stream", runLimiter, async (req, res) => {
+router.post("/run/stream", optionalAuth, runLimiter, async (req, res) => {
   const { language, code, filename } = req.body as {
     language?: string;
     code?: string;
@@ -324,7 +325,7 @@ router.post("/run/stream", runLimiter, async (req, res) => {
     return;
   }
 
-  const usageKey = resolveUsageKey(req.headers["x-user-key"], req.ip);
+  const usageKey = resolveUsageKey(req.user?.userId, req.headers["x-user-key"], req.ip);
   const usage = await checkAndIncrementRuns(usageKey);
   if (!usage.allowed) {
     releaseSlot();
@@ -369,7 +370,7 @@ router.post("/run/stream", runLimiter, async (req, res) => {
 
 // ─── Buffered JSON endpoint (backward-compat) ─────────────────────────────────
 // POST /api/run — collects all SSE events, returns single JSON response
-router.post("/run", runLimiter, async (req, res) => {
+router.post("/run", optionalAuth, runLimiter, async (req, res) => {
   const { language, code, filename } = req.body as {
     language?: string;
     code?: string;
@@ -398,7 +399,7 @@ router.post("/run", runLimiter, async (req, res) => {
     return;
   }
 
-  const usageKey = resolveUsageKey(req.headers["x-user-key"], req.ip);
+  const usageKey = resolveUsageKey(req.user?.userId, req.headers["x-user-key"], req.ip);
   const usage = await checkAndIncrementRuns(usageKey);
   if (!usage.allowed) {
     releaseSlot();

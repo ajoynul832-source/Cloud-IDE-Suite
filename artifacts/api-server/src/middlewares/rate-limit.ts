@@ -1,13 +1,18 @@
 import rateLimit from "express-rate-limit";
 
 function keyGen(req: import("express").Request): string {
+  // Prefer authenticated userId → X-User-Key header → IP
+  if (req.user?.userId) return `user:${req.user.userId}`;
   const userKey = req.headers["x-user-key"];
   if (typeof userKey === "string" && userKey.length > 0) return userKey;
   return req.ip ?? "unknown";
 }
 
+const baseOpts = { validate: { ip: false } } as const;
+
 /** 30 executions / minute per user */
 export const runLimiter = rateLimit({
+  ...baseOpts,
   windowMs: 60 * 1000,
   max: 30,
   standardHeaders: true,
@@ -19,6 +24,7 @@ export const runLimiter = rateLimit({
 
 /** 5 builds / minute per user */
 export const buildLimiter = rateLimit({
+  ...baseOpts,
   windowMs: 60 * 1000,
   max: 5,
   standardHeaders: true,
@@ -30,6 +36,7 @@ export const buildLimiter = rateLimit({
 
 /** 60 project reads/writes / minute per user */
 export const projectLimiter = rateLimit({
+  ...baseOpts,
   windowMs: 60 * 1000,
   max: 60,
   standardHeaders: true,
@@ -40,6 +47,7 @@ export const projectLimiter = rateLimit({
 
 /** 20 share link generates or lookups / minute per IP */
 export const shareLimiter = rateLimit({
+  ...baseOpts,
   windowMs: 60 * 1000,
   max: 20,
   standardHeaders: true,

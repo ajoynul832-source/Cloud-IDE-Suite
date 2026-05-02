@@ -1,55 +1,41 @@
 /**
- * Project CRUD API — stored in PostgreSQL, scoped by X-User-Key header.
+ * Project CRUD API — authenticated, scoped by user_id from JWT.
  *
- * GET    /api/projects          — list user's projects
- * POST   /api/projects          — create project
- * GET    /api/projects/:id      — get single project (must own it)
- * PUT    /api/projects/:id      — update project files / name
- * DELETE /api/projects/:id      — delete project
+ * GET    /api/projects                  — list user's projects
+ * POST   /api/projects                  — create project
+ * GET    /api/projects/:id              — get single project (must own)
+ * PUT    /api/projects/:id              — update project
+ * POST   /api/projects/:id/duplicate   — duplicate project
+ * DELETE /api/projects/:id              — delete project
  */
-import { Router, type Request, type Response } from "express";
+import { Router } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import { db, projectsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { projectLimiter } from "../middlewares/rate-limit";
+import { requireAuth } from "../middlewares/require-auth";
 
 const router = Router();
-
-// ─── Validation ───────────────────────────────────────────────────────────────
-
-function validateUserKey(req: Request, res: Response): string | null {
-  const raw = req.headers["x-user-key"];
-  const key = Array.isArray(raw) ? raw[0] : raw;
-  if (!key || key.trim().length < 8 || !/^[a-f0-9-]{8,64}$/i.test(key.trim())) {
-    res.status(401).json({ error: "Missing or invalid X-User-Key header." });
-    return null;
-  }
-  return key.trim();
-}
 
 function validateId(id: unknown): string | null {
   if (typeof id !== "string" || !/^[a-f0-9-]{8,64}$/.test(id)) return null;
   return id;
 }
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+// ─── GET /api/projects ────────────────────────────────────────────────────────
 
-// GET /api/projects
-router.get("/projects", projectLimiter, async (req, res) => {
-  const userKey = validateUserKey(req, res);
-  if (!userKey) return;
-
+router.get("/projects", requireAuth, projectLimiter, async (req, res) => {
   try {
     const projects = await db
       .select({
-        id: projectsTable.id,
-        name: projectsTable.name,
+        id:          projectsTable.id,
+        name:        projectsTable.name,
         projectType: projectsTable.projectType,
-        createdAt: projectsTable.createdAt,
-        updatedAt: projectsTable.updatedAt,
+        createdAt:   projectsTable.createdAt,
+        updatedAt:   projectsTable.updatedAt,
       })
       .from(projectsTable)
-      .where(eq(projectsTable.userKey, userKey))
+      .where(eq(projectsTable.userId, req.user!.userId))
       .orderBy(desc(projectsTable.updatedAt));
 
     res.json({ projects });
@@ -59,11 +45,9 @@ router.get("/projects", projectLimiter, async (req, res) => {
   }
 });
 
-// POST /api/projects
-router.post("/projects", projectLimiter, async (req, res) => {
-  const userKey = validateUserKey(req, res);
-  if (!userKey) return;
+// ─── POST /api/projects ───────────────────────────────────────────────────────
 
+router.post("/projects", requireAuth, projectLimiter, async (req, res) => {
   const { name, projectType, files } = req.body as {
     name?: unknown;
     projectType?: unknown;
@@ -80,12 +64,14 @@ router.post("/projects", projectLimiter, async (req, res) => {
   }
 
   const safeType = typeof projectType === "string" ? projectType : "javascript";
+  const userId   = req.user!.userId;
 
   try {
     const [project] = await db
       .insert(projectsTable)
       .values({
-        userKey,
+        userId,
+        userKey: userId, // satisfy NOT NULL — mirrors userId for auth'd projects
         name: name.trim().slice(0, 120),
         projectType: safeType,
         files: files as Record<string, string>,
@@ -99,11 +85,9 @@ router.post("/projects", projectLimiter, async (req, res) => {
   }
 });
 
-// GET /api/projects/:id
-router.get("/projects/:id", projectLimiter, async (req, res) => {
-  const userKey = validateUserKey(req, res);
-  if (!userKey) return;
+// ─── GET /api/projects/:id ────────────────────────────────────────────────────
 
+router.get("/projects/:id", requireAuth, projectLimiter, async (req, res) => {
   const id = validateId(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid project ID" }); return; }
 
@@ -111,7 +95,7 @@ router.get("/projects/:id", projectLimiter, async (req, res) => {
     const [project] = await db
       .select()
       .from(projectsTable)
-      .where(and(eq(projectsTable.id, id), eq(projectsTable.userKey, userKey)))
+      .where(and(eq(projectsTable.id, id), eq(projectsTable.userId, req.user!.userId)))
       .limit(1);
 
     if (!project) { res.status(404).json({ error: "Project not found" }); return; }
@@ -122,11 +106,9 @@ router.get("/projects/:id", projectLimiter, async (req, res) => {
   }
 });
 
-// PUT /api/projects/:id
-router.put("/projects/:id", projectLimiter, async (req, res) => {
-  const userKey = validateUserKey(req, res);
-  if (!userKey) return;
+// ─── PUT /api/projects/:id ────────────────────────────────────────────────────
 
+router.put("/projects/:id", requireAuth, projectLimiter, async (req, res) => {
   const id = validateId(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid project ID" }); return; }
 
@@ -152,7 +134,7 @@ router.put("/projects/:id", projectLimiter, async (req, res) => {
     const [updated] = await db
       .update(projectsTable)
       .set(updates)
-      .where(and(eq(projectsTable.id, id), eq(projectsTable.userKey, userKey)))
+      .where(and(eq(projectsTable.id, id), eq(projectsTable.userId, req.user!.userId)))
       .returning();
 
     if (!updated) { res.status(404).json({ error: "Project not found" }); return; }
@@ -163,19 +145,19 @@ router.put("/projects/:id", projectLimiter, async (req, res) => {
   }
 });
 
-// POST /api/projects/:id/duplicate
-router.post("/projects/:id/duplicate", projectLimiter, async (req, res) => {
-  const userKey = validateUserKey(req, res);
-  if (!userKey) return;
+// ─── POST /api/projects/:id/duplicate ────────────────────────────────────────
 
+router.post("/projects/:id/duplicate", requireAuth, projectLimiter, async (req, res) => {
   const id = validateId(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid project ID" }); return; }
+
+  const userId = req.user!.userId;
 
   try {
     const [source] = await db
       .select()
       .from(projectsTable)
-      .where(and(eq(projectsTable.id, id), eq(projectsTable.userKey, userKey)))
+      .where(and(eq(projectsTable.id, id), eq(projectsTable.userId, userId)))
       .limit(1);
 
     if (!source) { res.status(404).json({ error: "Project not found" }); return; }
@@ -183,7 +165,8 @@ router.post("/projects/:id/duplicate", projectLimiter, async (req, res) => {
     const [copy] = await db
       .insert(projectsTable)
       .values({
-        userKey,
+        userId,
+        userKey:     userId,
         name:        `Copy of ${source.name}`.slice(0, 120),
         projectType: source.projectType,
         files:       source.files,
@@ -197,18 +180,16 @@ router.post("/projects/:id/duplicate", projectLimiter, async (req, res) => {
   }
 });
 
-// DELETE /api/projects/:id
-router.delete("/projects/:id", projectLimiter, async (req, res) => {
-  const userKey = validateUserKey(req, res);
-  if (!userKey) return;
+// ─── DELETE /api/projects/:id ─────────────────────────────────────────────────
 
+router.delete("/projects/:id", requireAuth, projectLimiter, async (req, res) => {
   const id = validateId(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid project ID" }); return; }
 
   try {
     const [deleted] = await db
       .delete(projectsTable)
-      .where(and(eq(projectsTable.id, id), eq(projectsTable.userKey, userKey)))
+      .where(and(eq(projectsTable.id, id), eq(projectsTable.userId, req.user!.userId)))
       .returning({ id: projectsTable.id });
 
     if (!deleted) { res.status(404).json({ error: "Project not found" }); return; }

@@ -1,13 +1,17 @@
 import { useState, useCallback } from "react";
-import { getUserKey } from "@/lib/user-key";
 
 const BASE = "/api";
 
-function headers(): Record<string, string> {
-  return {
-    "Content-Type": "application/json",
-    "X-User-Key": getUserKey(),
-  };
+/** All project API calls send the session cookie and no user-key header */
+function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(url, {
+    ...init,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers as Record<string, string> | undefined),
+    },
+  });
 }
 
 export interface ProjectSummary {
@@ -44,7 +48,7 @@ export function useProjects() {
     setIsLoading(true);
     setError(null);
     try {
-      const res  = await fetch(`${BASE}/projects`, { headers: headers() });
+      const res  = await authFetch(`${BASE}/projects`);
       const data = await res.json() as { projects?: ProjectSummary[]; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to load projects");
       setProjects(data.projects ?? []);
@@ -65,9 +69,8 @@ export function useProjects() {
     try {
       const url    = existingId ? `${BASE}/projects/${existingId}` : `${BASE}/projects`;
       const method = existingId ? "PUT" : "POST";
-      const res    = await fetch(url, {
+      const res    = await authFetch(url, {
         method,
-        headers: headers(),
         body: JSON.stringify({ name, projectType, files }),
       });
       const data = await res.json() as { project?: FullProject; error?: string };
@@ -89,7 +92,7 @@ export function useProjects() {
   const loadProject = useCallback(async (id: string): Promise<FullProject | null> => {
     setError(null);
     try {
-      const res  = await fetch(`${BASE}/projects/${id}`, { headers: headers() });
+      const res  = await authFetch(`${BASE}/projects/${id}`);
       const data = await res.json() as { project?: FullProject; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to load project");
       return data.project ?? null;
@@ -102,10 +105,7 @@ export function useProjects() {
   const deleteProject = useCallback(async (id: string): Promise<boolean> => {
     setError(null);
     try {
-      const res = await fetch(`${BASE}/projects/${id}`, {
-        method: "DELETE",
-        headers: headers(),
-      });
+      const res = await authFetch(`${BASE}/projects/${id}`, { method: "DELETE" });
       if (!res.ok) {
         const d = await res.json() as { error?: string };
         throw new Error(d.error ?? "Failed to delete");
@@ -121,10 +121,9 @@ export function useProjects() {
   const renameProject = useCallback(async (id: string, name: string): Promise<ProjectSummary | null> => {
     setError(null);
     try {
-      const res  = await fetch(`${BASE}/projects/${id}`, {
+      const res  = await authFetch(`${BASE}/projects/${id}`, {
         method: "PUT",
-        headers: headers(),
-        body: JSON.stringify({ name }),
+        body:   JSON.stringify({ name }),
       });
       const data = await res.json() as { project?: ProjectSummary; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to rename project");
@@ -140,10 +139,7 @@ export function useProjects() {
   const duplicateProject = useCallback(async (id: string): Promise<ProjectSummary | null> => {
     setError(null);
     try {
-      const res  = await fetch(`${BASE}/projects/${id}/duplicate`, {
-        method: "POST",
-        headers: headers(),
-      });
+      const res  = await authFetch(`${BASE}/projects/${id}/duplicate`, { method: "POST" });
       const data = await res.json() as { project?: ProjectSummary; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to duplicate project");
       const copy = data.project!;
@@ -159,7 +155,7 @@ export function useProjects() {
 
   const listVersions = useCallback(async (projectId: string): Promise<VersionSummary[]> => {
     try {
-      const res  = await fetch(`${BASE}/projects/${projectId}/versions`, { headers: headers() });
+      const res  = await authFetch(`${BASE}/projects/${projectId}/versions`);
       const data = await res.json() as { versions?: VersionSummary[]; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to load versions");
       return data.versions ?? [];
@@ -170,10 +166,9 @@ export function useProjects() {
 
   const createVersion = useCallback(async (projectId: string, label = ""): Promise<VersionSummary | null> => {
     try {
-      const res  = await fetch(`${BASE}/projects/${projectId}/versions`, {
+      const res  = await authFetch(`${BASE}/projects/${projectId}/versions`, {
         method: "POST",
-        headers: headers(),
-        body: JSON.stringify({ label }),
+        body:   JSON.stringify({ label }),
       });
       const data = await res.json() as { version?: VersionSummary; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to create version");
@@ -188,9 +183,8 @@ export function useProjects() {
     versionId: string,
   ): Promise<FullProject | null> => {
     try {
-      const res  = await fetch(`${BASE}/projects/${projectId}/versions/${versionId}/restore`, {
+      const res  = await authFetch(`${BASE}/projects/${projectId}/versions/${versionId}/restore`, {
         method: "POST",
-        headers: headers(),
       });
       const data = await res.json() as { project?: FullProject; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to restore version");

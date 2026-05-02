@@ -1,32 +1,21 @@
 /**
  * Project sharing API
  *
- * POST /api/projects/:id/share          — generate/reuse a share link (idempotent)
- * GET  /api/explore                     — public ranked list of shared projects
- * GET  /api/share/:shareId              — public: load project + increment view counters
- * GET  /api/share/:shareId/stats        — public: read view counts without incrementing
- * POST /api/share/:shareId/event        — record a fork or run event
+ * POST /api/projects/:id/share          — generate/reuse share link (auth required)
+ * GET  /api/explore                     — public ranked list
+ * GET  /api/share/:shareId              — public: load project + count view
+ * GET  /api/share/:shareId/stats        — public: read counters only
+ * POST /api/share/:shareId/event        — public: record fork or run
  */
-import { Router, type Request, type Response } from "express";
-import { eq, sql, desc } from "drizzle-orm";
+import { Router } from "express";
+import { eq, sql, desc, and } from "drizzle-orm";
 import crypto from "crypto";
 import { db, projectsTable, sharesTable, shareViewersTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { shareLimiter, projectLimiter } from "../middlewares/rate-limit";
+import { requireAuth } from "../middlewares/require-auth";
 
 const router = Router();
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function validateUserKey(req: Request, res: Response): string | null {
-  const raw = req.headers["x-user-key"];
-  const key = Array.isArray(raw) ? raw[0] : raw;
-  if (!key || key.trim().length < 8 || !/^[a-f0-9-]{8,64}$/i.test(key.trim())) {
-    res.status(401).json({ error: "Missing or invalid X-User-Key header." });
-    return null;
-  }
-  return key.trim();
-}
 
 function validateId(id: unknown): string | null {
   if (typeof id !== "string" || !/^[a-f0-9-]{8,64}$/.test(id)) return null;
@@ -37,22 +26,20 @@ function validateShareId(id: string): boolean {
   return /^[a-f0-9]{8}$/.test(id);
 }
 
-/** Generate a collision-resistant 8-char hex share ID */
 function newShareId(): string {
   return crypto.randomBytes(4).toString("hex");
 }
 
-/** Derive a stable, privacy-preserving viewer key from the request IP */
-function viewerKey(req: Request): string {
+function viewerKey(req: import("express").Request): string {
   const ip = String(req.ip ?? req.socket.remoteAddress ?? "unknown");
   return crypto.createHash("sha256").update(ip).digest("hex").slice(0, 16);
 }
 
 interface ShareStats {
-  totalViews: number;
+  totalViews:  number;
   uniqueViews: number;
-  forksCount: number;
-  runsCount: number;
+  forksCount:  number;
+  runsCount:   number;
 }
 
 function toStats(share: typeof sharesTable.$inferSelect): ShareStats {
@@ -64,24 +51,17 @@ function toStats(share: typeof sharesTable.$inferSelect): ShareStats {
   };
 }
 
-/**
- * Fire-and-forget: increment totalViews; increment uniqueViews only for new viewers.
- * Wrapped in try/catch so it never bubbles up to the caller.
- */
 async function countView(shareId: string, key: string): Promise<void> {
-  // Always increment total
   await db
     .update(sharesTable)
     .set({ totalViews: sql`${sharesTable.totalViews} + 1` })
     .where(eq(sharesTable.shareId, shareId));
 
-  // Insert viewer key (composite PK prevents duplicates)
   const result = await db
     .insert(shareViewersTable)
     .values({ shareId, viewerKey: key })
     .onConflictDoNothing();
 
-  // If a new row was inserted → this is a unique viewer
   if ((result.rowCount ?? 0) > 0) {
     await db
       .update(sharesTable)
@@ -96,7 +76,7 @@ router.get("/explore", shareLimiter, async (req, res) => {
   const MAX_LIMIT = 20;
   const rawLimit  = parseInt(String(req.query["limit"] ?? "20"), 10);
   const rawOffset = parseInt(String(req.query["offset"] ?? "0"), 10);
-  const limit     = Math.min(isNaN(rawLimit)  ? MAX_LIMIT : Math.max(1, rawLimit),  MAX_LIMIT);
+  const limit     = Math.min(isNaN(rawLimit) ? MAX_LIMIT : Math.max(1, rawLimit), MAX_LIMIT);
   const offset    = isNaN(rawOffset) ? 0 : Math.max(0, rawOffset);
 
   try {
@@ -129,74 +109,67 @@ router.get("/explore", shareLimiter, async (req, res) => {
 
 // ─── POST /api/projects/:id/share ─────────────────────────────────────────────
 
-router.post(
-  "/projects/:id/share",
-  projectLimiter,
-  async (req, res) => {
-    const userKey = validateUserKey(req, res);
-    if (!userKey) return;
+router.post("/projects/:id/share", requireAuth, projectLimiter, async (req, res) => {
+  const projectId = validateId(req.params["id"]);
+  if (!projectId) {
+    res.status(400).json({ error: "Invalid project ID" });
+    return;
+  }
 
-    const projectId = validateId(req.params["id"]);
-    if (!projectId) {
-      res.status(400).json({ error: "Invalid project ID" });
+  try {
+    // Must own the project
+    const [project] = await db
+      .select({ id: projectsTable.id })
+      .from(projectsTable)
+      .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, req.user!.userId)))
+      .limit(1);
+
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
       return;
     }
 
-    try {
-      const [project] = await db
-        .select({ id: projectsTable.id })
-        .from(projectsTable)
-        .where(eq(projectsTable.id, projectId))
-        .limit(1);
+    // Idempotent: reuse existing share
+    const [existing] = await db
+      .select()
+      .from(sharesTable)
+      .where(eq(sharesTable.projectId, projectId))
+      .limit(1);
 
-      if (!project) {
-        res.status(404).json({ error: "Project not found" });
-        return;
-      }
-
-      // Idempotent: reuse existing share
-      const [existing] = await db
-        .select()
-        .from(sharesTable)
-        .where(eq(sharesTable.projectId, projectId))
-        .limit(1);
-
-      if (existing) {
-        res.json({
-          shareUrl: `/ide/p/${existing.shareId}`,
-          shareId: existing.shareId,
-          stats: toStats(existing),
-        });
-        return;
-      }
-
-      // Create a new share record (retry on PK collision)
-      let shareId = newShareId();
-      let attempts = 0;
-      while (attempts < 5) {
-        try {
-          await db.insert(sharesTable).values({ shareId, projectId });
-          break;
-        } catch {
-          shareId = newShareId();
-          attempts++;
-        }
-      }
-
+    if (existing) {
       res.json({
-        shareUrl: `/ide/p/${shareId}`,
-        shareId,
-        stats: { totalViews: 0, uniqueViews: 0, forksCount: 0, runsCount: 0 },
+        shareUrl: `/ide/p/${existing.shareId}`,
+        shareId:  existing.shareId,
+        stats:    toStats(existing),
       });
-    } catch (err) {
-      logger.error({ err, projectId }, "share project failed");
-      res.status(500).json({ error: "Failed to generate share link" });
+      return;
     }
-  },
-);
+
+    // Create new share record (retry on collision)
+    let shareId  = newShareId();
+    let attempts = 0;
+    while (attempts < 5) {
+      try {
+        await db.insert(sharesTable).values({ shareId, projectId });
+        break;
+      } catch {
+        shareId = newShareId();
+        attempts++;
+      }
+    }
+
+    res.json({
+      shareUrl: `/ide/p/${shareId}`,
+      shareId,
+      stats: { totalViews: 0, uniqueViews: 0, forksCount: 0, runsCount: 0 },
+    });
+  } catch (err) {
+    logger.error({ err, projectId }, "share project failed");
+    res.status(500).json({ error: "Failed to generate share link" });
+  }
+});
 
 // ─── GET /api/share/:shareId/stats ────────────────────────────────────────────
-// Must be declared BEFORE /api/share/:shareId to avoid "stats" matching as shareId
 
 router.get("/share/:shareId/stats", shareLimiter, async (req, res) => {
   const shareId = String(req.params["shareId"] ?? "");
@@ -221,7 +194,6 @@ router.get("/share/:shareId/stats", shareLimiter, async (req, res) => {
       res.status(404).json({ error: "Share link not found" });
       return;
     }
-
     res.json(share);
   } catch (err) {
     logger.error({ err, shareId }, "load share stats failed");
@@ -261,7 +233,6 @@ router.get("/share/:shareId", shareLimiter, async (req, res) => {
       return;
     }
 
-    // Return current stats (before this view is counted — intentional)
     const stats = toStats(share);
 
     res.json({
@@ -277,7 +248,6 @@ router.get("/share/:shareId", shareLimiter, async (req, res) => {
       stats,
     });
 
-    // Non-blocking: count the view after the response is already sent
     const key = viewerKey(req);
     countView(shareId, key).catch((err) =>
       logger.warn({ err, shareId }, "view count failed (non-blocking)"),
@@ -303,7 +273,6 @@ router.post("/share/:shareId/event", shareLimiter, async (req, res) => {
     return;
   }
 
-  // Respond immediately; count in background
   res.json({ ok: true });
 
   try {

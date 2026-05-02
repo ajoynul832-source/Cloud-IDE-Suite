@@ -1,0 +1,91 @@
+YOU ARE BUILDING PHASE 1: REAL USER AUTHENTICATION
+
+CURRENT STATE:
+- No auth system
+- Users identified by browser localStorage UUID
+- Falls back to IP hash for anonymous users
+- No database user table
+
+WHAT YOU MUST BUILD (EXACT ORDER):
+
+1. DATABASE SCHEMA
+   - Create users table:
+     * id (uuid primary key)
+     * email (text, unique)
+     * password_hash (text)
+     * oauth_provider (text nullable: 'google' or null)
+     * oauth_id (text nullable)
+     * created_at (timestamp)
+     * updated_at (timestamp)
+   
+   - Add user_id FK to projects table (nullable initially)
+   - Add user_id FK to shares table (nullable initially)
+   - Backfill existing projects/shares with user_id based on user_key->user mapping
+
+2. BACKEND API ENDPOINTS (REAL, NO MOCKS)
+   - POST /api/auth/register
+     * Input: { email, password }
+     * Hash password with bcrypt
+     * Create user row in DB
+     * Return { userId, token, expiresIn }
+   
+   - POST /api/auth/login
+     * Input: { email, password }
+     * Verify password hash
+     * Return { userId, token, expiresIn }
+   
+   - POST /api/auth/google
+     * Input: { idToken } from Google OAuth
+     * Verify idToken with Google API
+     * Create or find user by oauth_id
+     * Return { userId, token, expiresIn }
+   
+   - POST /api/auth/logout
+     * Invalidate token (optional: maintain blacklist in Redis)
+     * Return { ok: true }
+   
+   - GET /api/auth/me
+     * Return current user: { userId, email, oauth_provider }
+
+3. TOKEN MANAGEMENT
+   - Use JWT with 7-day expiry
+   - Sign with process.env.JWT_SECRET
+   - Store in httpOnly cookie (no localStorage exposure)
+   - Include userId in every request via Authorization header fallback
+
+4. MIDDLEWARE
+   - Create requireAuth() middleware
+   - Check Authorization header or httpOnly cookie
+   - Decode JWT, validate expiry
+   - Attach userId to req.user
+   - Return 401 if invalid/missing
+
+5. UPDATE EXISTING ENDPOINTS
+   - All /api/projects/* routes: require auth via requireAuth()
+   - Filter projects by req.user.userId
+   - Only allow edit/delete if userId matches project.user_id
+   - Migrate all user_key lookups to userId
+
+6. FRONTEND (MINIMAL CHANGES, NO UI REBUILD)
+   - Create AuthContext (useAuth hook)
+   - Add login/register pages (can be simple modals)
+   - Store JWT in httpOnly cookie (handled by fetch credentials)
+   - Update IDE.tsx to check useAuth() on load
+   - Redirect to login if not authenticated
+   - Remove all localStorage userKey usage
+
+7. FALLBACK HANDLING
+   - For shared projects and explore: allow anonymous view (no userId required)
+   - Anonymous users cannot create projects
+   - Shared projects still viewable by anyone
+
+TEST (BEFORE MOVING ON):
+✅ Register new user via email
+✅ Login with email/password
+✅ Token persists across page refreshes
+✅ Project creation stores userId
+✅ Cannot edit/delete another user's project
+✅ Shared projects still viewable without login
+✅ Logout clears auth state
+
+STOP HERE. DO NOT PROCEED TO PHASE 2 UNTIL THESE TESTS PASS.

@@ -22,12 +22,50 @@ A mobile-first cloud IDE system with two frontends:
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM (`projectsTable` — uuid PK, userKey, name, projectType, files jsonb)
+- **Database**: PostgreSQL + Drizzle ORM
 - **Validation**: Zod (catalog version), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 - **Mobile**: Expo SDK 54, Expo Router, React Native 0.81.5
 - **TypeScript execution**: `tsx` (installed in api-server)
+
+## Authentication (Phase 1 — Complete)
+
+### How It Works
+- **JWT** signed with `JWT_SECRET` env var, 7-day expiry, stored in an `httpOnly` cookie (`auth_token`)
+- `requireAuth` middleware: reads cookie → `Authorization: Bearer` fallback → attaches `req.user.userId`
+- `optionalAuth` middleware: same but never returns 401 (for run/stream and usage endpoints)
+- All `/api/projects/*` and `/api/auth/*` routes require or use auth
+- Shared project viewing and Explore feed are fully public (no auth required)
+
+### Auth Endpoints
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/register` | email + password → bcrypt (cost 12) → JWT cookie |
+| POST | `/api/auth/login` | verify bcrypt → JWT cookie |
+| POST | `/api/auth/google` | verify Google idToken → upsert user → JWT cookie (requires `GOOGLE_CLIENT_ID` env var) |
+| POST | `/api/auth/logout` | clears auth cookie |
+| GET | `/api/auth/me` | returns `{ userId, email, oauthProvider }` for current session |
+
+### Key Files
+- `artifacts/api-server/src/middlewares/require-auth.ts` — `requireAuth`, `optionalAuth`, `signToken`, `setAuthCookie`
+- `artifacts/api-server/src/routes/auth.ts` — all auth endpoints
+- `artifacts/cloud-ide/src/contexts/AuthContext.tsx` — `AuthProvider` + `useAuth()` hook
+- `artifacts/cloud-ide/src/pages/AuthPage.tsx` — login/register page (shown when not authenticated)
+
+### Frontend Auth Flow
+1. `AuthProvider` (in `App.tsx`) calls `GET /api/auth/me` on mount
+2. If authenticated → renders the IDE
+3. If unauthenticated → `ProtectedRoute` in `App.tsx` renders `<AuthPage />`
+4. All project API fetches use `credentials: "include"` (no X-User-Key header)
+5. Toolbar shows user email + logout button when authenticated
+
+### Environment Variables Required
+| Var | Purpose |
+|-----|---------|
+| `JWT_SECRET` | Signs/verifies JWT tokens (auto-generated on setup) |
+| `SESSION_SECRET` | Express session fallback (pre-existing) |
+| `GOOGLE_CLIENT_ID` | Optional: enables Google OAuth sign-in button |
 
 ## Cloud IDE Features (`artifacts/cloud-ide`)
 
@@ -36,12 +74,12 @@ A mobile-first cloud IDE system with two frontends:
 - **File tree** with folder grouping, language icons, inline rename, create/delete
 - **Project templates** for 10 mobile stacks (see below)
 - **SSE streaming execution** — real-time line-by-line output via `POST /api/run/stream`
-- **Project save/load** — PostgreSQL-backed, scoped per browser via `X-User-Key` UUID header
-- **Per-browser user key** — `crypto.randomUUID()` in localStorage key `cloudide-user-key`
+- **Project save/load** — PostgreSQL-backed, scoped per authenticated user
 - **APK Build pipeline**: zips files in-browser → uploads to `/api/build` → polls status → streams logs
 - **Resizable panels**: file tree, editor, preview/log panel
 - **Language badge** in toolbar shows detected language of active file
 - **HTML live preview** — running an HTML file renders it directly in the Preview iframe
+- **Version history** — up to 10 snapshots per project with restore
 
 ### Supported Languages (CodeMirror 6)
 
@@ -95,74 +133,100 @@ All handlers stream via Server-Sent Events (`POST /api/run/stream`). Each line o
 
 ## Rate Limiting (`artifacts/api-server/src/middlewares/rate-limit.ts`)
 
+Key resolution order: `userId` from JWT → `X-User-Key` header → IP address
+
 | Limiter | Route | Limit |
 |---------|-------|-------|
-| `runLimiter` | `/api/run`, `/api/run/stream` | 30 req/min per IP |
-| `buildLimiter` | `/api/build`, `/api/build/project` | 5 req/min per IP |
-| `projectLimiter` | `/api/projects/*` | 60 req/min per IP |
+| `runLimiter` | `/api/run`, `/api/run/stream` | 30 req/min per user |
+| `buildLimiter` | `/api/build`, `/api/build/project` | 5 req/min per user |
+| `projectLimiter` | `/api/projects/*` | 60 req/min per user |
+| `shareLimiter` | `/api/share/*`, `/api/explore` | 20 req/min per IP |
+
+## Daily Usage Limits
+
+- 50 runs/day per user (authenticated: by userId; anonymous: by IP)
+- 3 builds/day per user
+- Tracked in `usageTable` in Postgres
 
 ## Project Sharing System
 
 ### Backend
-- `POST /api/projects/:id/share` — generates (or reuses) an 8-char hex share ID (e.g. `abc12345`), stores in `sharesTable`, returns `{ shareUrl: "/ide/p/abc12345", shareId }`. Idempotent — same project always gets the same link.
-- `GET /api/share/:shareId` — public endpoint (no auth). Returns full project data without userKey. Rate-limited to 20 req/min by IP.
+- `POST /api/projects/:id/share` — generates (or reuses) an 8-char hex share ID, stores in `sharesTable`. Requires auth; must own the project.
+- `GET /api/share/:shareId` — public (no auth). Returns full project data + stats.
+- `GET /api/explore` — public ranked feed: `(forks×5) + (runs×2) + uniqueViews`
 
 ### Share URL Format
 `/ide/p/<shareId>` — e.g. `/ide/p/5501de83`
 
-### Shared View (`/p/:shareId` route in cloud-ide router)
-- Full read-only CodeMirror 6 editor (non-editable via `EditorState.readOnly` + `EditorView.editable`)
-- File explorer, tab bar, Preview + Console panels
-- Run button (executes via SSE, no auth required)
-- "read-only · fork to edit" watermark in editor
-- "read-only" badge in toolbar
-
-### Fork Flow
-"Fork Project" button → `POST /api/projects` under forker's user key → navigates to `/` (main IDE). Original project is untouched.
-
-### Share Button in IDE
-Toolbar shows "Share" button only when `currentProjectId` is set (project has been saved). Opens `ShareModal` with:
-- "Generate Share Link" button (calls `/api/projects/:id/share`)
-- Displays full URL once generated
-- "Copy Link" (clipboard) + "Preview" (new tab) actions
-
-### Database Table
-```
-sharesTable:
-  shareId    text PK (8-char hex, e.g. "5501de83")
-  projectId  uuid NOT NULL references projects(id) ON DELETE CASCADE
-  createdAt  timestamp default now()
-```
+### Shared View
+- Full read-only CodeMirror 6 editor
+- Run button works (anonymous, usage tracked by IP)
+- "Fork Project" button → requires login → creates copy under authenticated user
 
 ## Core API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/run` | Buffered code execution (returns full output) |
-| POST | `/api/run/stream` | SSE streaming execution (line-by-line) |
-| POST | `/api/build` | Upload Flutter ZIP, queue APK build |
-| POST | `/api/build/project` | Build from project files directly |
-| GET | `/api/status/:jobId` | Poll build status |
-| GET | `/api/download/:jobId` | Download compiled APK |
-| GET | `/api/logs/:jobId` | Fetch build logs |
-| GET | `/api/projects` | List user's projects (requires X-User-Key) |
-| POST | `/api/projects` | Create project |
-| GET | `/api/projects/:id` | Get single project |
-| PUT | `/api/projects/:id` | Update project |
-| DELETE | `/api/projects/:id` | Delete project |
-| GET | `/api/healthz` | Health check |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/auth/me` | required | Get current user |
+| POST | `/api/auth/register` | none | Register with email+password |
+| POST | `/api/auth/login` | none | Login with email+password |
+| POST | `/api/auth/logout` | none | Clear auth cookie |
+| POST | `/api/run` | optional | Buffered code execution |
+| POST | `/api/run/stream` | optional | SSE streaming execution |
+| POST | `/api/build` | none | Upload Flutter ZIP, queue APK build |
+| POST | `/api/build/project` | none | Build from project files |
+| GET | `/api/status/:jobId` | none | Poll build status |
+| GET | `/api/download/:jobId` | none | Download compiled APK |
+| GET | `/api/logs/:jobId` | none | Fetch build logs |
+| GET | `/api/projects` | required | List user's projects |
+| POST | `/api/projects` | required | Create project |
+| GET | `/api/projects/:id` | required | Get single project |
+| PUT | `/api/projects/:id` | required | Update project |
+| DELETE | `/api/projects/:id` | required | Delete project |
+| GET | `/api/explore` | none | Browse shared projects |
+| GET | `/api/share/:shareId` | none | Load shared project |
+| GET | `/api/usage` | optional | Daily usage stats |
+| GET | `/api/healthz` | none | Health check |
 
 ## Database Schema (`lib/db`)
 
 ```
+usersTable:
+  id            uuid PK (gen_random_uuid())
+  email         text NOT NULL UNIQUE
+  password_hash text nullable      — null for OAuth-only accounts
+  oauth_provider text nullable     — 'google' | null
+  oauth_id      text nullable
+  created_at    timestamp
+  updated_at    timestamp
+
 projectsTable:
-  id          uuid PK (default gen_random_uuid())
-  userKey     text NOT NULL        — per-browser UUID from X-User-Key header
-  name        text NOT NULL        — project name (max 120 chars)
-  projectType text NOT NULL        — e.g. "javascript", "flutter"
+  id          uuid PK
+  user_key    text NOT NULL        — legacy field; set to userId for auth'd projects
+  user_id     uuid nullable FK → users(id) ON DELETE CASCADE
+  name        text NOT NULL
+  project_type text NOT NULL
   files       jsonb NOT NULL       — { filename: content } map
-  createdAt   timestamp default now()
-  updatedAt   timestamp default now()
+  created_at  timestamp
+  updated_at  timestamp
+
+sharesTable:
+  share_id    text PK (8-char hex)
+  project_id  uuid FK → projects(id) ON DELETE CASCADE
+  total_views / unique_views / forks_count / runs_count  integer
+
+versionsTable:
+  id          uuid PK
+  project_id  uuid FK
+  files       jsonb
+  label       text
+  created_at  timestamp
+
+usageTable:
+  user_key    text PK (composite)
+  date        text PK (YYYY-MM-DD)
+  runs_count  integer
+  builds_count integer
 ```
 
 Run `pnpm --filter @workspace/db run push` to apply schema changes to the database.
@@ -170,6 +234,7 @@ Run `pnpm --filter @workspace/db run push` to apply schema changes to the databa
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages
+- `pnpm run typecheck:libs` — rebuild composite libs (run after schema changes)
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)

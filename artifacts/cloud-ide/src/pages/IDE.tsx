@@ -12,7 +12,6 @@ import { useFileSystem } from "@/hooks/useFileSystem";
 import { useBuild } from "@/hooks/useBuild";
 import { useRun } from "@/hooks/useRun";
 import { useProjects } from "@/hooks/useProjects";
-import { getUserKey } from "@/lib/user-key";
 import { ProjectTemplate } from "@/lib/templates";
 
 const AUTOSAVE_DEBOUNCE_MS = 3_000;
@@ -75,7 +74,7 @@ export default function IDE() {
 
   // ─── Fetch initial usage on mount ────────────────────────────────────────────
   useEffect(() => {
-    fetch("/api/usage", { headers: { "X-User-Key": getUserKey() } })
+    fetch("/api/usage", { credentials: "include" })
       .then((r) => r.json())
       .then((d: { runsRemaining?: number }) => {
         if (typeof d.runsRemaining === "number") setLocalRunsRemaining(d.runsRemaining);

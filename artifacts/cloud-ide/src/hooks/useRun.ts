@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef } from "react";
-import { getUserKey } from "@/lib/user-key";
 
 export interface StreamChunk {
   type: "stdout" | "stderr" | "error";
@@ -12,7 +11,6 @@ export interface RunOutput {
   exitCode:  number;
   duration:  number;
   error?:    string;
-  /** Set when server returns HTML for iframe preview */
   html?:     string;
 }
 
@@ -22,9 +20,9 @@ export interface StreamState {
 }
 
 export function useRun() {
-  const [isRunning,      setIsRunning]      = useState(false);
-  const [stream,         setStream]         = useState<StreamState>({ chunks: [], result: null });
-  const [runsRemaining,  setRunsRemaining]  = useState<number | null>(null);
+  const [isRunning,     setIsRunning]     = useState(false);
+  const [stream,        setStream]        = useState<StreamState>({ chunks: [], result: null });
+  const [runsRemaining, setRunsRemaining] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const runCode = useCallback(async (
@@ -40,19 +38,16 @@ export function useRun() {
     setStream({ chunks: [], result: null });
 
     try {
-      const res = await fetch(`/api/run/stream`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Key": getUserKey(),
-        },
-        body: JSON.stringify({ language, code, filename }),
-        signal: controller.signal,
+      const res = await fetch("/api/run/stream", {
+        method:      "POST",
+        headers:     { "Content-Type": "application/json" },
+        credentials: "include",   // sends session cookie for usage tracking
+        body:        JSON.stringify({ language, code, filename }),
+        signal:      controller.signal,
       });
 
       if (!res.ok || !res.body) {
         const errorData = await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string; remaining?: number };
-        // Surface limit-reached error clearly
         const msg = errorData.error ?? `HTTP ${res.status}`;
         if (typeof errorData.remaining === "number") setRunsRemaining(errorData.remaining);
         setStream({
@@ -66,8 +61,8 @@ export function useRun() {
       const decoder = new TextDecoder();
       let buffer = "";
 
-      let stdout      = "";
-      let stderr      = "";
+      let stdout        = "";
+      let stderr        = "";
       let htmlContent: string | undefined;
       let isHtmlPreview = false;
       let execError:  string | undefined;
@@ -97,7 +92,6 @@ export function useRun() {
           catch { continue; }
 
           if (event.type === "usage") {
-            // Server tells us how many runs are left after this one
             if (typeof event.remaining === "number") setRunsRemaining(event.remaining);
           } else if (event.type === "stdout") {
             const chunk = event.chunk ?? "";

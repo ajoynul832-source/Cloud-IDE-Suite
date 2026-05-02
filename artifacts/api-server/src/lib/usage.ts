@@ -1,9 +1,6 @@
 /**
- * Daily usage accounting — persisted in Postgres, keyed by (userKey, date).
- *
- * Limits (free tier):
- *   runs   → 50 / day
- *   builds → 3  / day
+ * Daily usage accounting — persisted in Postgres.
+ * Key priority: authenticated userId > X-User-Key header > IP fallback
  */
 import { and, eq, sql } from "drizzle-orm";
 import { db, usageTable } from "@workspace/db";
@@ -17,18 +14,21 @@ export function todayUTC(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Derive a stable key from X-User-Key header or fall back to IP */
+/**
+ * Derive a stable usage key.
+ * Priority: authenticated userId → X-User-Key header → IP.
+ */
 export function resolveUsageKey(
+  userId:    string | undefined,
   rawHeader: string | string[] | undefined,
-  ip: string | undefined,
+  ip:        string | undefined,
 ): string {
+  if (userId) return `user:${userId}`;
   const key = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader ?? "";
   if (key.length >= 8 && /^[a-f0-9-]{8,64}$/i.test(key)) return key.toLowerCase();
-  // Fallback: use IP (acceptable granularity for anonymous users)
   return `ip:${(ip ?? "unknown").slice(0, 45)}`;
 }
 
-/** Ensure a row exists for today, then return current counts */
 async function ensureRow(userKey: string, date: string): Promise<{ runsCount: number; buildsCount: number }> {
   await db
     .insert(usageTable)
@@ -48,7 +48,6 @@ export interface UsageResult {
   remaining: number;
 }
 
-/** Check then increment run counter atomically enough for our needs. */
 export async function checkAndIncrementRuns(userKey: string): Promise<UsageResult> {
   const date = todayUTC();
   try {
@@ -63,11 +62,10 @@ export async function checkAndIncrementRuns(userKey: string): Promise<UsageResul
     return { allowed: true, remaining: DAILY_RUN_LIMIT - row.runsCount - 1 };
   } catch (err) {
     logger.error({ err, userKey }, "usage increment (runs) failed — allowing request");
-    return { allowed: true, remaining: -1 }; // fail open so a DB hiccup doesn't block all users
+    return { allowed: true, remaining: -1 };
   }
 }
 
-/** Check then increment build counter. */
 export async function checkAndIncrementBuilds(userKey: string): Promise<UsageResult> {
   const date = todayUTC();
   try {
@@ -86,7 +84,6 @@ export async function checkAndIncrementBuilds(userKey: string): Promise<UsageRes
   }
 }
 
-/** Read current usage without modifying it (for GET /api/usage). */
 export async function getUsage(userKey: string): Promise<{
   runsToday:       number;
   buildsToday:     number;

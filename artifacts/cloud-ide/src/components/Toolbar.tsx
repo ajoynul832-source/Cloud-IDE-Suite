@@ -1,9 +1,10 @@
 import {
   Play, Box, Download, Loader2, FolderOpen, ChevronDown,
-  Database, Share2, Compass, CheckCircle2, Gauge,
+  Database, Share2, Compass, CheckCircle2, Gauge, LogOut, User,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "./ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type AutosaveStatus = "idle" | "saving" | "saved";
 
@@ -42,6 +43,7 @@ export function Toolbar({
   autosaveStatus = "idle",
   runsRemaining,
 }: ToolbarProps) {
+  const { user, logout } = useAuth();
   const runsLow = runsRemaining !== null && runsRemaining !== undefined && runsRemaining < 5;
 
   return (
@@ -98,7 +100,7 @@ export function Toolbar({
           </button>
         )}
 
-        {/* Project name + autosave indicator */}
+        {/* Project name + autosave */}
         {projectName && (
           <>
             <div className="w-px h-4 bg-border shrink-0" />
@@ -125,10 +127,10 @@ export function Toolbar({
         )}
       </div>
 
-      {/* ── Right: usage + actions ────────────────────────────────────────── */}
+      {/* ── Right: usage + actions + user ─────────────────────────────────── */}
       <div className="flex items-center gap-2 shrink-0">
 
-        {/* Daily runs remaining counter */}
+        {/* Runs remaining */}
         {runsRemaining !== null && runsRemaining !== undefined && (
           <div
             title={`${runsRemaining} runs remaining today (resets at midnight UTC)`}
@@ -140,7 +142,7 @@ export function Toolbar({
             ].join(" ")}
           >
             <Gauge size={10} />
-            <span>{runsLow && runsRemaining === 0 ? "No runs left" : `${runsRemaining} runs left`}</span>
+            <span>{runsRemaining === 0 ? "No runs left" : `${runsRemaining} runs left`}</span>
           </div>
         )}
 
@@ -155,7 +157,7 @@ export function Toolbar({
             runsRemaining === 0
               ? "Daily run limit reached (50/day). Resets at midnight UTC."
               : canRun
-              ? "Run current file (JS, TS, Python, HTML)"
+              ? "Run current file"
               : "Open a JS, TS, Python, or HTML file to run"
           }
           className={[
@@ -205,6 +207,29 @@ export function Toolbar({
 
         {buildStatus === "failed" && (
           <span className="text-xs font-mono text-destructive">Build failed</span>
+        )}
+
+        {/* User indicator + logout */}
+        {user && (
+          <>
+            <div className="w-px h-5 bg-border hidden md:block" />
+            <div className="hidden md:flex items-center gap-1.5">
+              <User size={11} className="text-muted-foreground" />
+              <span
+                className="font-mono text-[10px] text-muted-foreground max-w-[120px] truncate"
+                title={user.email}
+              >
+                {user.email}
+              </span>
+              <button
+                onClick={logout}
+                title="Sign out"
+                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <LogOut size={11} />
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>
