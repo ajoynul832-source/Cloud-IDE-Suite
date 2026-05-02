@@ -656,7 +656,22 @@ components:
           type: string
         shareId:
           type: string
-      required: [shareUrl, shareId]
+        stats:
+          $ref: "#/components/schemas/ShareStats"
+      required: [shareUrl, shareId, stats]
+
+    ShareStats:
+      type: object
+      properties:
+        totalViews:
+          type: integer
+        uniqueViews:
+          type: integer
+        forksCount:
+          type: integer
+        runsCount:
+          type: integer
+      required: [totalViews, uniqueViews, forksCount, runsCount]
 
     SharedProjectResponse:
       type: object
@@ -665,7 +680,9 @@ components:
           $ref: "#/components/schemas/Project"
         shareId:
           type: string
-      required: [project, shareId]
+        stats:
+          $ref: "#/components/schemas/ShareStats"
+      required: [project, shareId, stats]
 
     ErrorResponse:
       type: object

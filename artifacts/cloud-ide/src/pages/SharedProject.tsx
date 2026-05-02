@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { FileTree } from "@/components/FileTree";
@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Play,
   ExternalLink,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -41,6 +42,13 @@ function getDisplayLanguage(filename: string): string | undefined {
   return extMap[ext];
 }
 
+interface ShareStats {
+  totalViews:  number;
+  uniqueViews: number;
+  forksCount:  number;
+  runsCount:   number;
+}
+
 interface SharedData {
   project: {
     id: string;
@@ -51,6 +59,22 @@ interface SharedData {
     updatedAt: string;
   };
   shareId: string;
+  stats:   ShareStats;
+}
+
+/** Fire-and-forget: record a fork or run event on the share */
+function recordEvent(shareId: string, event: "fork" | "run"): void {
+  fetch(`/api/share/${shareId}/event`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event }),
+  }).catch(() => { /* non-critical */ });
+}
+
+/** Format a raw count nicely (1 234 → "1.2k" above 9999) */
+function fmtCount(n: number): string {
+  if (n >= 10_000) return `${(n / 1000).toFixed(1)}k`;
+  return n.toLocaleString();
 }
 
 export default function SharedProject() {
@@ -62,12 +86,12 @@ export default function SharedProject() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [openFiles, setOpenFiles] = useState<string[]>([]);
-  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [openFiles, setOpenFiles]       = useState<string[]>([]);
+  const [activeFile, setActiveFile]     = useState<string | null>(null);
   const [rightPanelTab, setRightPanelTab] = useState<PanelTab>("preview");
-  const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
+  const [htmlPreview, setHtmlPreview]   = useState<string | null>(null);
 
-  const [isCopied, setIsCopied] = useState(false);
+  const [isCopied, setIsCopied]   = useState(false);
   const [isForking, setIsForking] = useState(false);
   const [forkError, setForkError] = useState<string | null>(null);
 
@@ -80,12 +104,11 @@ export default function SharedProject() {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const res = await fetch(`/api/share/${shareId}`);
+        const res  = await fetch(`/api/share/${shareId}`);
         const data = (await res.json()) as SharedData & { error?: string };
         if (!res.ok) throw new Error(data.error ?? "Not found");
         setSharedData(data);
 
-        // Open first file automatically
         const first = Object.keys(data.project.files).sort()[0];
         if (first) {
           setOpenFiles([first]);
@@ -100,10 +123,11 @@ export default function SharedProject() {
     if (shareId) load();
   }, [shareId]);
 
-  const files = sharedData?.project.files ?? {};
-  const canRun = !!activeFile && !!getExecLanguage(activeFile);
+  const files          = sharedData?.project.files ?? {};
+  const canRun         = !!activeFile && !!getExecLanguage(activeFile);
   const currentLanguage = getDisplayLanguage(activeFile ?? Object.keys(files)[0] ?? "");
-  const shareUrl = `${window.location.origin}/ide/p/${shareId}`;
+  const shareUrl       = `${window.location.origin}/ide/p/${shareId}`;
+  const stats          = sharedData?.stats;
 
   const handleSelectFile = (path: string) => {
     if (!openFiles.includes(path)) setOpenFiles((prev) => [...prev, path]);
@@ -118,19 +142,21 @@ export default function SharedProject() {
     });
   };
 
-  const handleRun = async () => {
+  const handleRun = useCallback(async () => {
     if (!activeFile || !sharedData) return;
     const content = files[activeFile] ?? "";
-    const lang = getExecLanguage(activeFile);
+    const lang    = getExecLanguage(activeFile);
     if (!lang) return;
     if (lang === "html") {
       setHtmlPreview(content);
       setRightPanelTab("preview");
-      return;
+    } else {
+      setRightPanelTab("console");
+      await runCode(lang, content, activeFile);
     }
-    setRightPanelTab("console");
-    await runCode(lang, content, activeFile);
-  };
+    // Track run (fire-and-forget, non-blocking)
+    recordEvent(shareId, "run");
+  }, [activeFile, sharedData, files, runCode, shareId]);
 
   const handleCopyLink = async () => {
     try {
@@ -138,7 +164,6 @@ export default function SharedProject() {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     } catch {
-      // Fallback
       const input = document.createElement("input");
       input.value = shareUrl;
       document.body.appendChild(input);
@@ -155,17 +180,16 @@ export default function SharedProject() {
     setIsForking(true);
     setForkError(null);
     try {
-      const forkName = `Fork of ${sharedData.project.name}`;
       const saved = await saveProject(
-        forkName,
+        `Fork of ${sharedData.project.name}`,
         sharedData.project.projectType,
         sharedData.project.files,
       );
       if (saved) {
-        // Navigate to the main IDE — user key is already set
+        recordEvent(shareId, "fork");
         navigate("/");
       } else {
-        setForkError("Failed to fork project. Are you signed in?");
+        setForkError("Failed to fork project.");
       }
     } catch {
       setForkError("Failed to fork project");
@@ -215,7 +239,7 @@ export default function SharedProject() {
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
       {/* Shared project banner */}
       <div className="h-12 bg-card border-b border-border flex items-center justify-between px-4 shrink-0 gap-3">
-        {/* Left: brand + project info */}
+        {/* Left: brand + project info + stats */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex items-center gap-2 shrink-0">
             <Box className="text-primary" size={16} />
@@ -225,7 +249,10 @@ export default function SharedProject() {
           </div>
           <div className="w-px h-5 bg-border shrink-0" />
           <div className="flex items-center gap-2 min-w-0">
-            <span className="font-mono text-sm text-foreground truncate max-w-[180px]" title={sharedData.project.name}>
+            <span
+              className="font-mono text-sm text-foreground truncate max-w-[160px]"
+              title={sharedData.project.name}
+            >
               {sharedData.project.name}
             </span>
             {currentLanguage && (
@@ -237,11 +264,23 @@ export default function SharedProject() {
               read-only
             </span>
           </div>
+
+          {/* View counter — shown once stats load */}
+          {stats && (
+            <>
+              <div className="w-px h-4 bg-border shrink-0 hidden md:block" />
+              <div className="items-center gap-1 text-[10px] font-mono text-muted-foreground hidden md:flex shrink-0">
+                <Eye size={10} className="shrink-0" />
+                <span>
+                  {fmtCount(stats.totalViews)} views · {fmtCount(stats.uniqueViews)} unique
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right: actions */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Copy link */}
           <button
             onClick={handleCopyLink}
             title="Copy share link"
@@ -251,7 +290,6 @@ export default function SharedProject() {
             <span className="hidden sm:block">{isCopied ? "Copied!" : "Copy Link"}</span>
           </button>
 
-          {/* Open in new tab */}
           <a
             href={shareUrl}
             target="_blank"
@@ -262,7 +300,6 @@ export default function SharedProject() {
             <ExternalLink size={12} />
           </a>
 
-          {/* Run */}
           <Button
             variant="outline"
             size="sm"
@@ -280,7 +317,6 @@ export default function SharedProject() {
             )}
           </Button>
 
-          {/* Fork */}
           <Button
             size="sm"
             onClick={handleFork}
@@ -308,7 +344,6 @@ export default function SharedProject() {
       <div className="flex-1 overflow-hidden">
         <ResizablePanelGroup direction="horizontal" className="h-full">
           <ResizablePanel defaultSize={20} minSize={12} maxSize={35}>
-            {/* Read-only file tree — no create/delete/rename */}
             <ReadOnlyFileTree
               files={files}
               activeFile={activeFile}
@@ -336,7 +371,6 @@ export default function SharedProject() {
                       onChange={() => {}}
                       readOnly
                     />
-                    {/* Read-only overlay hint */}
                     <div className="absolute bottom-2 right-3 text-[10px] font-mono text-muted-foreground/50 pointer-events-none select-none">
                       read-only · fork to edit
                     </div>
@@ -369,7 +403,8 @@ export default function SharedProject() {
   );
 }
 
-/** Simplified read-only file tree */
+// ─── Read-only file tree ──────────────────────────────────────────────────────
+
 function ReadOnlyFileTree({
   files,
   activeFile,
@@ -381,10 +416,9 @@ function ReadOnlyFileTree({
 }) {
   const fileList = Object.keys(files).sort();
 
-  // Group by top-level folder
   const groups: Record<string, string[]> = {};
   for (const f of fileList) {
-    const parts = f.split("/");
+    const parts  = f.split("/");
     const folder = parts.length > 1 ? parts[0] : "__root__";
     if (!groups[folder]) groups[folder] = [];
     groups[folder].push(f);
@@ -416,9 +450,9 @@ function ReadOnlyFileTree({
               </div>
             )}
             {paths.map((path) => {
-              const name = path.split("/").pop() ?? path;
-              const ext = name.split(".").pop()?.toLowerCase() ?? "";
-              const icon = extIcon[ext] ?? "📄";
+              const name   = path.split("/").pop() ?? path;
+              const ext    = name.split(".").pop()?.toLowerCase() ?? "";
+              const icon   = extIcon[ext] ?? "📄";
               const indent = folder !== "__root__" ? "pl-6" : "pl-3";
               return (
                 <button

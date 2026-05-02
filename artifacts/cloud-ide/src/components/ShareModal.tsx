@@ -1,36 +1,73 @@
-import { useState } from "react";
-import { X, Copy, Check, ExternalLink, Loader2, Share2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Copy, Check, ExternalLink, Loader2, Share2, Eye } from "lucide-react";
 import { Button } from "./ui/button";
 import { getUserKey } from "@/lib/user-key";
 
+interface ShareStats {
+  totalViews:  number;
+  uniqueViews: number;
+  forksCount:  number;
+  runsCount:   number;
+}
+
 interface ShareModalProps {
-  projectId: string;
+  projectId:   string;
   projectName: string;
-  onClose: () => void;
+  onClose:     () => void;
+}
+
+function fmtCount(n: number): string {
+  if (n >= 10_000) return `${(n / 1000).toFixed(1)}k`;
+  return n.toLocaleString();
 }
 
 export function ShareModal({ projectId, projectName, onClose }: ShareModalProps) {
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareUrl,     setShareUrl]     = useState<string | null>(null);
+  const [shareId,      setShareId]      = useState<string | null>(null);
+  const [stats,        setStats]        = useState<ShareStats | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isCopied, setIsCopied] = useState(false);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [error,        setError]        = useState<string | null>(null);
+  const [isCopied,     setIsCopied]     = useState(false);
 
   const fullUrl = shareUrl ? `${window.location.origin}${shareUrl}` : null;
+
+  // Whenever we have a shareId (from generate or from re-opening), fetch live stats
+  useEffect(() => {
+    if (!shareId) return;
+    let cancelled = false;
+    setIsLoadingStats(true);
+    fetch(`/api/share/${shareId}/stats`)
+      .then((r) => r.json())
+      .then((data: ShareStats & { error?: string }) => {
+        if (!cancelled && !data.error) setStats(data);
+      })
+      .catch(() => { /* non-critical */ })
+      .finally(() => { if (!cancelled) setIsLoadingStats(false); });
+    return () => { cancelled = true; };
+  }, [shareId]);
 
   async function generate() {
     setIsGenerating(true);
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/share`, {
+      const res  = await fetch(`/api/projects/${projectId}/share`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-User-Key": getUserKey(),
         },
       });
-      const data = await res.json() as { shareUrl?: string; error?: string };
+      const data = await res.json() as {
+        shareUrl?: string;
+        shareId?:  string;
+        stats?:    ShareStats;
+        error?:    string;
+      };
       if (!res.ok) throw new Error(data.error ?? "Failed to generate link");
       setShareUrl(data.shareUrl ?? null);
+      setShareId(data.shareId  ?? null);
+      if (data.stats) setStats(data.stats);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -115,6 +152,22 @@ export function ShareModal({ projectId, projectName, onClose }: ShareModalProps)
                   {fullUrl}
                 </span>
               </div>
+
+              {/* View stats */}
+              {(isLoadingStats || stats) && (
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground">
+                  <Eye size={10} className="shrink-0" />
+                  {isLoadingStats && !stats ? (
+                    <span>Loading stats…</span>
+                  ) : stats ? (
+                    <span>
+                      {fmtCount(stats.totalViews)} views · {fmtCount(stats.uniqueViews)} unique
+                      {stats.forksCount > 0 && ` · ${fmtCount(stats.forksCount)} forks`}
+                      {stats.runsCount  > 0 && ` · ${fmtCount(stats.runsCount)} runs`}
+                    </span>
+                  ) : null}
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex gap-2">
