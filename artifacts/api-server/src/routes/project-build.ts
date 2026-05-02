@@ -13,6 +13,7 @@ import path from "path";
 import os from "os";
 import JSZip from "jszip";
 import { logger } from "../lib/logger";
+import { buildLimiter } from "../middlewares/rate-limit";
 
 // Re-export job map from build route (we share the same in-memory store)
 import { jobs, queue, processQueue } from "./build-shared";
@@ -122,7 +123,7 @@ async function startZipBuild(files: Record<string, string>, jobId: string): Prom
 
 // ---------- Route ----------
 
-router.post("/build/project", async (req, res) => {
+router.post("/build/project", buildLimiter, async (req, res) => {
   const { type, files, name } = req.body as {
     type?: string;
     files?: Record<string, string>;

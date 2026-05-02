@@ -3,12 +3,11 @@
  * Do not edit manually.
  * Api
  * API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -16,63 +15,52 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
- * Run JavaScript or Python code and return output
- * @summary Execute code
+ * @summary Execute code (buffered JSON response)
  */
 export const RunCodeBody = zod.object({
-  language: zod
-    .string()
-    .describe("Programming language: javascript, python, typescript, html"),
-  code: zod.string().describe("Source code to execute"),
-  filename: zod
-    .string()
-    .optional()
-    .describe("Optional filename hint for language detection"),
+  language: zod.string(),
+  code: zod.string(),
+  filename: zod.string().optional(),
 });
 
 export const RunCodeResponse = zod.object({
   stdout: zod.string(),
   stderr: zod.string(),
   exitCode: zod.number(),
-  duration: zod.number().describe("Execution time in milliseconds"),
+  duration: zod.number(),
   error: zod.string().nullish(),
+  html: zod.string().nullish(),
 });
 
 /**
- * Accept a ZIP file of a Flutter project and queue it for APK compilation
+ * @summary Execute code with real-time SSE streaming output
+ */
+export const RunCodeStreamBody = zod.object({
+  language: zod.string(),
+  code: zod.string(),
+  filename: zod.string().optional(),
+});
+
+/**
  * @summary Start a Flutter APK build (ZIP upload)
  */
 export const StartBuildBody = zod.object({
-  project: zod
-    .instanceof(File)
-    .describe("ZIP file of the Flutter project (max 10MB)"),
+  project: zod.instanceof(File),
 });
 
 export const StartBuildResponse = zod.object({
   jobId: zod.string(),
   status: zod.enum(["queued", "building", "success", "failed"]),
-  queuePosition: zod
-    .number()
-    .optional()
-    .describe("Position in queue (0 = currently building)"),
+  queuePosition: zod.number().optional(),
 });
 
 /**
- * Build or preview a project given a file map and a build type.
-- react-native → creates an Expo Snack and returns a live preview URL + QR
-- flutter → packages files as ZIP and builds APK
-- android → triggers Android Gradle build
-
- * @summary Build or preview a project from file map
+ * @summary Build or preview from file map (react-native, flutter, android)
  */
 export const BuildProjectBody = zod.object({
-  type: zod
-    .enum(["flutter", "react-native", "android", "ios"])
-    .describe("Project\/build type"),
-  files: zod
-    .record(zod.string(), zod.string())
-    .describe("Map of filename to file content"),
-  name: zod.string().optional().describe("Project name (used for Snack)"),
+  type: zod.enum(["flutter", "react-native", "android", "ios"]),
+  files: zod.record(zod.string(), zod.string()),
+  name: zod.string().optional(),
 });
 
 export const BuildProjectResponse = zod.object({
@@ -84,22 +72,12 @@ export const BuildProjectResponse = zod.object({
     "failed",
     "preview_ready",
   ]),
-  previewUrl: zod
-    .string()
-    .nullish()
-    .describe("Live preview URL (for react-native Expo Snack)"),
-  embedUrl: zod.string().nullish().describe("Embeddable iframe URL"),
-  qrUrl: zod
-    .string()
-    .nullish()
-    .describe("QR code image URL for opening on device"),
-  message: zod.string().nullish().describe("Status or error message"),
+  previewUrl: zod.string().nullish(),
+  embedUrl: zod.string().nullish(),
+  qrUrl: zod.string().nullish(),
+  message: zod.string().nullish(),
 });
 
-/**
- * Returns the current status of a build job
- * @summary Get build status
- */
 export const GetBuildStatusParams = zod.object({
   jobId: zod.coerce.string(),
 });
@@ -108,30 +86,20 @@ export const GetBuildStatusResponse = zod.object({
   jobId: zod.string(),
   status: zod.enum(["queued", "building", "success", "failed"]),
   logs: zod.string().nullish(),
-  download: zod.string().nullish().describe("Download URL if build succeeded"),
+  download: zod.string().nullish(),
   queuePosition: zod.number().nullish(),
   startedAt: zod.string().nullish(),
   completedAt: zod.string().nullish(),
-  stage: zod
-    .string()
-    .nullish()
-    .describe(
-      "Current build stage (extracting, validating, getting deps, building apk)",
-    ),
+  stage: zod.string().nullish(),
+  previewUrl: zod.string().nullish(),
+  embedUrl: zod.string().nullish(),
+  qrUrl: zod.string().nullish(),
 });
 
-/**
- * Returns the APK file if the build was successful
- * @summary Download the compiled APK
- */
 export const DownloadApkParams = zod.object({
   jobId: zod.coerce.string(),
 });
 
-/**
- * Returns stdout/stderr logs for a build job
- * @summary Get build logs
- */
 export const GetBuildLogsParams = zod.object({
   jobId: zod.coerce.string(),
 });
@@ -140,4 +108,93 @@ export const GetBuildLogsResponse = zod.object({
   jobId: zod.string(),
   logs: zod.string(),
   stage: zod.string().nullish(),
+});
+
+/**
+ * @summary List user's saved projects
+ */
+export const ListProjectsHeader = zod.object({
+  "x-user-key": zod.string(),
+});
+
+export const ListProjectsResponse = zod.object({
+  projects: zod.array(
+    zod.object({
+      id: zod.string(),
+      name: zod.string(),
+      projectType: zod.string(),
+      createdAt: zod.string(),
+      updatedAt: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Save a new project
+ */
+export const CreateProjectHeader = zod.object({
+  "x-user-key": zod.string(),
+});
+
+export const CreateProjectBody = zod.object({
+  name: zod.string(),
+  projectType: zod.string().optional(),
+  files: zod.record(zod.string(), zod.string()),
+});
+
+export const GetProjectParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const GetProjectHeader = zod.object({
+  "x-user-key": zod.string(),
+});
+
+export const GetProjectResponse = zod.object({
+  project: zod.object({
+    id: zod.string(),
+    name: zod.string(),
+    projectType: zod.string(),
+    files: zod.record(zod.string(), zod.string()).nullish(),
+    createdAt: zod.string(),
+    updatedAt: zod.string(),
+  }),
+});
+
+export const UpdateProjectParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const UpdateProjectHeader = zod.object({
+  "x-user-key": zod.string(),
+});
+
+export const UpdateProjectBody = zod.object({
+  name: zod.string().optional(),
+  projectType: zod.string().optional(),
+  files: zod.record(zod.string(), zod.string()).optional(),
+});
+
+export const UpdateProjectResponse = zod.object({
+  project: zod.object({
+    id: zod.string(),
+    name: zod.string(),
+    projectType: zod.string(),
+    files: zod.record(zod.string(), zod.string()).nullish(),
+    createdAt: zod.string(),
+    updatedAt: zod.string(),
+  }),
+});
+
+export const DeleteProjectParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const DeleteProjectHeader = zod.object({
+  "x-user-key": zod.string(),
+});
+
+export const DeleteProjectResponse = zod.object({
+  success: zod.boolean(),
+  id: zod.string(),
 });

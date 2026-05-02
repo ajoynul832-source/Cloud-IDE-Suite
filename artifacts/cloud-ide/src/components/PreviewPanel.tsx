@@ -1,6 +1,6 @@
 import { BuildLog } from "./BuildLog";
 import { ConsoleOutput } from "./ConsoleOutput";
-import { RunOutput } from "@/hooks/useRun";
+import { StreamState } from "@/hooks/useRun";
 import { ExternalLink, QrCode } from "lucide-react";
 
 export type PanelTab = "preview" | "console" | "build";
@@ -17,7 +17,7 @@ interface PreviewPanelProps {
   isRunning?: boolean;
   activeTab: PanelTab;
   onTabChange: (tab: PanelTab) => void;
-  consoleOutput?: RunOutput | null;
+  stream?: StreamState;
   snackPreview?: SnackPreview | null;
   htmlPreview?: string | null;
   projectType?: string;
@@ -29,7 +29,7 @@ export function PreviewPanel({
   isRunning,
   activeTab,
   onTabChange,
-  consoleOutput,
+  stream,
   snackPreview,
   htmlPreview,
   projectType,
@@ -39,6 +39,8 @@ export function PreviewPanel({
     { id: "console", label: "Console" },
     { id: "build", label: "Build Log" },
   ];
+
+  const defaultStream: StreamState = { chunks: [], result: null };
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -77,11 +79,9 @@ export function PreviewPanel({
           />
         )}
         {activeTab === "console" && (
-          <ConsoleOutput output={consoleOutput ?? null} isRunning={isRunning ?? false} />
+          <ConsoleOutput stream={stream ?? defaultStream} isRunning={isRunning ?? false} />
         )}
-        {activeTab === "build" && (
-          <BuildLog logs={logs} />
-        )}
+        {activeTab === "build" && <BuildLog logs={logs} />}
       </div>
     </div>
   );
@@ -96,7 +96,6 @@ function PreviewContent({
   htmlPreview?: string | null;
   projectType?: string;
 }) {
-  // HTML file → render in sandboxed iframe
   if (htmlPreview) {
     return (
       <iframe
@@ -108,11 +107,9 @@ function PreviewContent({
     );
   }
 
-  // React Native → Expo Snack embed
   if (snackPreview) {
     return (
       <div className="h-full flex flex-col">
-        {/* Snack toolbar */}
         <div className="shrink-0 flex items-center gap-3 px-3 py-2 border-b border-border bg-card text-xs font-mono">
           <span className="text-primary font-semibold">Expo Snack</span>
           <span className="text-muted-foreground flex-1 truncate">{snackPreview.snackUrl}</span>
@@ -126,8 +123,6 @@ function PreviewContent({
             Open
           </a>
         </div>
-
-        {/* Snack iframe */}
         <div className="flex-1 relative overflow-hidden">
           <iframe
             src={snackPreview.embedUrl}
@@ -136,39 +131,39 @@ function PreviewContent({
             title="Expo Snack Preview"
           />
         </div>
-
-        {/* QR code */}
         <div className="shrink-0 flex items-center gap-3 px-3 py-2 border-t border-border bg-card">
           <QrCode size={13} className="text-muted-foreground" />
           <span className="text-xs font-mono text-muted-foreground">Scan to open on device</span>
-          <img
-            src={snackPreview.qrUrl}
-            alt="QR Code"
-            className="w-14 h-14 ml-auto rounded"
-          />
+          <img src={snackPreview.qrUrl} alt="QR Code" className="w-14 h-14 ml-auto rounded" />
         </div>
       </div>
     );
   }
 
-  // Default: no preview available
   return (
     <div className="w-full h-full flex items-center justify-center text-muted-foreground font-mono text-sm p-8 text-center">
       <div className="space-y-3">
         {projectType === "react-native" ? (
           <>
             <p>React Native preview not generated yet.</p>
-            <p className="text-primary text-xs">Click <span className="font-bold">Build APK</span> to create an Expo Snack preview.</p>
+            <p className="text-primary text-xs">
+              Click <span className="font-bold">Build APK</span> to create an Expo Snack preview.
+            </p>
           </>
         ) : projectType === "flutter" ? (
           <>
             <p>Flutter apps cannot run directly in browser preview.</p>
-            <p className="mt-2 text-primary">Click <span className="font-bold">Build APK</span> to compile.</p>
+            <p className="mt-2 text-primary">
+              Click <span className="font-bold">Build APK</span> to compile.
+            </p>
           </>
         ) : (
           <>
-            <p>No browser preview available for this project type.</p>
-            <p className="mt-2 text-primary text-xs">Use <span className="font-bold">Run</span> to execute code or <span className="font-bold">Build APK</span> to compile.</p>
+            <p>No browser preview for this project type.</p>
+            <p className="mt-2 text-primary text-xs">
+              Use <span className="font-bold">Run</span> to execute code or{" "}
+              <span className="font-bold">Build APK</span> to compile.
+            </p>
           </>
         )}
       </div>

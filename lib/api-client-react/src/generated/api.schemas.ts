@@ -3,18 +3,15 @@
  * Do not edit manually.
  * Api
  * API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
 }
 
 export interface RunRequest {
-  /** Programming language: javascript, python, typescript, html */
   language: string;
-  /** Source code to execute */
   code: string;
-  /** Optional filename hint for language detection */
   filename?: string;
 }
 
@@ -22,14 +19,11 @@ export interface RunResult {
   stdout: string;
   stderr: string;
   exitCode: number;
-  /** Execution time in milliseconds */
   duration: number;
   error?: string | null;
+  html?: string | null;
 }
 
-/**
- * Project/build type
- */
 export type ProjectBuildRequestType =
   (typeof ProjectBuildRequestType)[keyof typeof ProjectBuildRequestType];
 
@@ -40,17 +34,11 @@ export const ProjectBuildRequestType = {
   ios: "ios",
 } as const;
 
-/**
- * Map of filename to file content
- */
 export type ProjectBuildRequestFiles = { [key: string]: string };
 
 export interface ProjectBuildRequest {
-  /** Project/build type */
   type: ProjectBuildRequestType;
-  /** Map of filename to file content */
   files: ProjectBuildRequestFiles;
-  /** Project name (used for Snack) */
   name?: string;
 }
 
@@ -68,13 +56,9 @@ export const ProjectBuildResponseStatus = {
 export interface ProjectBuildResponse {
   jobId: string;
   status: ProjectBuildResponseStatus;
-  /** Live preview URL (for react-native Expo Snack) */
   previewUrl?: string | null;
-  /** Embeddable iframe URL */
   embedUrl?: string | null;
-  /** QR code image URL for opening on device */
   qrUrl?: string | null;
-  /** Status or error message */
   message?: string | null;
 }
 
@@ -91,7 +75,6 @@ export const BuildResponseStatus = {
 export interface BuildResponse {
   jobId: string;
   status: BuildResponseStatus;
-  /** Position in queue (0 = currently building) */
   queuePosition?: number;
 }
 
@@ -109,13 +92,14 @@ export interface JobStatus {
   jobId: string;
   status: JobStatusStatus;
   logs?: string | null;
-  /** Download URL if build succeeded */
   download?: string | null;
   queuePosition?: number | null;
   startedAt?: string | null;
   completedAt?: string | null;
-  /** Current build stage (extracting, validating, getting deps, building apk) */
   stage?: string | null;
+  previewUrl?: string | null;
+  embedUrl?: string | null;
+  qrUrl?: string | null;
 }
 
 export interface BuildLogs {
@@ -124,11 +108,58 @@ export interface BuildLogs {
   stage?: string | null;
 }
 
+export type CreateProjectRequestFiles = { [key: string]: string };
+
+export interface CreateProjectRequest {
+  name: string;
+  projectType?: string;
+  files: CreateProjectRequestFiles;
+}
+
+export type UpdateProjectRequestFiles = { [key: string]: string };
+
+export interface UpdateProjectRequest {
+  name?: string;
+  projectType?: string;
+  files?: UpdateProjectRequestFiles;
+}
+
+export type ProjectFiles = { [key: string]: string } | null;
+
+export interface Project {
+  id: string;
+  name: string;
+  projectType: string;
+  files?: ProjectFiles;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  projectType: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectListResponse {
+  projects: ProjectSummary[];
+}
+
+export interface ProjectResponse {
+  project: Project;
+}
+
 export interface ErrorResponse {
   error: string;
 }
 
 export type StartBuildBody = {
-  /** ZIP file of the Flutter project (max 10MB) */
   project: Blob;
+};
+
+export type DeleteProject200 = {
+  success: boolean;
+  id: string;
 };

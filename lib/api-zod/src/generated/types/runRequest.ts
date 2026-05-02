@@ -3,14 +3,11 @@
  * Do not edit manually.
  * Api
  * API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export interface RunRequest {
-  /** Programming language: javascript, python, typescript, html */
   language: string;
-  /** Source code to execute */
   code: string;
-  /** Optional filename hint for language detection */
   filename?: string;
 }

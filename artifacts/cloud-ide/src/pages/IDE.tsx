@@ -6,29 +6,23 @@ import { TabBar } from "@/components/TabBar";
 import { PreviewPanel, PanelTab } from "@/components/PreviewPanel";
 import { Toolbar } from "@/components/Toolbar";
 import { TemplateSelector } from "@/components/TemplateSelector";
+import { ProjectsModal } from "@/components/ProjectsModal";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useBuild } from "@/hooks/useBuild";
 import { useRun } from "@/hooks/useRun";
 import { ProjectTemplate } from "@/lib/templates";
 
-/** Map file extension → execution language for /api/run */
 function getExecLanguage(filename: string): string | null {
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
   const map: Record<string, string> = {
-    js: "javascript",
-    jsx: "javascript",
-    mjs: "javascript",
-    cjs: "javascript",
-    ts: "typescript",
-    tsx: "typescript",
+    js: "javascript", jsx: "javascript", mjs: "javascript", cjs: "javascript",
+    ts: "typescript", tsx: "typescript",
     py: "python",
-    html: "html",
-    htm: "html",
+    html: "html", htm: "html",
   };
   return map[ext] ?? null;
 }
 
-/** Map file extension → display language name */
 function getDisplayLanguage(filename: string): string | undefined {
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
   const extMap: Record<string, string> = {
@@ -44,53 +38,47 @@ function getDisplayLanguage(filename: string): string | undefined {
 export default function IDE() {
   const { files, saveFile, createFile, renameFile, deleteFile, loadTemplate } = useFileSystem();
   const { isBuilding, startBuild, status, logs, jobId, projectType, previewData } = useBuild();
-  const { isRunning, output: runOutput, runCode } = useRun();
+  const { isRunning, stream, runCode } = useRun();
 
   const [openFiles, setOpenFiles] = useState<string[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [rightPanelTab, setRightPanelTab] = useState<PanelTab>("preview");
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showProjects, setShowProjects] = useState(false);
   const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
+
+  // Project save/load state
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [currentProjectName, setCurrentProjectName] = useState<string>("Untitled Project");
 
   const editorRef = useRef<EditorRef>(null);
 
   const currentLanguage = getDisplayLanguage(activeFile ?? Object.keys(files)[0] ?? "");
+  const canRun = !!activeFile && !!getExecLanguage(activeFile);
 
   const handleSelectFile = (path: string) => {
-    if (!openFiles.includes(path)) {
-      setOpenFiles((prev) => [...prev, path]);
-    }
+    if (!openFiles.includes(path)) setOpenFiles((prev) => [...prev, path]);
     setActiveFile(path);
   };
 
   const handleCloseFile = (path: string) => {
     setOpenFiles((prev) => {
       const next = prev.filter((p) => p !== path);
-      if (activeFile === path) {
-        setActiveFile(next.length > 0 ? next[next.length - 1] : null);
-      }
+      if (activeFile === path) setActiveFile(next.length > 0 ? next[next.length - 1] : null);
       return next;
     });
   };
 
-  /** Save current editor content then execute via /api/run */
   const handleRun = async () => {
     const file = activeFile;
     if (!file) return;
 
-    // Flush unsaved edits
     const content = editorRef.current?.getContent() ?? files[file] ?? "";
     saveFile(file, content);
 
     const lang = getExecLanguage(file);
+    if (!lang) { setRightPanelTab("preview"); return; }
 
-    if (!lang) {
-      // Language not executable server-side — just switch to preview
-      setRightPanelTab("preview");
-      return;
-    }
-
-    // HTML → render in iframe, no server round-trip needed
     if (lang === "html") {
       setHtmlPreview(content);
       setRightPanelTab("preview");
@@ -102,7 +90,6 @@ export default function IDE() {
   };
 
   const handleBuild = () => {
-    // Save active editor content first
     if (activeFile && editorRef.current) {
       const content = editorRef.current.getContent();
       saveFile(activeFile, content);
@@ -111,12 +98,10 @@ export default function IDE() {
       startBuild(files);
     }
 
-    // React Native → Preview tab (Expo Snack will appear when ready)
-    // Others → Build Log tab
-    const willUseSnack = Object.keys(files).some((p) =>
-      Object.values(files).some((c) => c.includes("react-native") || c.includes("expo"))
+    const isRN = Object.values(files).some(
+      (c) => c.includes("react-native") || c.includes("expo")
     );
-    setRightPanelTab(willUseSnack ? "preview" : "build");
+    setRightPanelTab(isRN ? "preview" : "build");
   };
 
   const handleLoadTemplate = (template: ProjectTemplate) => {
@@ -125,11 +110,32 @@ export default function IDE() {
     setActiveFile(null);
     setShowTemplates(false);
     setHtmlPreview(null);
+    setCurrentProjectId(null);
+    setCurrentProjectName("Untitled Project");
+
     const first = Object.keys(template.files).sort()[0];
-    if (first) {
-      setOpenFiles([first]);
-      setActiveFile(first);
-    }
+    if (first) { setOpenFiles([first]); setActiveFile(first); }
+  };
+
+  const handleLoadProject = (
+    loadedFiles: Record<string, string>,
+    name: string,
+    id: string,
+  ) => {
+    loadTemplate(loadedFiles);
+    setOpenFiles([]);
+    setActiveFile(null);
+    setHtmlPreview(null);
+    setCurrentProjectId(id);
+    setCurrentProjectName(name);
+
+    const first = Object.keys(loadedFiles).sort()[0];
+    if (first) { setOpenFiles([first]); setActiveFile(first); }
+  };
+
+  const handleProjectSaved = (id: string, name: string) => {
+    setCurrentProjectId(id);
+    setCurrentProjectName(name);
   };
 
   return (
@@ -140,10 +146,13 @@ export default function IDE() {
         onRun={handleRun}
         onBuild={handleBuild}
         onNewProject={() => setShowTemplates(true)}
+        onOpenProjects={() => setShowProjects(true)}
         buildStatus={status?.status}
         jobId={jobId}
         currentLanguage={currentLanguage}
-        canRun={!!activeFile && !!getExecLanguage(activeFile ?? "")}
+        canRun={canRun}
+        projectName={currentProjectName}
+        hasUnsavedChanges={!!Object.keys(files).length}
       />
 
       <div className="flex-1 overflow-hidden">
@@ -202,7 +211,7 @@ export default function IDE() {
               isRunning={isRunning}
               activeTab={rightPanelTab}
               onTabChange={setRightPanelTab}
-              consoleOutput={runOutput}
+              stream={stream}
               snackPreview={previewData}
               htmlPreview={htmlPreview}
               projectType={projectType}
@@ -215,6 +224,17 @@ export default function IDE() {
         <TemplateSelector
           onSelect={handleLoadTemplate}
           onClose={() => setShowTemplates(false)}
+        />
+      )}
+
+      {showProjects && (
+        <ProjectsModal
+          currentFiles={files}
+          currentProjectType={projectType}
+          currentProjectId={currentProjectId}
+          onLoad={handleLoadProject}
+          onSaved={handleProjectSaved}
+          onClose={() => setShowProjects(false)}
         />
       )}
     </div>

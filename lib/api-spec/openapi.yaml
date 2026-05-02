@@ -2,25 +2,23 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
   - name: builds
-    description: Flutter APK build operations
   - name: execution
-    description: Code execution engine
+  - name: projects
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -33,8 +31,7 @@ paths:
     post:
       operationId: runCode
       tags: [execution]
-      summary: Execute code
-      description: Run JavaScript or Python code and return output
+      summary: Execute code (buffered JSON response)
       requestBody:
         required: true
         content:
@@ -49,7 +46,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/RunResult"
         "400":
-          description: Missing or invalid parameters
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /run/stream:
+    post:
+      operationId: runCodeStream
+      tags: [execution]
+      summary: Execute code with real-time SSE streaming output
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunRequest"
+      responses:
+        "200":
+          description: Server-Sent Events stream of execution output
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
           content:
             application/json:
               schema:
@@ -60,7 +94,6 @@ paths:
       operationId: startBuild
       tags: [builds]
       summary: Start a Flutter APK build (ZIP upload)
-      description: Accept a ZIP file of a Flutter project and queue it for APK compilation
       requestBody:
         required: true
         content:
@@ -71,7 +104,6 @@ paths:
                 project:
                   type: string
                   format: binary
-                  description: ZIP file of the Flutter project (max 10MB)
               required:
                 - project
       responses:
@@ -82,7 +114,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/BuildResponse"
         "400":
-          description: Invalid request (not a zip, too large, missing fields)
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
           content:
             application/json:
               schema:
@@ -92,12 +130,7 @@ paths:
     post:
       operationId: buildProject
       tags: [builds]
-      summary: Build or preview a project from file map
-      description: |
-        Build or preview a project given a file map and a build type.
-        - react-native → creates an Expo Snack and returns a live preview URL + QR
-        - flutter → packages files as ZIP and builds APK
-        - android → triggers Android Gradle build
+      summary: Build or preview from file map (react-native, flutter, android)
       requestBody:
         required: true
         content:
@@ -122,8 +155,6 @@ paths:
     get:
       operationId: getBuildStatus
       tags: [builds]
-      summary: Get build status
-      description: Returns the current status of a build job
       parameters:
         - name: jobId
           in: path
@@ -138,7 +169,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/JobStatus"
         "404":
-          description: Job not found
+          description: Not found
           content:
             application/json:
               schema:
@@ -148,8 +179,6 @@ paths:
     get:
       operationId: downloadApk
       tags: [builds]
-      summary: Download the compiled APK
-      description: Returns the APK file if the build was successful
       parameters:
         - name: jobId
           in: path
@@ -158,14 +187,14 @@ paths:
             type: string
       responses:
         "200":
-          description: APK file binary
+          description: APK binary
           content:
             application/octet-stream:
               schema:
                 type: string
                 format: binary
         "404":
-          description: Job not found or build not successful
+          description: Not found
           content:
             application/json:
               schema:
@@ -175,8 +204,6 @@ paths:
     get:
       operationId: getBuildLogs
       tags: [builds]
-      summary: Get build logs
-      description: Returns stdout/stderr logs for a build job
       parameters:
         - name: jobId
           in: path
@@ -191,7 +218,159 @@ paths:
               schema:
                 $ref: "#/components/schemas/BuildLogs"
         "404":
-          description: Job not found
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List user's saved projects
+      parameters:
+        - name: x-user-key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectListResponse"
+        "401":
+          description: Missing user key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Save a new project
+      parameters:
+        - name: x-user-key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: x-user-key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateProject
+      tags: [projects]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: x-user-key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectRequest"
+      responses:
+        "200":
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: x-user-key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  id:
+                    type: string
+                required: [success, id]
+        "404":
+          description: Not found
           content:
             application/json:
               schema:
@@ -204,24 +383,18 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
     RunRequest:
       type: object
       properties:
         language:
           type: string
-          description: "Programming language: javascript, python, typescript, html"
         code:
           type: string
-          description: Source code to execute
         filename:
           type: string
-          description: Optional filename hint for language detection
-      required:
-        - language
-        - code
+      required: [language, code]
 
     RunResult:
       type: object
@@ -234,15 +407,13 @@ components:
           type: integer
         duration:
           type: integer
-          description: Execution time in milliseconds
         error:
           type: string
           nullable: true
-      required:
-        - stdout
-        - stderr
-        - exitCode
-        - duration
+        html:
+          type: string
+          nullable: true
+      required: [stdout, stderr, exitCode, duration]
 
     ProjectBuildRequest:
       type: object
@@ -250,18 +421,13 @@ components:
         type:
           type: string
           enum: [flutter, react-native, android, ios]
-          description: Project/build type
         files:
           type: object
           additionalProperties:
             type: string
-          description: Map of filename to file content
         name:
           type: string
-          description: Project name (used for Snack)
-      required:
-        - type
-        - files
+      required: [type, files]
 
     ProjectBuildResponse:
       type: object
@@ -274,22 +440,16 @@ components:
         previewUrl:
           type: string
           nullable: true
-          description: Live preview URL (for react-native Expo Snack)
         embedUrl:
           type: string
           nullable: true
-          description: Embeddable iframe URL
         qrUrl:
           type: string
           nullable: true
-          description: QR code image URL for opening on device
         message:
           type: string
           nullable: true
-          description: Status or error message
-      required:
-        - jobId
-        - status
+      required: [jobId, status]
 
     BuildResponse:
       type: object
@@ -301,10 +461,7 @@ components:
           enum: [queued, building, success, failed]
         queuePosition:
           type: integer
-          description: Position in queue (0 = currently building)
-      required:
-        - jobId
-        - status
+      required: [jobId, status]
 
     JobStatus:
       type: object
@@ -320,7 +477,6 @@ components:
         download:
           type: string
           nullable: true
-          description: Download URL if build succeeded
         queuePosition:
           type: integer
           nullable: true
@@ -333,10 +489,16 @@ components:
         stage:
           type: string
           nullable: true
-          description: Current build stage (extracting, validating, getting deps, building apk)
-      required:
-        - jobId
-        - status
+        previewUrl:
+          type: string
+          nullable: true
+        embedUrl:
+          type: string
+          nullable: true
+        qrUrl:
+          type: string
+          nullable: true
+      required: [jobId, status]
 
     BuildLogs:
       type: object
@@ -348,14 +510,87 @@ components:
         stage:
           type: string
           nullable: true
-      required:
-        - jobId
-        - logs
+      required: [jobId, logs]
+
+    CreateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        projectType:
+          type: string
+        files:
+          type: object
+          additionalProperties:
+            type: string
+      required: [name, files]
+
+    UpdateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        projectType:
+          type: string
+        files:
+          type: object
+          additionalProperties:
+            type: string
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        projectType:
+          type: string
+        files:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, name, projectType, createdAt, updatedAt]
+
+    ProjectSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        projectType:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, name, projectType, createdAt, updatedAt]
+
+    ProjectListResponse:
+      type: object
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectSummary"
+      required: [projects]
+
+    ProjectResponse:
+      type: object
+      properties:
+        project:
+          $ref: "#/components/schemas/Project"
+      required: [project]
 
     ErrorResponse:
       type: object
       properties:
         error:
           type: string
-      required:
-        - error
+      required: [error]

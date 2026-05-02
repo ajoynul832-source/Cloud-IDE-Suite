@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
@@ -19,14 +19,19 @@ import type {
 import type {
   BuildLogs,
   BuildResponse,
+  CreateProjectRequest,
+  DeleteProject200,
   ErrorResponse,
   HealthStatus,
   JobStatus,
   ProjectBuildRequest,
   ProjectBuildResponse,
+  ProjectListResponse,
+  ProjectResponse,
   RunRequest,
   RunResult,
   StartBuildBody,
+  UpdateProjectRequest,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -39,7 +44,6 @@ type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const getHealthCheckUrl = () => {
@@ -115,8 +119,7 @@ export function useHealthCheck<
 }
 
 /**
- * Run JavaScript or Python code and return output
- * @summary Execute code
+ * @summary Execute code (buffered JSON response)
  */
 export const getRunCodeUrl = () => {
   return `/api/run`;
@@ -179,7 +182,7 @@ export type RunCodeMutationBody = BodyType<RunRequest>;
 export type RunCodeMutationError = ErrorType<ErrorResponse>;
 
 /**
- * @summary Execute code
+ * @summary Execute code (buffered JSON response)
  */
 export const useRunCode = <
   TError = ErrorType<ErrorResponse>,
@@ -202,7 +205,92 @@ export const useRunCode = <
 };
 
 /**
- * Accept a ZIP file of a Flutter project and queue it for APK compilation
+ * @summary Execute code with real-time SSE streaming output
+ */
+export const getRunCodeStreamUrl = () => {
+  return `/api/run/stream`;
+};
+
+export const runCodeStream = async (
+  runRequest: RunRequest,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getRunCodeStreamUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(runRequest),
+  });
+};
+
+export const getRunCodeStreamMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runCodeStream>>,
+    TError,
+    { data: BodyType<RunRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof runCodeStream>>,
+  TError,
+  { data: BodyType<RunRequest> },
+  TContext
+> => {
+  const mutationKey = ["runCodeStream"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof runCodeStream>>,
+    { data: BodyType<RunRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return runCodeStream(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RunCodeStreamMutationResult = NonNullable<
+  Awaited<ReturnType<typeof runCodeStream>>
+>;
+export type RunCodeStreamMutationBody = BodyType<RunRequest>;
+export type RunCodeStreamMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Execute code with real-time SSE streaming output
+ */
+export const useRunCodeStream = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runCodeStream>>,
+    TError,
+    { data: BodyType<RunRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof runCodeStream>>,
+  TError,
+  { data: BodyType<RunRequest> },
+  TContext
+> => {
+  return useMutation(getRunCodeStreamMutationOptions(options));
+};
+
+/**
  * @summary Start a Flutter APK build (ZIP upload)
  */
 export const getStartBuildUrl = () => {
@@ -291,12 +379,7 @@ export const useStartBuild = <
 };
 
 /**
- * Build or preview a project given a file map and a build type.
-- react-native → creates an Expo Snack and returns a live preview URL + QR
-- flutter → packages files as ZIP and builds APK
-- android → triggers Android Gradle build
-
- * @summary Build or preview a project from file map
+ * @summary Build or preview from file map (react-native, flutter, android)
  */
 export const getBuildProjectUrl = () => {
   return `/api/build/project`;
@@ -359,7 +442,7 @@ export type BuildProjectMutationBody = BodyType<ProjectBuildRequest>;
 export type BuildProjectMutationError = ErrorType<ErrorResponse>;
 
 /**
- * @summary Build or preview a project from file map
+ * @summary Build or preview from file map (react-native, flutter, android)
  */
 export const useBuildProject = <
   TError = ErrorType<ErrorResponse>,
@@ -381,10 +464,6 @@ export const useBuildProject = <
   return useMutation(getBuildProjectMutationOptions(options));
 };
 
-/**
- * Returns the current status of a build job
- * @summary Get build status
- */
 export const getGetBuildStatusUrl = (jobId: string) => {
   return `/api/status/${jobId}`;
 };
@@ -442,10 +521,6 @@ export type GetBuildStatusQueryResult = NonNullable<
 >;
 export type GetBuildStatusQueryError = ErrorType<ErrorResponse>;
 
-/**
- * @summary Get build status
- */
-
 export function useGetBuildStatus<
   TData = Awaited<ReturnType<typeof getBuildStatus>>,
   TError = ErrorType<ErrorResponse>,
@@ -469,10 +544,6 @@ export function useGetBuildStatus<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
-/**
- * Returns the APK file if the build was successful
- * @summary Download the compiled APK
- */
 export const getDownloadApkUrl = (jobId: string) => {
   return `/api/download/${jobId}`;
 };
@@ -530,10 +601,6 @@ export type DownloadApkQueryResult = NonNullable<
 >;
 export type DownloadApkQueryError = ErrorType<ErrorResponse>;
 
-/**
- * @summary Download the compiled APK
- */
-
 export function useDownloadApk<
   TData = Awaited<ReturnType<typeof downloadApk>>,
   TError = ErrorType<ErrorResponse>,
@@ -557,10 +624,6 @@ export function useDownloadApk<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
-/**
- * Returns stdout/stderr logs for a build job
- * @summary Get build logs
- */
 export const getGetBuildLogsUrl = (jobId: string) => {
   return `/api/logs/${jobId}`;
 };
@@ -618,10 +681,6 @@ export type GetBuildLogsQueryResult = NonNullable<
 >;
 export type GetBuildLogsQueryError = ErrorType<ErrorResponse>;
 
-/**
- * @summary Get build logs
- */
-
 export function useGetBuildLogs<
   TData = Awaited<ReturnType<typeof getBuildLogs>>,
   TError = ErrorType<ErrorResponse>,
@@ -644,3 +703,403 @@ export function useGetBuildLogs<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List user's saved projects
+ */
+export const getListProjectsUrl = () => {
+  return `/api/projects`;
+};
+
+export const listProjects = async (
+  options?: RequestInit,
+): Promise<ProjectListResponse> => {
+  return customFetch<ProjectListResponse>(getListProjectsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProjectsQueryKey = () => {
+  return [`/api/projects`] as const;
+};
+
+export const getListProjectsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProjects>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listProjects>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListProjectsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listProjects>>> = ({
+    signal,
+  }) => listProjects({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProjects>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProjectsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProjects>>
+>;
+export type ListProjectsQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary List user's saved projects
+ */
+
+export function useListProjects<
+  TData = Awaited<ReturnType<typeof listProjects>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listProjects>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProjectsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Save a new project
+ */
+export const getCreateProjectUrl = () => {
+  return `/api/projects`;
+};
+
+export const createProject = async (
+  createProjectRequest: CreateProjectRequest,
+  options?: RequestInit,
+): Promise<ProjectResponse> => {
+  return customFetch<ProjectResponse>(getCreateProjectUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createProjectRequest),
+  });
+};
+
+export const getCreateProjectMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createProject>>,
+    TError,
+    { data: BodyType<CreateProjectRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createProject>>,
+  TError,
+  { data: BodyType<CreateProjectRequest> },
+  TContext
+> => {
+  const mutationKey = ["createProject"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createProject>>,
+    { data: BodyType<CreateProjectRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createProject(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateProjectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createProject>>
+>;
+export type CreateProjectMutationBody = BodyType<CreateProjectRequest>;
+export type CreateProjectMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Save a new project
+ */
+export const useCreateProject = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createProject>>,
+    TError,
+    { data: BodyType<CreateProjectRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createProject>>,
+  TError,
+  { data: BodyType<CreateProjectRequest> },
+  TContext
+> => {
+  return useMutation(getCreateProjectMutationOptions(options));
+};
+
+export const getGetProjectUrl = (id: string) => {
+  return `/api/projects/${id}`;
+};
+
+export const getProject = async (
+  id: string,
+  options?: RequestInit,
+): Promise<ProjectResponse> => {
+  return customFetch<ProjectResponse>(getGetProjectUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetProjectQueryKey = (id: string) => {
+  return [`/api/projects/${id}`] as const;
+};
+
+export const getGetProjectQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProject>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProject>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetProjectQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getProject>>> = ({
+    signal,
+  }) => getProject(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProject>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetProjectQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProject>>
+>;
+export type GetProjectQueryError = ErrorType<ErrorResponse>;
+
+export function useGetProject<
+  TData = Awaited<ReturnType<typeof getProject>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProject>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProjectQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getUpdateProjectUrl = (id: string) => {
+  return `/api/projects/${id}`;
+};
+
+export const updateProject = async (
+  id: string,
+  updateProjectRequest: UpdateProjectRequest,
+  options?: RequestInit,
+): Promise<ProjectResponse> => {
+  return customFetch<ProjectResponse>(getUpdateProjectUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateProjectRequest),
+  });
+};
+
+export const getUpdateProjectMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateProject>>,
+    TError,
+    { id: string; data: BodyType<UpdateProjectRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateProject>>,
+  TError,
+  { id: string; data: BodyType<UpdateProjectRequest> },
+  TContext
+> => {
+  const mutationKey = ["updateProject"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateProject>>,
+    { id: string; data: BodyType<UpdateProjectRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateProject(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateProjectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateProject>>
+>;
+export type UpdateProjectMutationBody = BodyType<UpdateProjectRequest>;
+export type UpdateProjectMutationError = ErrorType<ErrorResponse>;
+
+export const useUpdateProject = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateProject>>,
+    TError,
+    { id: string; data: BodyType<UpdateProjectRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateProject>>,
+  TError,
+  { id: string; data: BodyType<UpdateProjectRequest> },
+  TContext
+> => {
+  return useMutation(getUpdateProjectMutationOptions(options));
+};
+
+export const getDeleteProjectUrl = (id: string) => {
+  return `/api/projects/${id}`;
+};
+
+export const deleteProject = async (
+  id: string,
+  options?: RequestInit,
+): Promise<DeleteProject200> => {
+  return customFetch<DeleteProject200>(getDeleteProjectUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteProjectMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProject>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteProject>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["deleteProject"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteProject>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteProject(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteProjectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteProject>>
+>;
+
+export type DeleteProjectMutationError = ErrorType<ErrorResponse>;
+
+export const useDeleteProject = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProject>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteProject>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getDeleteProjectMutationOptions(options));
+};

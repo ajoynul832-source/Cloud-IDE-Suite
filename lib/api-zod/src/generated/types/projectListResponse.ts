@@ -5,9 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.2.0
  */
+import type { ProjectSummary } from "./projectSummary";
 
-export interface BuildLogs {
-  jobId: string;
-  logs: string;
-  stage?: string | null;
+export interface ProjectListResponse {
+  projects: ProjectSummary[];
 }

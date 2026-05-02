@@ -4,14 +4,16 @@
 
 A mobile-first cloud IDE system with two frontends:
 1. **Expo mobile app** — for submitting Flutter ZIPs via URL and tracking builds
-2. **Web Cloud IDE** — full browser-based code editor supporting 10+ mobile development languages with APK build pipeline
+2. **Web Cloud IDE** — full browser-based code editor supporting 10+ mobile development languages with APK build pipeline, SSE code execution, and PostgreSQL project storage
 
 ## Architecture
 
 - **Expo Mobile App** (`artifacts/mobile`) — Frontend app at `/` (served via REPLIT_EXPO_DEV_DOMAIN)
 - **Web Cloud IDE** (`artifacts/cloud-ide`) — React+Vite IDE at `/ide/`
 - **API Server** (`artifacts/api-server`) — Express backend at `/api`
+- **Shared DB** (`lib/db`) — Drizzle ORM schema + PostgreSQL client (`@workspace/db`)
 - **Shared API Client** (`lib/api-client-react`) — React Query hooks generated from OpenAPI spec
+- **Shared Zod Schemas** (`lib/api-zod`) — Generated from OpenAPI spec
 
 ## Stack
 
@@ -20,11 +22,12 @@ A mobile-first cloud IDE system with two frontends:
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM (available, not used for builds — jobs are in-memory)
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
+- **Database**: PostgreSQL + Drizzle ORM (`projectsTable` — uuid PK, userKey, name, projectType, files jsonb)
+- **Validation**: Zod (catalog version), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 - **Mobile**: Expo SDK 54, Expo Router, React Native 0.81.5
+- **TypeScript execution**: `tsx` (installed in api-server)
 
 ## Cloud IDE Features (`artifacts/cloud-ide`)
 
@@ -32,9 +35,13 @@ A mobile-first cloud IDE system with two frontends:
 - **Multi-tab editor** with localStorage-based file persistence
 - **File tree** with folder grouping, language icons, inline rename, create/delete
 - **Project templates** for 10 mobile stacks (see below)
+- **SSE streaming execution** — real-time line-by-line output via `POST /api/run/stream`
+- **Project save/load** — PostgreSQL-backed, scoped per browser via `X-User-Key` UUID header
+- **Per-browser user key** — `crypto.randomUUID()` in localStorage key `cloudide-user-key`
 - **APK Build pipeline**: zips files in-browser → uploads to `/api/build` → polls status → streams logs
 - **Resizable panels**: file tree, editor, preview/log panel
 - **Language badge** in toolbar shows detected language of active file
+- **HTML live preview** — running an HTML file renders it directly in the Preview iframe
 
 ### Supported Languages (CodeMirror 6)
 
@@ -73,30 +80,59 @@ A mobile-first cloud IDE system with two frontends:
 | Go gomobile | Go | golang.org/x/mobile |
 | C++ NDK | C++ | Android NDK |
 
+## Execution Engine
+
+Language handler plugin map in `artifacts/api-server/src/routes/run.ts`:
+
+| Language | Handler | Approach |
+|----------|---------|----------|
+| javascript | `javascriptHandler` | Node.js .mjs (ESM, top-level await via IIFE wrapper) |
+| typescript | `typescriptHandler` | `tsx` binary for full TS support (generics, decorators) |
+| python | `pythonHandler` | `python3` with resource limits (128MB RAM, 30s CPU) |
+| html | `htmlHandler` | Returns HTML via SSE `done.chunk` for iframe preview |
+
+All handlers stream via Server-Sent Events (`POST /api/run/stream`). Each line of stdout/stderr arrives as a separate SSE event. Execution is sandboxed in `/tmp/ide_exec_{uuid}/` temp directories (auto-cleaned).
+
+## Rate Limiting (`artifacts/api-server/src/middlewares/rate-limit.ts`)
+
+| Limiter | Route | Limit |
+|---------|-------|-------|
+| `runLimiter` | `/api/run`, `/api/run/stream` | 30 req/min per IP |
+| `buildLimiter` | `/api/build`, `/api/build/project` | 5 req/min per IP |
+| `projectLimiter` | `/api/projects/*` | 60 req/min per IP |
+
 ## Core API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
+| POST | `/api/run` | Buffered code execution (returns full output) |
+| POST | `/api/run/stream` | SSE streaming execution (line-by-line) |
 | POST | `/api/build` | Upload Flutter ZIP, queue APK build |
-| GET | `/api/status/:jobId` | Poll build status (queued/building/success/failed) |
+| POST | `/api/build/project` | Build from project files directly |
+| GET | `/api/status/:jobId` | Poll build status |
 | GET | `/api/download/:jobId` | Download compiled APK |
-| GET | `/api/logs/:jobId` | Fetch build stdout/stderr logs |
+| GET | `/api/logs/:jobId` | Fetch build logs |
+| GET | `/api/projects` | List user's projects (requires X-User-Key) |
+| POST | `/api/projects` | Create project |
+| GET | `/api/projects/:id` | Get single project |
+| PUT | `/api/projects/:id` | Update project |
+| DELETE | `/api/projects/:id` | Delete project |
 | GET | `/api/healthz` | Health check |
 
-## Build Pipeline
+## Database Schema (`lib/db`)
 
-1. Accepts multipart/form-data with ZIP file (max 10MB)
-2. Extracts ZIP to `/tmp/project_{jobId}`
-3. Validates Flutter structure (pubspec.yaml + lib/main.dart)
-4. Runs `flutter pub get` then `flutter build apk --debug`
-5. Returns APK from `/tmp/project_{jobId}/build/app/outputs/flutter-apk/app-debug.apk`
-6. Jobs cleaned up after 30 minutes
+```
+projectsTable:
+  id          uuid PK (default gen_random_uuid())
+  userKey     text NOT NULL        — per-browser UUID from X-User-Key header
+  name        text NOT NULL        — project name (max 120 chars)
+  projectType text NOT NULL        — e.g. "javascript", "flutter"
+  files       jsonb NOT NULL       — { filename: content } map
+  createdAt   timestamp default now()
+  updatedAt   timestamp default now()
+```
 
-## Mobile App Features
-
-- **Build tab**: Paste a public ZIP URL → fetches ZIP → uploads to API → shows live logs + status
-- **History tab**: Persists past build jobs in AsyncStorage
-- **Job Detail screen**: Full logs + download button for any historical job
+Run `pnpm --filter @workspace/db run push` to apply schema changes to the database.
 
 ## Key Commands
 

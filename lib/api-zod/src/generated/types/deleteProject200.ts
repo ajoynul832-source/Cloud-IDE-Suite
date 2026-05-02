@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface BuildLogs {
-  jobId: string;
-  logs: string;
-  stage?: string | null;
-}
+export type DeleteProject200 = {
+  success: boolean;
+  id: string;
+};

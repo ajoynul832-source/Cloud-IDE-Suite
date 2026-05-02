@@ -1,199 +1,403 @@
+/**
+ * /api/run        — JSON response (buffered)
+ * /api/run/stream — SSE response (real-time line-by-line)
+ *
+ * Language handlers are registered in a plugin map — add new languages
+ * without touching the routing logic.
+ */
 import { Router } from "express";
 import { spawn } from "child_process";
+import { randomBytes } from "crypto";
+import fsp from "fs/promises";
+import path from "path";
+import os from "os";
 import { logger } from "../lib/logger";
+import { runLimiter } from "../middlewares/rate-limit";
 
 const router = Router();
 
-const MAX_OUTPUT_BYTES = 100_000; // 100KB
-const EXEC_TIMEOUT_MS = 10_000;  // 10s hard limit
+// ─── Constants ────────────────────────────────────────────────────────────────
+const EXEC_TIMEOUT_MS = 10_000;
+const MAX_CHUNK_BYTES = 100_000; // 100 KB per stream
+const TEMP_ROOT = os.tmpdir();
 
-type ExecResult = {
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-  duration: number;
+// ─── Types ────────────────────────────────────────────────────────────────────
+export type ExecEventType = "stdout" | "stderr" | "done" | "error";
+
+export interface ExecEvent {
+  type: ExecEventType;
+  chunk?: string;
+  exitCode?: number;
+  duration?: number;
   error?: string;
-};
-
-function detectLanguage(language: string, filename?: string): string {
-  const raw = language.toLowerCase().trim();
-  if (["javascript", "js", "node", "jsx"].includes(raw)) return "javascript";
-  if (["typescript", "ts", "tsx"].includes(raw)) return "typescript";
-  if (["python", "py", "python3"].includes(raw)) return "python";
-  if (["html", "htm"].includes(raw)) return "html";
-
-  // fall back to filename extension
-  if (filename) {
-    const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-    if (["js", "jsx", "mjs", "cjs"].includes(ext)) return "javascript";
-    if (["ts", "tsx"].includes(ext)) return "typescript";
-    if (["py"].includes(ext)) return "python";
-    if (["html", "htm"].includes(ext)) return "html";
-  }
-
-  return raw; // return as-is; will hit unsupported branch
 }
 
-function spawnExec(cmd: string, args: string[], input?: string): Promise<ExecResult> {
+interface ExecOpts {
+  code: string;
+  filename?: string;
+  execId: string;
+}
+
+type HandlerFn = (opts: ExecOpts) => AsyncGenerator<ExecEvent>;
+
+interface LanguageHandler {
+  id: string;
+  name: string;
+  extensions: string[];
+  execute: HandlerFn;
+}
+
+// ─── Sandbox helpers ──────────────────────────────────────────────────────────
+/** Minimal env — never expose server secrets to user code */
+function sandboxEnv(): NodeJS.ProcessEnv {
+  return {
+    PATH: process.env["PATH"],
+    HOME: TEMP_ROOT,
+    TMPDIR: TEMP_ROOT,
+    TERM: "dumb",
+    LANG: "en_US.UTF-8",
+    // Python
+    PYTHONDONTWRITEBYTECODE: "1",
+    PYTHONUNBUFFERED: "1",
+    PYTHONPATH: "",
+    // Node
+    NODE_PATH: "",
+    NODE_ENV: "sandbox",
+  };
+}
+
+/** Create isolated temp dir, run fn, clean up */
+async function withTempDir<T>(execId: string, fn: (dir: string) => Promise<T>): Promise<T> {
+  const dir = path.join(TEMP_ROOT, `ide_exec_${execId}`);
+  await fsp.mkdir(dir, { recursive: true });
+  try {
+    return await fn(dir);
+  } finally {
+    fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/** Spawn a process and yield SSE events from its stdio */
+async function* spawnStream(
+  cmd: string,
+  args: string[],
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+): AsyncGenerator<ExecEvent> {
   const start = Date.now();
+  let totalOut = 0;
+  let killed = false;
 
-  return new Promise((resolve) => {
-    let stdout = "";
-    let stderr = "";
-    let killed = false;
+  // We use a callback-to-async-generator bridge via a shared queue
+  type QueueItem = ExecEvent | null; // null = done
+  const queue: QueueItem[] = [];
+  let resolve: (() => void) | null = null;
 
-    const env: NodeJS.ProcessEnv = {
-      PATH: process.env["PATH"],
-      HOME: process.env["HOME"],
-      TMPDIR: process.env["TMPDIR"] ?? "/tmp",
-      TERM: "dumb",
-      PYTHONDONTWRITEBYTECODE: "1",
-      PYTHONUNBUFFERED: "1",
-      NODE_PATH: process.env["NODE_PATH"],
-    };
+  const push = (item: QueueItem) => {
+    queue.push(item);
+    resolve?.();
+    resolve = null;
+  };
 
-    const proc = spawn(cmd, args, { env });
+  const proc = spawn(cmd, args, { cwd, env });
 
-    if (input) {
-      proc.stdin.write(input);
-      proc.stdin.end();
-    }
+  const timer = setTimeout(() => {
+    killed = true;
+    proc.kill("SIGKILL");
+    push({ type: "error", error: "timeout", chunk: `\nProcess killed — exceeded ${EXEC_TIMEOUT_MS / 1000}s timeout\n` });
+  }, EXEC_TIMEOUT_MS);
 
-    const timer = setTimeout(() => {
-      killed = true;
-      proc.kill("SIGKILL");
-    }, EXEC_TIMEOUT_MS);
-
-    proc.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-      if (stdout.length > MAX_OUTPUT_BYTES) {
+  proc.stdout.on("data", (buf: Buffer) => {
+    const chunk = buf.toString();
+    totalOut += chunk.length;
+    if (totalOut > MAX_CHUNK_BYTES) {
+      if (!killed) {
         killed = true;
         proc.kill("SIGKILL");
-        stdout = stdout.slice(0, MAX_OUTPUT_BYTES) + "\n\n[Output truncated — exceeded 100 KB limit]";
+        push({ type: "stdout", chunk: "\n[Output truncated — exceeded 100 KB limit]\n" });
       }
-    });
-
-    proc.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-      if (stderr.length > MAX_OUTPUT_BYTES) {
-        stderr = stderr.slice(0, MAX_OUTPUT_BYTES) + "\n[stderr truncated]";
-      }
-    });
-
-    proc.on("close", (code) => {
-      clearTimeout(timer);
-      const duration = Date.now() - start;
-      if (killed) {
-        resolve({
-          stdout,
-          stderr: stderr || `Process killed after ${EXEC_TIMEOUT_MS / 1000}s (timeout)`,
-          exitCode: code ?? -1,
-          duration,
-          error: "timeout",
-        });
-      } else {
-        resolve({ stdout, stderr, exitCode: code ?? 0, duration });
-      }
-    });
-
-    proc.on("error", (err) => {
-      clearTimeout(timer);
-      resolve({
-        stdout,
-        stderr: err.message,
-        exitCode: -1,
-        duration: Date.now() - start,
-        error: err.message,
-      });
-    });
+      return;
+    }
+    push({ type: "stdout", chunk });
   });
+
+  proc.stderr.on("data", (buf: Buffer) => {
+    push({ type: "stderr", chunk: buf.toString() });
+  });
+
+  proc.on("close", (code) => {
+    clearTimeout(timer);
+    push({
+      type: "done",
+      exitCode: code ?? (killed ? -1 : 0),
+      duration: Date.now() - start,
+    });
+    push(null); // sentinel
+  });
+
+  proc.on("error", (err) => {
+    clearTimeout(timer);
+    push({ type: "error", error: err.message, chunk: err.message });
+    push({ type: "done", exitCode: -1, duration: Date.now() - start });
+    push(null);
+  });
+
+  // Drain the queue as events arrive
+  while (true) {
+    if (queue.length === 0) {
+      await new Promise<void>((r) => { resolve = r; });
+    }
+    const item = queue.shift()!;
+    if (item === null) break;
+    yield item;
+  }
 }
 
-async function executeJavaScript(code: string): Promise<ExecResult> {
-  // Wrap in async IIFE so top-level await works
-  const wrapped = `(async () => {\n${code}\n})().catch(e => { process.stderr.write(String(e) + '\\n'); process.exit(1); });`;
-  return spawnExec("node", ["--input-type=module", "-e", wrapped]);
+// ─── Language Handlers ────────────────────────────────────────────────────────
+
+const javascriptHandler: LanguageHandler = {
+  id: "javascript",
+  name: "JavaScript",
+  extensions: ["js", "jsx", "mjs", "cjs"],
+  async *execute({ code, execId }) {
+    yield* withTempDirStream(execId, async function* (dir) {
+      // .mjs extension makes Node.js treat the file as ESM automatically
+      // (no --input-type flag needed — that flag is for STDIN only)
+      const file = path.join(dir, "main.mjs");
+      const wrapped = `(async () => {\n${code}\n})().catch(e => { process.stderr.write(String(e) + '\\n'); process.exit(1); });`;
+      await fsp.writeFile(file, wrapped, "utf8");
+      yield* spawnStream(
+        "node",
+        ["--max-old-space-size=128", file],
+        dir,
+        sandboxEnv(),
+      );
+    });
+  },
+};
+
+const typescriptHandler: LanguageHandler = {
+  id: "typescript",
+  name: "TypeScript",
+  extensions: ["ts", "tsx"],
+  async *execute({ code, execId }) {
+    yield* withTempDirStream(execId, async function* (dir) {
+      // Use tsx for proper TypeScript execution (handles generics, decorators, etc.)
+      const file = path.join(dir, "main.ts");
+      const wrapped = `(async () => {\n${code}\n})().catch((e: unknown) => { process.stderr.write(String(e) + '\\n'); process.exit(1); });`;
+      await fsp.writeFile(file, wrapped, "utf8");
+      const tsxBin = path.resolve("node_modules/.bin/tsx");
+      yield* spawnStream(
+        tsxBin,
+        ["--max-old-space-size=128", file],
+        dir,
+        sandboxEnv(),
+      );
+    });
+  },
+};
+
+const pythonHandler: LanguageHandler = {
+  id: "python",
+  name: "Python",
+  extensions: ["py"],
+  async *execute({ code, execId }) {
+    yield* withTempDirStream(execId, async function* (dir) {
+      const file = path.join(dir, "main.py");
+      // Prepend resource limits (CPU 10s, AS already limited by container)
+      const limitedCode = `import resource as _r, sys as _sys
+try:
+    _r.setrlimit(_r.RLIMIT_CPU, (10, 10))
+except Exception:
+    pass
+del _r
+${code}`;
+      await fsp.writeFile(file, limitedCode, "utf8");
+      yield* spawnStream(
+        "python3",
+        ["-u", file],
+        dir,
+        sandboxEnv(),
+      );
+    });
+  },
+};
+
+/** HTML: not executed server-side — signal the client to render it locally */
+const htmlHandler: LanguageHandler = {
+  id: "html",
+  name: "HTML",
+  extensions: ["html", "htm"],
+  async *execute({ code }) {
+    yield { type: "stdout", chunk: "__HTML_PREVIEW__" } satisfies ExecEvent;
+    yield { type: "done", exitCode: 0, duration: 0, chunk: code } satisfies ExecEvent;
+  },
+};
+
+// Handler registry — add new languages here only
+export const languageHandlers: Record<string, LanguageHandler> = {
+  javascript: javascriptHandler,
+  js: javascriptHandler,
+  jsx: javascriptHandler,
+  typescript: typescriptHandler,
+  ts: typescriptHandler,
+  tsx: typescriptHandler,
+  python: pythonHandler,
+  py: pythonHandler,
+  python3: pythonHandler,
+  html: htmlHandler,
+  htm: htmlHandler,
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Version of withTempDir that works inside async generators */
+async function* withTempDirStream(
+  execId: string,
+  fn: (dir: string) => AsyncGenerator<ExecEvent>,
+): AsyncGenerator<ExecEvent> {
+  const dir = path.join(TEMP_ROOT, `ide_exec_${execId}`);
+  await fsp.mkdir(dir, { recursive: true });
+  try {
+    yield* fn(dir);
+  } finally {
+    fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
-async function executeTypeScript(code: string): Promise<ExecResult> {
-  // Use esbuild to transpile TS to JS inline, then run with node
-  // Fallback: strip type annotations and run as JS
-  const stripTypes = code
-    .replace(/:\s*[\w<>\[\]|&{}()\s,'"]+(?=\s*[=,);\n{])/g, "") // crude type strip
-    .replace(/as\s+\w+/g, "")
-    .replace(/<[\w\s,|&]+>/g, "");
 
-  return executeJavaScript(stripTypes);
+function resolveHandler(language: string, filename?: string): LanguageHandler | null {
+  const key = language.toLowerCase().trim();
+  if (languageHandlers[key]) return languageHandlers[key];
+
+  // Fallback: derive from filename extension
+  if (filename) {
+    const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+    if (languageHandlers[ext]) return languageHandlers[ext];
+  }
+  return null;
 }
 
-async function executePython(code: string): Promise<ExecResult> {
-  return spawnExec("python3", ["-u", "-c", code]);
-}
-
-// POST /api/run
-router.post("/run", async (req, res) => {
+// ─── SSE streaming endpoint ───────────────────────────────────────────────────
+// POST /api/run/stream — real-time line-by-line output via Server-Sent Events
+router.post("/run/stream", runLimiter, async (req, res) => {
   const { language, code, filename } = req.body as {
     language?: string;
     code?: string;
     filename?: string;
   };
 
-  if (!language || typeof language !== "string") {
-    res.status(400).json({ error: '"language" is required' });
-    return;
-  }
-  if (!code || typeof code !== "string") {
-    res.status(400).json({ error: '"code" is required' });
+  if (!language || !code) {
+    res.status(400).json({ error: '"language" and "code" are required' });
     return;
   }
   if (code.length > 500_000) {
-    res.status(400).json({ error: "Code too large (max 500KB)" });
+    res.status(400).json({ error: "Code too large (max 500 KB)" });
     return;
   }
 
-  const lang = detectLanguage(language, filename);
-  logger.info({ lang, filename }, "code execution request");
+  const handler = resolveHandler(language, filename);
+  if (!handler) {
+    res.status(400).json({
+      error: `Language "${language}" is not supported. Supported: JavaScript, TypeScript, Python, HTML`,
+    });
+    return;
+  }
 
-  let result: ExecResult;
+  // SSE headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering
+  res.flushHeaders();
+
+  const execId = randomBytes(6).toString("hex");
+  logger.info({ execId, language: handler.id, filename }, "stream execution start");
+
+  const sendEvent = (event: ExecEvent) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
 
   try {
-    switch (lang) {
-      case "javascript":
-        result = await executeJavaScript(code);
-        break;
-      case "typescript":
-        result = await executeTypeScript(code);
-        break;
-      case "python":
-        result = await executePython(code);
-        break;
-      case "html":
-        // HTML can't be "executed" server-side — return the source for the browser to render
-        result = {
-          stdout: "",
-          stderr: "",
-          exitCode: 0,
-          duration: 0,
-          error: "html_preview",
-        };
-        res.json({ ...result, html: code });
-        return;
-      default:
-        result = {
-          stdout: "",
-          stderr: `Language "${language}" is not supported for server-side execution.\nSupported: JavaScript, TypeScript, Python, HTML`,
-          exitCode: 1,
-          duration: 0,
-          error: "unsupported",
-        };
+    for await (const event of handler.execute({ code, filename, execId })) {
+      sendEvent(event);
+      if (event.type === "done" || (event.type === "error" && !event.chunk)) break;
     }
   } catch (err) {
-    logger.error({ err }, "code execution internal error");
+    logger.error({ err, execId }, "stream execution error");
+    sendEvent({ type: "error", error: "Internal execution error" });
+    sendEvent({ type: "done", exitCode: -1, duration: 0 });
+  }
+
+  res.end();
+});
+
+// ─── Buffered JSON endpoint (backward-compat) ─────────────────────────────────
+// POST /api/run — collects all SSE events, returns single JSON response
+router.post("/run", runLimiter, async (req, res) => {
+  const { language, code, filename } = req.body as {
+    language?: string;
+    code?: string;
+    filename?: string;
+  };
+
+  if (!language || !code) {
+    res.status(400).json({ error: '"language" and "code" are required' });
+    return;
+  }
+  if (code.length > 500_000) {
+    res.status(400).json({ error: "Code too large (max 500 KB)" });
+    return;
+  }
+
+  const handler = resolveHandler(language, filename);
+  if (!handler) {
+    res.status(400).json({
+      error: `Language "${language}" is not supported. Supported: JavaScript, TypeScript, Python, HTML`,
+    });
+    return;
+  }
+
+  const execId = randomBytes(6).toString("hex");
+  logger.info({ execId, language: handler.id }, "buffered execution start");
+
+  let stdout = "";
+  let stderr = "";
+  let exitCode = 0;
+  let duration = 0;
+  let htmlContent: string | undefined;
+  let execError: string | undefined;
+  let isHtmlPreview = false;
+
+  try {
+    for await (const event of handler.execute({ code, filename, execId })) {
+      if (event.type === "stdout") {
+        if (event.chunk === "__HTML_PREVIEW__") {
+          isHtmlPreview = true;
+        } else {
+          stdout += event.chunk ?? "";
+        }
+      } else if (event.type === "stderr") {
+        stderr += event.chunk ?? "";
+      } else if (event.type === "done") {
+        exitCode = event.exitCode ?? 0;
+        duration = event.duration ?? 0;
+        if (isHtmlPreview) htmlContent = event.chunk;
+      } else if (event.type === "error") {
+        execError = event.error;
+        if (event.chunk && event.chunk !== "__HTML_PREVIEW__") stderr += event.chunk;
+      }
+    }
+  } catch (err) {
+    logger.error({ err, execId }, "buffered execution error");
     res.status(500).json({ error: "Internal execution error" });
     return;
   }
 
-  res.json(result);
+  res.json({ stdout, stderr, exitCode, duration, error: execError, html: htmlContent });
 });
+
+// Prevent circular reference — re-export for withTempDir usage
+export { withTempDir };
 
 export default router;

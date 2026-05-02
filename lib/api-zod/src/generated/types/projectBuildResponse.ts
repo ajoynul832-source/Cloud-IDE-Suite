@@ -3,19 +3,15 @@
  * Do not edit manually.
  * Api
  * API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { ProjectBuildResponseStatus } from "./projectBuildResponseStatus";
 
 export interface ProjectBuildResponse {
   jobId: string;
   status: ProjectBuildResponseStatus;
-  /** Live preview URL (for react-native Expo Snack) */
   previewUrl?: string | null;
-  /** Embeddable iframe URL */
   embedUrl?: string | null;
-  /** QR code image URL for opening on device */
   qrUrl?: string | null;
-  /** Status or error message */
   message?: string | null;
 }

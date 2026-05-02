@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { JobStatusStatus } from "./jobStatusStatus";
 
@@ -11,11 +11,12 @@ export interface JobStatus {
   jobId: string;
   status: JobStatusStatus;
   logs?: string | null;
-  /** Download URL if build succeeded */
   download?: string | null;
   queuePosition?: number | null;
   startedAt?: string | null;
   completedAt?: string | null;
-  /** Current build stage (extracting, validating, getting deps, building apk) */
   stage?: string | null;
+  previewUrl?: string | null;
+  embedUrl?: string | null;
+  qrUrl?: string | null;
 }

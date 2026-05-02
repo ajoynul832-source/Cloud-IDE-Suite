@@ -3,13 +3,12 @@
  * Do not edit manually.
  * Api
  * API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { BuildResponseStatus } from "./buildResponseStatus";
 
 export interface BuildResponse {
   jobId: string;
   status: BuildResponseStatus;
-  /** Position in queue (0 = currently building) */
   queuePosition?: number;
 }

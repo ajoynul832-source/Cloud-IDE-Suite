@@ -3,16 +3,13 @@
  * Do not edit manually.
  * Api
  * API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { ProjectBuildRequestFiles } from "./projectBuildRequestFiles";
 import type { ProjectBuildRequestType } from "./projectBuildRequestType";
 
 export interface ProjectBuildRequest {
-  /** Project/build type */
   type: ProjectBuildRequestType;
-  /** Map of filename to file content */
   files: ProjectBuildRequestFiles;
-  /** Project name (used for Snack) */
   name?: string;
 }

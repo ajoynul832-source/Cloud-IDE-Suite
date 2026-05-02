@@ -1,4 +1,4 @@
-import { Play, Box, Download, Loader2, FolderOpen, ChevronDown } from "lucide-react";
+import { Play, Box, Download, Loader2, FolderOpen, ChevronDown, Save, Database } from "lucide-react";
 import { Button } from "./ui/button";
 
 interface ToolbarProps {
@@ -7,10 +7,13 @@ interface ToolbarProps {
   onRun: () => void;
   onBuild: () => void;
   onNewProject: () => void;
+  onOpenProjects: () => void;
   buildStatus?: string | null;
   jobId?: string | null;
   currentLanguage?: string;
   canRun?: boolean;
+  projectName?: string;
+  hasUnsavedChanges?: boolean;
 }
 
 export function Toolbar({
@@ -19,72 +22,91 @@ export function Toolbar({
   onRun,
   onBuild,
   onNewProject,
+  onOpenProjects,
   buildStatus,
   jobId,
   currentLanguage,
   canRun,
+  projectName,
 }: ToolbarProps) {
   const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   return (
-    <div className="h-12 bg-card border-b border-border flex items-center justify-between px-4 shrink-0">
-      {/* Left: brand + new project */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
+    <div className="h-12 bg-card border-b border-border flex items-center justify-between px-4 shrink-0 gap-2">
+      {/* Left: brand + project nav */}
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2 shrink-0">
           <Box className="text-primary" size={18} />
-          <span className="font-mono font-bold text-foreground text-sm tracking-widest uppercase">
+          <span className="font-mono font-bold text-foreground text-sm tracking-widest uppercase hidden sm:block">
             CloudIDE
           </span>
         </div>
 
-        <div className="w-px h-5 bg-border" />
+        <div className="w-px h-5 bg-border shrink-0" />
 
+        {/* New Project */}
         <button
           data-testid="button-new-project"
           onClick={onNewProject}
-          className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded hover:bg-primary/10"
+          className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded hover:bg-primary/10 shrink-0"
         >
           <FolderOpen size={13} />
-          New Project
+          <span className="hidden sm:block">New</span>
           <ChevronDown size={11} />
         </button>
 
+        {/* Projects (save/load) */}
+        <button
+          data-testid="button-projects"
+          onClick={onOpenProjects}
+          title="Save & load projects"
+          className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded hover:bg-primary/10 shrink-0"
+        >
+          <Database size={13} />
+          <span className="hidden md:block">Projects</span>
+        </button>
+
+        {/* Current project name */}
+        {projectName && (
+          <>
+            <div className="w-px h-4 bg-border shrink-0" />
+            <span className="text-xs font-mono text-muted-foreground truncate max-w-[140px]" title={projectName}>
+              {projectName}
+            </span>
+          </>
+        )}
+
+        {/* Language badge */}
         {currentLanguage && (
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25 shrink-0">
             {currentLanguage}
           </span>
         )}
       </div>
 
       {/* Right: actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
+        {/* Run */}
         <Button
           data-testid="button-run"
           variant="outline"
           size="sm"
           onClick={onRun}
-          disabled={isRunning}
-          title={canRun ? "Run current file" : "Open a JS, TS, Python, or HTML file to run"}
+          disabled={isRunning || !canRun}
+          title={canRun ? "Run current file (JS, TS, Python, HTML)" : "Open a JS, TS, Python, or HTML file to run"}
           className={[
             "font-mono text-xs h-7 px-3",
-            canRun
-              ? "hover:text-primary hover:border-primary"
-              : "opacity-50 cursor-not-allowed",
+            canRun ? "hover:text-primary hover:border-primary" : "opacity-40 cursor-not-allowed",
           ].join(" ")}
         >
           {isRunning ? (
-            <>
-              <Loader2 size={12} className="mr-1.5 animate-spin" />
-              Running...
-            </>
+            <><Loader2 size={12} className="mr-1.5 animate-spin" />Running…</>
           ) : (
-            <>
-              <Play size={12} className="mr-1.5" />
-              Run
-            </>
+            <><Play size={12} className="mr-1.5" />Run</>
           )}
         </Button>
 
+        {/* Build APK */}
         <Button
           data-testid="button-build-apk"
           variant="default"
@@ -94,18 +116,13 @@ export function Toolbar({
           className="font-mono text-xs h-7 px-3 bg-primary text-primary-foreground hover:bg-primary/90"
         >
           {isBuilding ? (
-            <>
-              <Loader2 size={12} className="mr-1.5 animate-spin" />
-              Building...
-            </>
+            <><Loader2 size={12} className="mr-1.5 animate-spin" />Building…</>
           ) : (
-            <>
-              <Box size={12} className="mr-1.5" />
-              Build APK
-            </>
+            <><Box size={12} className="mr-1.5" />Build APK</>
           )}
         </Button>
 
+        {/* Download APK */}
         {buildStatus === "success" && jobId && (
           <Button
             data-testid="button-download-apk"
@@ -114,11 +131,7 @@ export function Toolbar({
             asChild
             className="font-mono text-xs h-7 px-3 border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
           >
-            <a
-              href={`${baseUrl}/api/download/${jobId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href={`${baseUrl}/api/download/${jobId}`} target="_blank" rel="noopener noreferrer">
               <Download size={12} className="mr-1.5" />
               Download APK
             </a>

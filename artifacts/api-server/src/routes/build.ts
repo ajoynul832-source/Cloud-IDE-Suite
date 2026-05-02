@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { jobs, queue, processQueue, Job } from "./build-shared";
+import { buildLimiter } from "../middlewares/rate-limit";
 
 const router = Router();
 
@@ -30,7 +31,7 @@ const upload = multer({
 });
 
 // POST /api/build — multipart ZIP upload (Flutter / legacy)
-router.post("/build", (req, res, next) => {
+router.post("/build", buildLimiter, (req, res, next) => {
   upload.single("project")(req, res, (err) => {
     if (err) {
       if (err.message === "Only ZIP files are allowed") {

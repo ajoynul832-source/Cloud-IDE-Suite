@@ -3,10 +3,7 @@
  * Do not edit manually.
  * Api
  * API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
-/**
- * Map of filename to file content
- */
 export type ProjectBuildRequestFiles = { [key: string]: string };

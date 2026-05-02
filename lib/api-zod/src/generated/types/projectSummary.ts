@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface BuildLogs {
-  jobId: string;
-  logs: string;
-  stage?: string | null;
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  projectType: string;
+  createdAt: string;
+  updatedAt: string;
 }
