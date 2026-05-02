@@ -1,17 +1,20 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { FileTree } from "@/components/FileTree";
 import { Editor, EditorRef } from "@/components/Editor";
 import { TabBar } from "@/components/TabBar";
 import { PreviewPanel, PanelTab } from "@/components/PreviewPanel";
-import { Toolbar } from "@/components/Toolbar";
+import { Toolbar, AutosaveStatus } from "@/components/Toolbar";
 import { TemplateSelector } from "@/components/TemplateSelector";
 import { ProjectsModal } from "@/components/ProjectsModal";
 import { ShareModal } from "@/components/ShareModal";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useBuild } from "@/hooks/useBuild";
 import { useRun } from "@/hooks/useRun";
+import { useProjects } from "@/hooks/useProjects";
 import { ProjectTemplate } from "@/lib/templates";
+
+const AUTOSAVE_DEBOUNCE_MS = 3_000;
 
 function getExecLanguage(filename: string): string | null {
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
@@ -40,24 +43,66 @@ export default function IDE() {
   const { files, saveFile, createFile, renameFile, deleteFile, loadTemplate } = useFileSystem();
   const { isBuilding, startBuild, status, logs, jobId, projectType, previewData } = useBuild();
   const { isRunning, stream, runCode } = useRun();
+  const { saveProject, createVersion } = useProjects();
 
-  const [openFiles, setOpenFiles] = useState<string[]>([]);
-  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [openFiles,    setOpenFiles]    = useState<string[]>([]);
+  const [activeFile,   setActiveFile]   = useState<string | null>(null);
   const [rightPanelTab, setRightPanelTab] = useState<PanelTab>("preview");
   const [showTemplates, setShowTemplates] = useState(false);
-  const [showProjects, setShowProjects] = useState(false);
-  const [showShare, setShowShare] = useState(false);
-  const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
+  const [showProjects,  setShowProjects]  = useState(false);
+  const [showShare,     setShowShare]     = useState(false);
+  const [htmlPreview,   setHtmlPreview]   = useState<string | null>(null);
 
-  // Project persistence state
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [currentProjectId,   setCurrentProjectId]   = useState<string | null>(null);
   const [currentProjectName, setCurrentProjectName] = useState<string>("Untitled Project");
+  const [autosaveStatus,     setAutosaveStatus]     = useState<AutosaveStatus>("idle");
 
-  const editorRef = useRef<EditorRef>(null);
+  const editorRef     = useRef<EditorRef>(null);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track whether files have changed since last save to avoid redundant saves
+  const lastSavedHash = useRef<string>("");
 
   const currentLanguage = getDisplayLanguage(activeFile ?? Object.keys(files)[0] ?? "");
-  const canRun = !!activeFile && !!getExecLanguage(activeFile);
+  const canRun   = !!activeFile && !!getExecLanguage(activeFile);
   const canShare = !!currentProjectId;
+
+  // ─── Autosave ────────────────────────────────────────────────────────────────
+
+  const scheduleAutosave = useCallback(() => {
+    if (!currentProjectId) return;
+
+    const hash = JSON.stringify(files);
+    if (hash === lastSavedHash.current) return; // nothing changed
+
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+
+    autosaveTimer.current = setTimeout(async () => {
+      const currentHash = JSON.stringify(files);
+      if (currentHash === lastSavedHash.current) return;
+
+      setAutosaveStatus("saving");
+      const saved = await saveProject(currentProjectName, projectType, files, currentProjectId);
+      if (saved) {
+        lastSavedHash.current = currentHash;
+        setAutosaveStatus("saved");
+        // Fade back to idle after 2 s
+        setTimeout(() => setAutosaveStatus("idle"), 2_000);
+      } else {
+        setAutosaveStatus("idle");
+      }
+    }, AUTOSAVE_DEBOUNCE_MS);
+  }, [currentProjectId, currentProjectName, projectType, files, saveProject]);
+
+  useEffect(() => {
+    scheduleAutosave();
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+  // Only run when files change (not when scheduleAutosave reference changes)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files]);
+
+  // ─── File & project handlers ──────────────────────────────────────────────────
 
   const handleSelectFile = (path: string) => {
     if (!openFiles.includes(path)) setOpenFiles((prev) => [...prev, path]);
@@ -115,6 +160,7 @@ export default function IDE() {
     setHtmlPreview(null);
     setCurrentProjectId(null);
     setCurrentProjectName("Untitled Project");
+    lastSavedHash.current = "";
 
     const first = Object.keys(template.files).sort()[0];
     if (first) { setOpenFiles([first]); setActiveFile(first); }
@@ -131,6 +177,7 @@ export default function IDE() {
     setHtmlPreview(null);
     setCurrentProjectId(id);
     setCurrentProjectName(name);
+    lastSavedHash.current = JSON.stringify(loadedFiles);
 
     const first = Object.keys(loadedFiles).sort()[0];
     if (first) { setOpenFiles([first]); setActiveFile(first); }
@@ -139,6 +186,9 @@ export default function IDE() {
   const handleProjectSaved = (id: string, name: string) => {
     setCurrentProjectId(id);
     setCurrentProjectName(name);
+    lastSavedHash.current = JSON.stringify(files);
+    // Take a version snapshot on every explicit save
+    createVersion(id, "Saved");
   };
 
   return (
@@ -157,6 +207,7 @@ export default function IDE() {
         canRun={canRun}
         canShare={canShare}
         projectName={currentProjectName}
+        autosaveStatus={autosaveStatus}
       />
 
       <div className="flex-1 overflow-hidden">

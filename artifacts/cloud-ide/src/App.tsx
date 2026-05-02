@@ -2,10 +2,11 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { lazy, Suspense } from "react";
 import NotFound from "@/pages/not-found";
 import IDE from "@/pages/IDE";
 import SharedProject from "@/pages/SharedProject";
-import Explore from "@/pages/Explore";
+const Explore = lazy(() => import("@/pages/Explore"));
 
 const queryClient = new QueryClient();
 
@@ -13,7 +14,15 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={IDE} />
-      <Route path="/explore" component={Explore} />
+      <Route path="/explore">
+        <Suspense fallback={
+          <div className="h-screen w-screen flex items-center justify-center bg-background font-mono text-sm text-muted-foreground">
+            Loading…
+          </div>
+        }>
+          <Explore />
+        </Suspense>
+      </Route>
       <Route path="/p/:shareId" component={SharedProject} />
       <Route component={NotFound} />
     </Switch>

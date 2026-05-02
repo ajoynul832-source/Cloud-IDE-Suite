@@ -11,27 +11,40 @@ function headers(): Record<string, string> {
 }
 
 export interface ProjectSummary {
-  id: string;
-  name: string;
+  id:          string;
+  name:        string;
   projectType: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt:   string;
+  updatedAt:   string;
 }
 
 export interface FullProject extends ProjectSummary {
   files: Record<string, string>;
 }
 
+export interface VersionSummary {
+  id:        string;
+  projectId: string;
+  label:     string;
+  createdAt: string;
+}
+
+export interface FullVersion extends VersionSummary {
+  files: Record<string, string>;
+}
+
 export function useProjects() {
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projects,  setProjects]  = useState<ProjectSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error,     setError]     = useState<string | null>(null);
+
+  // ─── Project CRUD ────────────────────────────────────────────────────────────
 
   const listProjects = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE}/projects`, { headers: headers() });
+      const res  = await fetch(`${BASE}/projects`, { headers: headers() });
       const data = await res.json() as { projects?: ProjectSummary[]; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to load projects");
       setProjects(data.projects ?? []);
@@ -50,9 +63,9 @@ export function useProjects() {
   ): Promise<ProjectSummary | null> => {
     setError(null);
     try {
-      const url = existingId ? `${BASE}/projects/${existingId}` : `${BASE}/projects`;
+      const url    = existingId ? `${BASE}/projects/${existingId}` : `${BASE}/projects`;
       const method = existingId ? "PUT" : "POST";
-      const res = await fetch(url, {
+      const res    = await fetch(url, {
         method,
         headers: headers(),
         body: JSON.stringify({ name, projectType, files }),
@@ -76,7 +89,7 @@ export function useProjects() {
   const loadProject = useCallback(async (id: string): Promise<FullProject | null> => {
     setError(null);
     try {
-      const res = await fetch(`${BASE}/projects/${id}`, { headers: headers() });
+      const res  = await fetch(`${BASE}/projects/${id}`, { headers: headers() });
       const data = await res.json() as { project?: FullProject; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to load project");
       return data.project ?? null;
@@ -105,5 +118,92 @@ export function useProjects() {
     }
   }, []);
 
-  return { projects, isLoading, error, listProjects, saveProject, loadProject, deleteProject };
+  const renameProject = useCallback(async (id: string, name: string): Promise<ProjectSummary | null> => {
+    setError(null);
+    try {
+      const res  = await fetch(`${BASE}/projects/${id}`, {
+        method: "PUT",
+        headers: headers(),
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json() as { project?: ProjectSummary; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Failed to rename project");
+      const updated = data.project!;
+      setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      return updated;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+      return null;
+    }
+  }, []);
+
+  const duplicateProject = useCallback(async (id: string): Promise<ProjectSummary | null> => {
+    setError(null);
+    try {
+      const res  = await fetch(`${BASE}/projects/${id}/duplicate`, {
+        method: "POST",
+        headers: headers(),
+      });
+      const data = await res.json() as { project?: ProjectSummary; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Failed to duplicate project");
+      const copy = data.project!;
+      setProjects((prev) => [copy, ...prev]);
+      return copy;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+      return null;
+    }
+  }, []);
+
+  // ─── Version history ─────────────────────────────────────────────────────────
+
+  const listVersions = useCallback(async (projectId: string): Promise<VersionSummary[]> => {
+    try {
+      const res  = await fetch(`${BASE}/projects/${projectId}/versions`, { headers: headers() });
+      const data = await res.json() as { versions?: VersionSummary[]; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Failed to load versions");
+      return data.versions ?? [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const createVersion = useCallback(async (projectId: string, label = ""): Promise<VersionSummary | null> => {
+    try {
+      const res  = await fetch(`${BASE}/projects/${projectId}/versions`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ label }),
+      });
+      const data = await res.json() as { version?: VersionSummary; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Failed to create version");
+      return data.version ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const restoreVersion = useCallback(async (
+    projectId: string,
+    versionId: string,
+  ): Promise<FullProject | null> => {
+    try {
+      const res  = await fetch(`${BASE}/projects/${projectId}/versions/${versionId}/restore`, {
+        method: "POST",
+        headers: headers(),
+      });
+      const data = await res.json() as { project?: FullProject; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Failed to restore version");
+      return data.project ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  return {
+    projects, isLoading, error,
+    listProjects, saveProject, loadProject, deleteProject,
+    renameProject, duplicateProject,
+    listVersions, createVersion, restoreVersion,
+  };
 }

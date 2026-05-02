@@ -163,6 +163,40 @@ router.put("/projects/:id", projectLimiter, async (req, res) => {
   }
 });
 
+// POST /api/projects/:id/duplicate
+router.post("/projects/:id/duplicate", projectLimiter, async (req, res) => {
+  const userKey = validateUserKey(req, res);
+  if (!userKey) return;
+
+  const id = validateId(req.params["id"]);
+  if (!id) { res.status(400).json({ error: "Invalid project ID" }); return; }
+
+  try {
+    const [source] = await db
+      .select()
+      .from(projectsTable)
+      .where(and(eq(projectsTable.id, id), eq(projectsTable.userKey, userKey)))
+      .limit(1);
+
+    if (!source) { res.status(404).json({ error: "Project not found" }); return; }
+
+    const [copy] = await db
+      .insert(projectsTable)
+      .values({
+        userKey,
+        name:        `Copy of ${source.name}`.slice(0, 120),
+        projectType: source.projectType,
+        files:       source.files,
+      })
+      .returning();
+
+    res.status(201).json({ project: copy });
+  } catch (err) {
+    logger.error({ err, id }, "duplicate project failed");
+    res.status(500).json({ error: "Failed to duplicate project" });
+  }
+});
+
 // DELETE /api/projects/:id
 router.delete("/projects/:id", projectLimiter, async (req, res) => {
   const userKey = validateUserKey(req, res);

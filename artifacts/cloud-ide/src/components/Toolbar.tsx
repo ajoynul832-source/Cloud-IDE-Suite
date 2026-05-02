@@ -1,21 +1,24 @@
-import { Play, Box, Download, Loader2, FolderOpen, ChevronDown, Database, Share2, Compass } from "lucide-react";
+import { Play, Box, Download, Loader2, FolderOpen, ChevronDown, Database, Share2, Compass, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "./ui/button";
 
+export type AutosaveStatus = "idle" | "saving" | "saved";
+
 interface ToolbarProps {
-  isBuilding: boolean;
-  isRunning?: boolean;
-  onRun: () => void;
-  onBuild: () => void;
-  onNewProject: () => void;
-  onOpenProjects: () => void;
-  onShare?: () => void;
-  buildStatus?: string | null;
-  jobId?: string | null;
+  isBuilding:      boolean;
+  isRunning?:      boolean;
+  onRun:           () => void;
+  onBuild:         () => void;
+  onNewProject:    () => void;
+  onOpenProjects:  () => void;
+  onShare?:        () => void;
+  buildStatus?:    string | null;
+  jobId?:          string | null;
   currentLanguage?: string;
-  canRun?: boolean;
-  canShare?: boolean;
-  projectName?: string;
+  canRun?:         boolean;
+  canShare?:       boolean;
+  projectName?:    string;
+  autosaveStatus?: AutosaveStatus;
 }
 
 export function Toolbar({
@@ -32,6 +35,7 @@ export function Toolbar({
   canRun,
   canShare,
   projectName,
+  autosaveStatus = "idle",
 }: ToolbarProps) {
   return (
     <div className="h-12 bg-card border-b border-border flex items-center justify-between px-4 shrink-0 gap-2">
@@ -90,16 +94,28 @@ export function Toolbar({
           </button>
         )}
 
-        {/* Current project name */}
+        {/* Current project name + autosave status */}
         {projectName && (
           <>
             <div className="w-px h-4 bg-border shrink-0" />
             <span
-              className="text-xs font-mono text-muted-foreground truncate max-w-[140px]"
+              className="text-xs font-mono text-muted-foreground truncate max-w-[130px]"
               title={projectName}
             >
               {projectName}
             </span>
+            {autosaveStatus === "saving" && (
+              <span className="hidden sm:flex items-center gap-1 text-[10px] font-mono text-muted-foreground/60 shrink-0">
+                <Loader2 size={9} className="animate-spin" />
+                saving
+              </span>
+            )}
+            {autosaveStatus === "saved" && (
+              <span className="hidden sm:flex items-center gap-1 text-[10px] font-mono text-primary/70 shrink-0">
+                <CheckCircle2 size={9} />
+                saved
+              </span>
+            )}
           </>
         )}
 

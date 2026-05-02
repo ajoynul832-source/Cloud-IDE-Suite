@@ -17,9 +17,23 @@ import { runLimiter } from "../middlewares/rate-limit";
 const router = Router();
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const EXEC_TIMEOUT_MS = 10_000;
-const MAX_CHUNK_BYTES = 100_000; // 100 KB per stream
+const EXEC_TIMEOUT_MS    = 10_000;
+const MAX_CHUNK_BYTES    = 100_000; // 100 KB per stream
+const MAX_CONCURRENT_OPS = 8;       // global cap across all users
 const TEMP_ROOT = os.tmpdir();
+
+// ─── Concurrency semaphore ────────────────────────────────────────────────────
+let activeExecutions = 0;
+
+function acquireSlot(): boolean {
+  if (activeExecutions >= MAX_CONCURRENT_OPS) return false;
+  activeExecutions++;
+  return true;
+}
+
+function releaseSlot(): void {
+  activeExecutions = Math.max(0, activeExecutions - 1);
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type ExecEventType = "stdout" | "stderr" | "done" | "error";
@@ -304,6 +318,11 @@ router.post("/run/stream", runLimiter, async (req, res) => {
     return;
   }
 
+  if (!acquireSlot()) {
+    res.status(503).json({ error: "Server is busy — too many concurrent executions. Please try again in a moment." });
+    return;
+  }
+
   // SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -312,7 +331,7 @@ router.post("/run/stream", runLimiter, async (req, res) => {
   res.flushHeaders();
 
   const execId = randomBytes(6).toString("hex");
-  logger.info({ execId, language: handler.id, filename }, "stream execution start");
+  logger.info({ execId, language: handler.id, filename, activeExecutions }, "stream execution start");
 
   const sendEvent = (event: ExecEvent) => {
     res.write(`data: ${JSON.stringify(event)}\n\n`);
@@ -327,6 +346,8 @@ router.post("/run/stream", runLimiter, async (req, res) => {
     logger.error({ err, execId }, "stream execution error");
     sendEvent({ type: "error", error: "Internal execution error" });
     sendEvent({ type: "done", exitCode: -1, duration: 0 });
+  } finally {
+    releaseSlot();
   }
 
   res.end();
@@ -358,8 +379,13 @@ router.post("/run", runLimiter, async (req, res) => {
     return;
   }
 
+  if (!acquireSlot()) {
+    res.status(503).json({ error: "Server is busy — too many concurrent executions. Please try again in a moment." });
+    return;
+  }
+
   const execId = randomBytes(6).toString("hex");
-  logger.info({ execId, language: handler.id }, "buffered execution start");
+  logger.info({ execId, language: handler.id, activeExecutions }, "buffered execution start");
 
   let stdout = "";
   let stderr = "";
@@ -390,10 +416,12 @@ router.post("/run", runLimiter, async (req, res) => {
     }
   } catch (err) {
     logger.error({ err, execId }, "buffered execution error");
+    releaseSlot();
     res.status(500).json({ error: "Internal execution error" });
     return;
   }
 
+  releaseSlot();
   res.json({ stdout, stderr, exitCode, duration, error: execError, html: htmlContent });
 });
 
