@@ -69,6 +69,7 @@ export async function ensureRedis(): Promise<void> {
   if (await isRedisReachable()) {
     logger.info({ host: REDIS_HOST, port: REDIS_PORT }, "redis: already running");
     _ensured = true;
+    await configureRedis();
     return;
   }
 
@@ -87,6 +88,28 @@ export async function ensureRedis(): Promise<void> {
   }
 
   _ensured = true;
+  await configureRedis();
+}
+
+/**
+ * Apply safe production defaults for the embedded Redis instance.
+ * - maxmemory 512mb  — prevents OOM from unbounded key growth
+ * - allkeys-lru      — evict least-recently-used keys when at limit
+ * These are no-ops if REDIS_URL points to a managed provider (they may
+ * reject CONFIG SET — the error is caught and logged as a warning).
+ */
+async function configureRedis(): Promise<void> {
+  const client = createRedisClient();
+  try {
+    const maxMem = process.env["REDIS_MAX_MEMORY"] ?? "512mb";
+    await client.config("SET", "maxmemory", maxMem);
+    await client.config("SET", "maxmemory-policy", "allkeys-lru");
+    logger.info({ maxMem, policy: "allkeys-lru" }, "redis: memory config applied");
+  } catch (err) {
+    logger.warn({ err }, "redis: CONFIG SET failed (managed Redis may not allow it — safe to ignore)");
+  } finally {
+    client.disconnect();
+  }
 }
 
 // ─── Shared client for chunk-list operations ──────────────────────────────────

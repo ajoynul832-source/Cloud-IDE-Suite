@@ -3,7 +3,7 @@ import { logger } from "./lib/logger";
 import { ensureRedis, shutdownRedis }          from "./lib/redis";
 import { startWorker, shutdownQueue }          from "./lib/queue";
 import { startBuildWorker, shutdownBuildQueue } from "./lib/build-queue";
-import { ensureApkStorage }                    from "./lib/apk-storage";
+import { ensureApkStorage, pruneStaleApks }    from "./lib/apk-storage";
 import { checkFlutter }                        from "./lib/flutter";
 import { checkAndroid }                        from "./lib/android";
 import { mountAdminBoard }                     from "./lib/bull-board";
@@ -26,6 +26,11 @@ async function main() {
 
   // ── Admin dashboard (Bull Board) ─────────────────────────────────────────
   mountAdminBoard(app);
+
+  // ── Scheduled maintenance ────────────────────────────────────────────────
+  // Prune APKs older than 30 days every 6 hours; run once immediately at startup.
+  void pruneStaleApks();
+  setInterval(() => { void pruneStaleApks(); }, 6 * 60 * 60 * 1000).unref();
 
   // ── HTTP server ─────────────────────────────────────────────────────────
   const server = app.listen(port, (err?: Error) => {

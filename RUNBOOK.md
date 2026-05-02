@@ -284,12 +284,7 @@ Browser ──────────► Load Balancer   │
 
 ### Separate build workers
 
-Run one or more dedicated worker processes (no HTTP server) to handle APK builds:
-
-```bash
-# Not yet implemented as a separate entrypoint — coming in Phase 9.
-# Currently: build workers run inside the API server process.
-```
+Build workers run inside the API server process. For high-throughput deployments, you can increase BullMQ worker concurrency via env var or run multiple API server instances sharing the same Redis (only one instance will process each job).
 
 ### Database scaling
 

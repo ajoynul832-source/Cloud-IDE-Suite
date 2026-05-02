@@ -1,0 +1,104 @@
+YOU ARE BUILDING PHASE 10: LAUNCH CHECKLIST
+
+PRE-LAUNCH VERIFICATION (DO NOT SKIP):
+
+DATABASE:
+✅ All migrations applied (check schema version)
+✅ Backups configured (daily snapshots)
+✅ Indexes created on: user_id, project_id, created_at, share_id
+✅ Connection pooling: PgBouncer or built-in (max 20 connections)
+
+REDIS:
+✅ Connected and responding to PING
+✅ Memory limit set (e.g., maxmemory 512MB)
+✅ Eviction policy: allkeys-lru (or appropriate)
+✅ Persistence: AOF or RDB enabled (optional but recommended)
+✅ Queue processors running (verify via info commandstats)
+
+SECRETS:
+✅ JWT_SECRET set (32+ hex chars, not "test123")
+✅ DATABASE_URL uses strong password (20+ chars)
+✅ GITHUB_TOKEN (if Android builds enabled) is valid
+✅ No secrets in .env (use env vars only)
+✅ .gitignore includes .env, .env.local
+
+FILE SYSTEM:
+✅ /tmp/code_execution and /tmp/apk_builds writable
+✅ Disk space > 50 GB available
+✅ Logs directory writable, logs rotation enabled
+✅ APK cleanup cron job configured (delete > 30 days old)
+
+SECURITY:
+✅ HTTPS only (no HTTP)
+✅ CORS origin restricted (no wildcard)
+✅ CSRF tokens on forms (if applicable)
+✅ Rate limits enforced (100 req/min per IP)
+✅ Auth middleware on all protected routes
+✅ Input validation on all POST/PUT
+✅ Error messages don't leak internal details
+✅ SQL injection prevention (parameterized queries via ORM)
+✅ XSS prevention (sanitize all user input, CSP headers)
+
+MONITORING:
+✅ Health check endpoint responding
+✅ Metrics endpoint operational
+✅ Error logs flowing to centralized location (if available)
+✅ Alerting configured (errors > 5%, queue depth > 50)
+✅ Backup of logs configured
+
+DEPLOYMENT:
+✅ Latest code committed and tagged (v1.0.0)
+✅ All tests passing
+✅ No console warnings or errors
+✅ Production build optimized (minified, no source maps)
+✅ Environment variables documented
+✅ Rollback plan documented (in case of critical bug)
+
+PERFORMANCE:
+✅ Page load time < 2s (CDN optional)
+✅ API response time < 500ms (p95)
+✅ Database queries < 100ms (p95)
+✅ No memory leaks (check after 24h uptime)
+
+CAPACITY:
+✅ Database size: estimate 1MB per 100 projects (scale accordingly)
+✅ Redis memory: ~100MB (adjust based on queue size)
+✅ Disk space: 50GB minimum for APKs
+✅ Can scale to: 1000 concurrent users (with load balancing)
+
+RUNBOOK:
+✅ Startup procedure documented
+✅ Emergency shutdown procedure documented
+✅ Troubleshooting guide complete
+✅ On-call contact list available
+✅ Incident response plan documented
+
+FINAL SIGN-OFF:
+Question | Answer | Sign-off
+Is this code production-ready? | YES | ✅
+Are all features working correctly? | YES | ✅
+Is error handling comprehensive? | YES | ✅
+Is security validated? | YES | ✅
+Is performance acceptable? | YES | ✅
+Can it scale to 1000+ users? | YES | ✅
+
+IF ANY ANSWER IS "NO", DO NOT LAUNCH. FIX FIRST.
+
+LAUNCH:
+1. Backup production database
+2. Deploy code to production
+3. Run health check: GET /api/healthz (expect 200)
+4. Monitor metrics for 1 hour
+5. Test critical flows (register, create, run, share, fork)
+6. Announce: "Cloud IDE v1.0.0 is live"
+
+ROLLBACK PLAN:
+If critical bug found:
+1. Stop API server
+2. Restore database from last backup
+3. Rollback code to previous tag (v0.x.x)
+4. Restart API server
+5. Verify health check
+6. Post-mortem within 24h
+
+YOU ARE LIVE. 🎉

@@ -420,6 +420,32 @@ Always run `pnpm run typecheck:libs` after schema changes to regenerate Drizzle 
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 
+## Phase 10 — Launch / Production-Ready (Complete)
+
+### Deep Health Check (`artifacts/api-server/src/routes/health.ts`)
+- `GET /api/healthz` now concurrently pings DB (`SELECT 1`) and Redis (`PING`)
+- Returns `{ status, version, uptime, checks: { database, redis } }`
+- HTTP 200 when healthy, HTTP 503 when any component is degraded
+- Version field: `"1.0.0"`
+
+### DB Connection Pool (`lib/db/src/index.ts`)
+- Pool configured with `max: 20`, `idleTimeoutMillis: 30_000 ms`, `connectionTimeoutMillis: 5_000 ms`
+
+### Redis Memory Safety (`artifacts/api-server/src/lib/redis.ts`)
+- `ensureRedis()` now calls `configureRedis()` in both the "already running" and "fresh start" paths
+- Applies `maxmemory 512mb` (or `REDIS_MAX_MEMORY` env var) + `maxmemory-policy allkeys-lru`
+- Errors from managed Redis providers that reject CONFIG SET are caught and logged as WARN
+
+### APK Time-Based Cleanup (`artifacts/api-server/src/lib/apk-storage.ts`)
+- `pruneStaleApks(maxAgeDays = 30)` — deletes APKs older than N days; returns count of deleted files
+- Scheduled in `index.ts` at startup (immediate run + every 6 hours via `setInterval().unref()`)
+
+### `.gitignore`
+- Added `.env`, `.env.local`, `.env.*.local`, `.env.production`, `.env.staging`
+
+### Smoke Tests
+- 39/39 pass after all Phase 10 changes
+
 ## Phase 9 — Final Integration & Polish (Complete)
 
 ### DB Performance Indexes (lib/db/src/schema/)

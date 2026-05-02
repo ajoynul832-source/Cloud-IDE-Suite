@@ -68,3 +68,31 @@ async function pruneOldApks(): Promise<void> {
 export function apkExists(storedPath: string): boolean {
   return fs.existsSync(storedPath);
 }
+
+/**
+ * Delete APK files older than `maxAgeDays` days.
+ * Run on a schedule (every 6 hours) to prevent unbounded disk growth.
+ * Returns the number of files deleted.
+ */
+export async function pruneStaleApks(maxAgeDays = 30): Promise<number> {
+  const cutoffMs = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+  let deleted = 0;
+  try {
+    const files = await fsp.readdir(STORAGE_ROOT);
+    const apks  = files.filter((f) => f.endsWith(".apk"));
+    await Promise.all(
+      apks.map(async (f) => {
+        const fullPath = path.join(STORAGE_ROOT, f);
+        const st = await fsp.stat(fullPath).catch(() => null);
+        if (st && st.mtimeMs < cutoffMs) {
+          await fsp.rm(fullPath, { force: true }).catch(() => {});
+          deleted++;
+        }
+      }),
+    );
+    if (deleted > 0) logger.info({ deleted, maxAgeDays }, "apk stale-cleanup: removed old APKs");
+  } catch (err) {
+    logger.warn({ err }, "apk stale-cleanup failed");
+  }
+  return deleted;
+}

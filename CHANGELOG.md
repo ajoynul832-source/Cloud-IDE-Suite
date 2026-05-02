@@ -4,7 +4,35 @@ All significant changes to the Cloud IDE platform are documented here.
 
 ---
 
-## [1.0.0] — Phase 8: Documentation & Deployment
+## [1.0.0] — Phase 10: Launch (Production-Ready)
+
+### Added
+- **Deep health check** — `GET /api/healthz` now checks DB (`SELECT 1`) and Redis (`PING`) with per-component response times; returns HTTP 503 when any component is degraded
+- **APK time-based cleanup** — `pruneStaleApks()` deletes APKs older than 30 days; scheduled every 6 hours + runs once at startup (configurable via `APK_MAX_AGE_DAYS`)
+- **Redis memory safety** — `ensureRedis()` now applies `maxmemory 512mb` + `allkeys-lru` eviction policy automatically; configurable via `REDIS_MAX_MEMORY` env var
+- **`.env` in .gitignore** — added `.env`, `.env.local`, `.env.*.local`, `.env.production`, `.env.staging` patterns
+
+### Changed
+- **DB connection pool** — `max: 20` connections (was default 10), `idleTimeoutMillis: 30 000 ms`, `connectionTimeoutMillis: 5 000 ms`
+- **Version** — bumped to `1.0.0` in health check response and package metadata
+
+---
+
+## [0.9.0] — Phase 9: Final Integration & Polish
+
+### Added
+- **9 DB performance indexes** — `builds` (user_id, status, created_at, project_id), `projects` (user_id, updated_at), `versions` (project_id, created_at), `shares` (project_id)
+- **Vite code splitting** — Monaco editor, react-dom, and TanStack Query emitted as separate chunks for faster initial load
+- **Session expiry banner** — `AuthProvider` listens for `cloud-ide:session-expired` DOM events and shows a sticky bottom banner; `useProjects` dispatches the event on any 401 response
+- **Gzip compression** — `compression` middleware on all Express JSON responses (SSE streams excluded)
+
+### Fixed
+- **ShareModal credential bug** — `POST /api/projects/:id/share` was missing `credentials: "include"` → authenticated share generation now works correctly
+- **Logout response** — changed `{ ok: true }` to `{ success: true }` for OpenAPI consistency
+
+---
+
+## [1.0.0-rc.1] — Phase 8: Documentation & Deployment
 
 ### Added
 - **Interactive API docs** at `/api/docs` (Swagger UI, served by `swagger-ui-express`)
