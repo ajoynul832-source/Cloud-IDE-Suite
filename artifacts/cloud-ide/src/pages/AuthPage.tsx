@@ -5,7 +5,11 @@ import { useAuth } from "@/contexts/AuthContext";
 
 type AuthMode = "login" | "register";
 
-export default function AuthPage() {
+interface AuthPageProps {
+  onSuccess?: () => void;
+}
+
+export default function AuthPage({ onSuccess }: AuthPageProps = {}) {
   const { login, register } = useAuth();
   const [mode,     setMode]     = useState<AuthMode>("login");
   const [email,    setEmail]    = useState("");
@@ -23,12 +27,17 @@ export default function AuthPage() {
       ? await login(email.trim(), password)
       : await register(email.trim(), password);
 
-    if (result.error) setError(result.error);
-    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+    } else {
+      setLoading(false);
+      onSuccess?.();
+    }
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col items-center justify-center bg-background px-4">
+    <div className="flex flex-col items-center justify-center bg-background rounded-lg px-6 py-8 w-full">
       <div className="w-full max-w-sm">
         {/* Brand */}
         <div className="flex items-center justify-center gap-2 mb-8">

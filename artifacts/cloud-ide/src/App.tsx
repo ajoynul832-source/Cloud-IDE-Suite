@@ -6,8 +6,7 @@ import { lazy, Suspense } from "react";
 import NotFound      from "@/pages/not-found";
 import IDE          from "@/pages/IDE";
 import SharedProject from "@/pages/SharedProject";
-import AuthPage      from "@/pages/AuthPage";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const Explore = lazy(() => import("@/pages/Explore"));
 
@@ -19,19 +18,11 @@ const LoadingScreen = (
   </div>
 );
 
-/** Routes that require authentication show the AuthPage when not logged in */
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, isLoading } = useAuth();
-  if (isLoading) return LoadingScreen;
-  if (!user)     return <AuthPage />;
-  return <Component />;
-}
-
 function Router() {
   return (
     <Switch>
       <Route path="/">
-        <ProtectedRoute component={IDE} />
+        <IDE />
       </Route>
       <Route path="/explore">
         <Suspense fallback={LoadingScreen}>

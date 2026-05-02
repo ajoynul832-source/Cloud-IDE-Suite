@@ -8,10 +8,12 @@ import { Toolbar, AutosaveStatus } from "@/components/Toolbar";
 import { TemplateSelector } from "@/components/TemplateSelector";
 import { ProjectsModal } from "@/components/ProjectsModal";
 import { ShareModal } from "@/components/ShareModal";
+import AuthPage from "@/pages/AuthPage";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useBuild } from "@/hooks/useBuild";
 import { useRun } from "@/hooks/useRun";
 import { useProjects } from "@/hooks/useProjects";
+import { useAuth } from "@/contexts/AuthContext";
 import { ProjectTemplate } from "@/lib/templates";
 
 const AUTOSAVE_DEBOUNCE_MS = 3_000;
@@ -44,6 +46,7 @@ export default function IDE() {
   const { isBuilding, startBuild, status, logs, jobId, projectType, previewData } = useBuild();
   const { isRunning, stream, runsRemaining, runCode } = useRun();
   const { saveProject, createVersion } = useProjects();
+  const { user } = useAuth();
 
   const [openFiles,     setOpenFiles]     = useState<string[]>([]);
   const [activeFile,    setActiveFile]    = useState<string | null>(null);
@@ -51,6 +54,7 @@ export default function IDE() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showProjects,  setShowProjects]  = useState(false);
   const [showShare,     setShowShare]     = useState(false);
+  const [showSignIn,    setShowSignIn]    = useState(false);
   const [htmlPreview,   setHtmlPreview]   = useState<string | null>(null);
 
   const [currentProjectId,   setCurrentProjectId]   = useState<string | null>(null);
@@ -66,6 +70,23 @@ export default function IDE() {
   const currentLanguage = getDisplayLanguage(activeFile ?? Object.keys(files)[0] ?? "");
   const canRun   = !!activeFile && !!getExecLanguage(activeFile);
   const canShare = !!currentProjectId;
+
+  // Auto-open the first runnable file when files load for the first time
+  useEffect(() => {
+    if (openFiles.length > 0 || Object.keys(files).length === 0) return;
+    // Prefer runnable files (.js first, then .ts, .py, .html), else first file
+    const allFiles = Object.keys(files);
+    const preferred = allFiles.find(f => /\.(js|jsx|mjs)$/.test(f))
+      ?? allFiles.find(f => /\.(ts|tsx)$/.test(f))
+      ?? allFiles.find(f => /\.py$/.test(f))
+      ?? allFiles.find(f => /\.html?$/.test(f))
+      ?? allFiles[0];
+    if (preferred) {
+      setOpenFiles([preferred]);
+      setActiveFile(preferred);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files]);
 
   // Merge server-reported runsRemaining (from SSE events) into local state
   useEffect(() => {
@@ -183,8 +204,8 @@ export default function IDE() {
         onRun={handleRun}
         onBuild={handleBuild}
         onNewProject={() => setShowTemplates(true)}
-        onOpenProjects={() => setShowProjects(true)}
-        onShare={() => setShowShare(true)}
+        onOpenProjects={() => user ? setShowProjects(true) : setShowSignIn(true)}
+        onShare={() => user ? setShowShare(true) : setShowSignIn(true)}
         buildStatus={status?.status}
         jobId={jobId}
         currentLanguage={currentLanguage}
@@ -279,6 +300,20 @@ export default function IDE() {
           projectName={currentProjectName}
           onClose={() => setShowShare(false)}
         />
+      )}
+
+      {showSignIn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="relative w-full max-w-md">
+            <button
+              onClick={() => setShowSignIn(false)}
+              className="absolute -top-8 right-0 text-muted-foreground hover:text-foreground text-sm font-mono"
+            >
+              ✕ close
+            </button>
+            <AuthPage onSuccess={() => setShowSignIn(false)} />
+          </div>
+        </div>
       )}
     </div>
   );
