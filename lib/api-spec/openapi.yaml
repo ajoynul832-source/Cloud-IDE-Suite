@@ -2,459 +2,167 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.2.0
-  description: API specification
+  version: 1.0.0
+  description: |
+    **Cloud IDE API** — a production-ready backend for a browser-based code editor
+    supporting JavaScript, TypeScript, Python, and HTML execution, plus Flutter and
+    Android APK build pipelines.
+
+    ## Authentication
+    Most project endpoints require a valid JWT issued by `POST /api/auth/login`.
+    The token is set as an **httpOnly cookie** (`auth_token`, 7-day expiry).
+    Pass it automatically via `credentials: "include"` in fetch/XHR calls.
+
+    Anonymous users can execute code and build APKs using a per-client `X-User-Key`
+    header (a stable random UUID stored client-side) for rate-limit tracking.
+
+    ## Rate Limits
+    | Scope | Limit |
+    |-------|-------|
+    | Global (all routes) | 100 req / hour per IP |
+    | Code execution | 30 req / min per user |
+    | APK builds | 5 req / min per user |
+    | Projects + versions | 60 req / min per user |
+    | Share operations | 20 req / min per IP |
+    | Daily executions | 50 / day per user |
+    | Daily APK builds | 3 / day per user |
+
+    Rate-limit responses use HTTP **429** with `Retry-After` header.
+
+    ## Error format
+    All error responses share a common shape: `{ "error": "Human-readable message", "code"?: "MACHINE_CODE" }`
+
 servers:
   - url: /api
-    description: Base API path
+    description: Base API path (proxied — do not include /api in client requests)
+
 tags:
   - name: health
-  - name: builds
+    description: Server health and readiness
+  - name: auth
+    description: User authentication (JWT cookie-based)
   - name: execution
+    description: Code execution — JavaScript, TypeScript, Python, HTML
+  - name: builds
+    description: APK build pipeline — Flutter and Android (Gradle)
   - name: projects
+    description: Saved project CRUD and sharing
+  - name: versions
+    description: Project version history (up to 10 snapshots per project)
+  - name: usage
+    description: Daily quota tracking
+  - name: admin
+    description: Internal admin endpoints (require ADMIN_TOKEN)
 
-paths:
-  /healthz:
-    get:
-      operationId: healthCheck
-      tags: [health]
-      summary: Health check
-      responses:
-        "200":
-          description: Healthy
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthStatus"
-
-  /run:
-    post:
-      operationId: runCode
-      tags: [execution]
-      summary: Execute code (buffered JSON response)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RunRequest"
-      responses:
-        "200":
-          description: Execution result
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RunResult"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "429":
-          description: Rate limited
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /run/stream:
-    post:
-      operationId: runCodeStream
-      tags: [execution]
-      summary: Execute code with real-time SSE streaming output
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RunRequest"
-      responses:
-        "200":
-          description: Server-Sent Events stream of execution output
-          content:
-            text/event-stream:
-              schema:
-                type: string
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "429":
-          description: Rate limited
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /build:
-    post:
-      operationId: startBuild
-      tags: [builds]
-      summary: Start a Flutter APK build (ZIP upload)
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                project:
-                  type: string
-                  format: binary
-              required:
-                - project
-      responses:
-        "200":
-          description: Build queued
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BuildResponse"
-        "400":
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "429":
-          description: Rate limited
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /build/project:
-    post:
-      operationId: buildProject
-      tags: [builds]
-      summary: Build or preview from file map (react-native, flutter, android)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ProjectBuildRequest"
-      responses:
-        "200":
-          description: Build started or preview ready
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProjectBuildResponse"
-        "400":
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /status/{jobId}:
-    get:
-      operationId: getBuildStatus
-      tags: [builds]
-      parameters:
-        - name: jobId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Job status
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/JobStatus"
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /download/{jobId}:
-    get:
-      operationId: downloadApk
-      tags: [builds]
-      parameters:
-        - name: jobId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: APK binary
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /logs/{jobId}:
-    get:
-      operationId: getBuildLogs
-      tags: [builds]
-      parameters:
-        - name: jobId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Build logs
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BuildLogs"
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /projects:
-    get:
-      operationId: listProjects
-      tags: [projects]
-      summary: List user's saved projects
-      parameters:
-        - name: x-user-key
-          in: header
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Project list
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProjectListResponse"
-        "401":
-          description: Missing user key
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-    post:
-      operationId: createProject
-      tags: [projects]
-      summary: Save a new project
-      parameters:
-        - name: x-user-key
-          in: header
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateProjectRequest"
-      responses:
-        "201":
-          description: Project created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProjectResponse"
-        "400":
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /projects/{id}:
-    get:
-      operationId: getProject
-      tags: [projects]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: x-user-key
-          in: header
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Project
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProjectResponse"
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-    put:
-      operationId: updateProject
-      tags: [projects]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: x-user-key
-          in: header
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateProjectRequest"
-      responses:
-        "200":
-          description: Project updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProjectResponse"
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-    delete:
-      operationId: deleteProject
-      tags: [projects]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: x-user-key
-          in: header
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Deleted
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  id:
-                    type: string
-                required: [success, id]
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /projects/{id}/share:
-    post:
-      operationId: shareProject
-      tags: [projects]
-      summary: Generate a public share link for a project
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: x-user-key
-          in: header
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Share link created or reused
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ShareResponse"
-        "401":
-          description: Missing user key
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Project not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /share/{shareId}:
-    get:
-      operationId: getSharedProject
-      tags: [projects]
-      summary: Load a publicly shared project (no auth required)
-      parameters:
-        - name: shareId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Shared project data
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SharedProjectResponse"
-        "404":
-          description: Share link not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
+# ─── Security schemes ──────────────────────────────────────────────────────────
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: auth_token
+      description: |
+        JWT cookie set by `POST /auth/login` or `POST /auth/register`.
+        Expires after 7 days. Pass via `credentials: "include"` in fetch.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Alternative to cookie auth. Pass the JWT returned at login as
+        `Authorization: Bearer <token>`.
+    userKey:
+      type: apiKey
+      in: header
+      name: X-User-Key
+      description: |
+        Stable anonymous user identifier (UUID). Used for rate-limit and usage
+        tracking when not authenticated. Generate once and store client-side.
+    adminToken:
+      type: http
+      scheme: bearer
+      description: |
+        `ADMIN_TOKEN` env var (falls back to `SESSION_SECRET`).
+        Also accepted as Basic Auth password: `Authorization: Basic base64(:token)`.
+
   schemas:
+    # ── Common ──────────────────────────────────────────────────────────────────
     HealthStatus:
       type: object
       properties:
         status:
           type: string
+          example: ok
       required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+          example: "Invalid request body"
+        code:
+          type: string
+          description: Machine-readable error code (optional)
+          example: "DAILY_LIMIT_REACHED"
+      required: [error]
+
+    # ── Auth ────────────────────────────────────────────────────────────────────
+    AuthRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          example: "mypassword123"
+      required: [email, password]
+
+    GoogleAuthRequest:
+      type: object
+      properties:
+        idToken:
+          type: string
+          description: Google ID token from Google Sign-In
+      required: [idToken]
+
+    AuthResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        oauthProvider:
+          type: string
+          nullable: true
+          example: google
+      required: [userId, email]
+
+    # ── Execution ───────────────────────────────────────────────────────────────
     RunRequest:
       type: object
       properties:
         language:
           type: string
+          enum: [javascript, typescript, python, html]
+          description: Language identifier (case-insensitive)
+          example: javascript
         code:
           type: string
+          description: Source code to execute (max 500 KB)
+          example: "console.log('Hello, world!')"
         filename:
           type: string
+          description: Optional filename hint for language detection
+          example: main.js
       required: [language, code]
 
     RunResult:
@@ -462,32 +170,73 @@ components:
       properties:
         stdout:
           type: string
+          description: Standard output from the execution
         stderr:
           type: string
+          description: Standard error output
         exitCode:
           type: integer
+          description: Process exit code (0 = success)
+          example: 0
         duration:
           type: integer
+          description: Wall-clock execution time in milliseconds
+          example: 42
         error:
           type: string
           nullable: true
+          description: "`timeout` if killed by the 10 s limit, else null"
         html:
           type: string
           nullable: true
+          description: Full HTML content when language is `html`
+        remaining:
+          type: integer
+          description: Daily executions remaining for this user
+          example: 48
       required: [stdout, stderr, exitCode, duration]
 
+    RunJobStatus:
+      type: object
+      properties:
+        jobId:
+          type: string
+        runId:
+          type: string
+        status:
+          type: string
+          enum: [waiting, active, completed, failed, delayed, unknown]
+        result:
+          $ref: "#/components/schemas/RunResult"
+          nullable: true
+        failedReason:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+          nullable: true
+      required: [jobId, status]
+
+    # ── Builds ──────────────────────────────────────────────────────────────────
     ProjectBuildRequest:
       type: object
       properties:
         type:
           type: string
           enum: [flutter, react-native, android, ios]
+          description: |
+            Build target. `react-native` → instant Expo Snack preview (no queue).
+            `flutter` / `android` → BullMQ queue → APK download.
+            `ios` → always returns 400 (requires macOS/Xcode).
         files:
           type: object
           additionalProperties:
             type: string
+          description: "Map of filename-to-content string pairs: { \"path/to/file\": \"content\" }"
         name:
           type: string
+          description: Project name (used as Expo Snack title for react-native)
       required: [type, files]
 
     ProjectBuildResponse:
@@ -495,18 +244,23 @@ components:
       properties:
         jobId:
           type: string
+          format: uuid
         status:
           type: string
           enum: [queued, building, success, failed, preview_ready]
+        language:
+          type: string
         previewUrl:
           type: string
           nullable: true
+          description: Expo Snack web preview URL (react-native only)
         embedUrl:
           type: string
           nullable: true
         qrUrl:
           type: string
           nullable: true
+          description: QR code URL to open in Expo Go (react-native only)
         message:
           type: string
           nullable: true
@@ -517,38 +271,76 @@ components:
       properties:
         jobId:
           type: string
+          format: uuid
         status:
           type: string
-          enum: [queued, building, success, failed]
+          enum: [queued]
         queuePosition:
           type: integer
+          description: Number of jobs ahead in the queue
+        language:
+          type: string
+          enum: [flutter, android]
       required: [jobId, status]
 
     JobStatus:
       type: object
+      description: Full build job status record (read from database)
       properties:
         jobId:
           type: string
+          format: uuid
         status:
           type: string
-          enum: [queued, building, success, failed]
+          enum: [queued, building, failed-will-retry, success, failed]
+          description: |
+            `failed-will-retry` — Phase 5 resilience: a retriable error occurred and
+            BullMQ is about to start a second attempt. Poll again in a few seconds.
+        stage:
+          type: string
+          nullable: true
+          description: Active build stage (extracting, running-pub-get, building-apk, packaging, etc.)
         logs:
           type: string
+          nullable: true
+          description: Full accumulated build log text
+        queuePosition:
+          type: integer
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
           nullable: true
         download:
           type: string
           nullable: true
-        queuePosition:
+          description: Relative URL to download the APK (`/api/download/{jobId}`)
+        apkSize:
           type: integer
           nullable: true
-        startedAt:
+          description: APK file size in bytes
+        # Phase 5 resilience fields
+        errorMessage:
           type: string
           nullable: true
-        completedAt:
+          description: Human-readable error message from the last failed attempt
+        errorType:
           type: string
           nullable: true
-        stage:
+          enum: [retriable, permanent, system]
+          description: |
+            Error classification. `retriable` = transient (network/timeout),
+            `permanent` = bad project, `system` = OOM/disk.
+        retryCount:
+          type: integer
+          description: Number of retries that have been attempted (0 on first failure)
+          example: 1
+        willRetry:
+          type: boolean
+          description: True when status is `failed-will-retry`
+        lastErrorAt:
           type: string
+          format: date-time
           nullable: true
         previewUrl:
           type: string
@@ -571,19 +363,89 @@ components:
         stage:
           type: string
           nullable: true
+        status:
+          type: string
       required: [jobId, logs]
 
+    BuildSummary:
+      type: object
+      description: Abbreviated build record for project history lists
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        language:
+          type: string
+        status:
+          type: string
+        stage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        apkSize:
+          type: integer
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        errorType:
+          type: string
+          nullable: true
+        retryCount:
+          type: integer
+        lastErrorAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [jobId, language, status, retryCount]
+
+    BuildErrorRecord:
+      type: object
+      properties:
+        ts:
+          type: string
+          format: date-time
+        buildId:
+          type: string
+        userId:
+          type: string
+          nullable: true
+        language:
+          type: string
+        errorType:
+          type: string
+          enum: [retriable, permanent, system]
+        errorMessage:
+          type: string
+        attempt:
+          type: integer
+        maxAttempts:
+          type: integer
+      required: [ts, buildId, language, errorType, errorMessage, attempt, maxAttempts]
+
+    # ── Projects ────────────────────────────────────────────────────────────────
     CreateProjectRequest:
       type: object
       properties:
         name:
           type: string
+          maxLength: 120
+          example: My Flutter App
         projectType:
           type: string
+          enum: [javascript, typescript, python, html, flutter, react-native, android]
+          default: javascript
         files:
           type: object
           additionalProperties:
             type: string
+          description: "Initial file map `{ \"path\": \"content\" }`"
       required: [name, files]
 
     UpdateProjectRequest:
@@ -591,6 +453,7 @@ components:
       properties:
         name:
           type: string
+          maxLength: 120
         projectType:
           type: string
         files:
@@ -603,6 +466,7 @@ components:
       properties:
         id:
           type: string
+          format: uuid
         name:
           type: string
         projectType:
@@ -614,8 +478,10 @@ components:
           nullable: true
         createdAt:
           type: string
+          format: date-time
         updatedAt:
           type: string
+          format: date-time
       required: [id, name, projectType, createdAt, updatedAt]
 
     ProjectSummary:
@@ -623,14 +489,17 @@ components:
       properties:
         id:
           type: string
+          format: uuid
         name:
           type: string
         projectType:
           type: string
         createdAt:
           type: string
+          format: date-time
         updatedAt:
           type: string
+          format: date-time
       required: [id, name, projectType, createdAt, updatedAt]
 
     ProjectListResponse:
@@ -649,13 +518,62 @@ components:
           $ref: "#/components/schemas/Project"
       required: [project]
 
+    # ── Versions ────────────────────────────────────────────────────────────────
+    VersionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        label:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, projectId, createdAt]
+
+    VersionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        label:
+          type: string
+          nullable: true
+        files:
+          type: object
+          additionalProperties:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, projectId, files, createdAt]
+
+    CreateVersionRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          description: Optional human-readable label (e.g. "v1.2 – added login page")
+
+    # ── Sharing ─────────────────────────────────────────────────────────────────
     ShareResponse:
       type: object
       properties:
         shareUrl:
           type: string
+          description: Full URL to the shared project viewer
         shareId:
           type: string
+          description: 8-character hex share identifier
         stats:
           $ref: "#/components/schemas/ShareStats"
       required: [shareUrl, shareId, stats]
@@ -684,9 +602,1212 @@ components:
           $ref: "#/components/schemas/ShareStats"
       required: [project, shareId, stats]
 
-    ErrorResponse:
+    ShareEventRequest:
       type: object
       properties:
-        error:
+        event:
           type: string
-      required: [error]
+          enum: [fork, run]
+      required: [event]
+
+    ExploreProject:
+      type: object
+      properties:
+        shareId:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+        projectType:
+          type: string
+        totalViews:
+          type: integer
+        uniqueViews:
+          type: integer
+        forksCount:
+          type: integer
+        runsCount:
+          type: integer
+      required: [shareId, name, projectType, totalViews, uniqueViews, forksCount, runsCount]
+
+    ExploreResponse:
+      type: object
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExploreProject"
+      required: [projects]
+
+    # ── Usage ───────────────────────────────────────────────────────────────────
+    UsageResponse:
+      type: object
+      properties:
+        runsToday:
+          type: integer
+        buildsToday:
+          type: integer
+        runsRemaining:
+          type: integer
+        buildsRemaining:
+          type: integer
+        limits:
+          type: object
+          properties:
+            runsPerDay:
+              type: integer
+              example: 50
+            buildsPerDay:
+              type: integer
+              example: 3
+      required: [runsToday, buildsToday, runsRemaining, buildsRemaining, limits]
+
+    # ── Metrics (admin) ─────────────────────────────────────────────────────────
+    MetricsSnapshot:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        period:
+          type: string
+          description: UTC date this snapshot covers (YYYY-MM-DD)
+          example: "2026-05-02"
+        uptimeSeconds:
+          type: integer
+        runs:
+          type: object
+          properties:
+            total:     { type: integer }
+            errors:    { type: integer }
+            errorRate: { type: string, example: "2.8%" }
+            byLanguage:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  count:       { type: integer }
+                  durationSum: { type: integer }
+            avgDurationMs:
+              type: object
+              additionalProperties:
+                type: integer
+        builds:
+          type: object
+          properties:
+            total:         { type: integer }
+            errors:        { type: integer }
+            retries:       { type: integer }
+            errorRate:     { type: string }
+            avgDurationMs: { type: integer }
+        rateLimitHits:
+          type: integer
+        queues:
+          type: object
+          properties:
+            runs:
+              type: object
+              properties:
+                waiting: { type: integer }
+                active:  { type: integer }
+            builds:
+              type: object
+              properties:
+                waiting: { type: integer }
+                active:  { type: integer }
+        activeUsers24h:
+          type: integer
+        logFiles:
+          type: object
+          properties:
+            app:
+              type: object
+              nullable: true
+              properties:
+                path:      { type: string }
+                sizeBytes: { type: integer }
+            errors:
+              type: object
+              nullable: true
+              properties:
+                path:      { type: string }
+                sizeBytes: { type: integer }
+      required: [generatedAt, period, uptimeSeconds]
+
+# ─── Paths ────────────────────────────────────────────────────────────────────
+paths:
+  # ── Health ───────────────────────────────────────────────────────────────────
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Server health check
+      description: "Returns `{ \"status\": \"ok\" }` when the server is ready."
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ── Auth ─────────────────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Create a new account
+      description: |
+        Registers a new user with email + password. Sets an httpOnly JWT cookie
+        on success. Password is hashed with bcrypt (cost 12).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequest"
+      responses:
+        "201":
+          description: Account created and session cookie set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Invalid email or password too short
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Sign in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequest"
+      responses:
+        "200":
+          description: Login successful — JWT cookie set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/google:
+    post:
+      operationId: loginWithGoogle
+      tags: [auth]
+      summary: Sign in / register with a Google ID token
+      description: |
+        Verifies the Google ID token (requires `GOOGLE_CLIENT_ID` env var).
+        Upserts the user and sets a JWT cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleAuthRequest"
+      responses:
+        "200":
+          description: Session cookie set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Invalid or expired Google ID token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Google auth not configured (GOOGLE_CLIENT_ID not set)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Clear the session cookie
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                required: [success]
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Return the currently authenticated user
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Execution ────────────────────────────────────────────────────────────────
+  /run:
+    post:
+      operationId: runCode
+      tags: [execution]
+      summary: Execute code — buffered JSON response
+      description: |
+        Executes the provided code in a sandboxed worker and returns the full
+        output as a single JSON response (waits up to 30 s for the job to complete).
+
+        **Security sandbox rules (JS/TS)**:
+        - Blocked modules: `http`, `https`, `fs`, `child_process`, `net`, etc.
+        - Blocked APIs: `fetch()`, `XMLHttpRequest`, `process.env`, `process.exit()`
+        - Filename path traversal is rejected (HTTP 400)
+        - Code > 500 KB is rejected (HTTP 413)
+      security:
+        - cookieAuth: []
+        - userKey: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunRequest"
+      responses:
+        "200":
+          description: Execution result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResult"
+        "400":
+          description: Bad request (invalid language, bad filename, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Dangerous code detected (blocked module or API)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: Code payload exceeds 500 KB limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited (30/min or 50/day)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /run/stream:
+    post:
+      operationId: runCodeStream
+      tags: [execution]
+      summary: Execute code — real-time Server-Sent Events stream
+      description: |
+        Same as `POST /run` but streams output as SSE events as the process writes
+        to stdout/stderr. Use `Accept: text/event-stream` and consume the stream
+        incrementally.
+
+        **Event types**:
+        - `stdout` — chunk of stdout output
+        - `stderr` — chunk of stderr output
+        - `done` — process exited: `{ exitCode, duration }`
+        - `error` — execution error: `{ error, chunk }`
+        - `usage` — daily remaining count: `{ remaining }`
+      security:
+        - cookieAuth: []
+        - userKey: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunRequest"
+      responses:
+        "200":
+          description: SSE stream of execution events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Newline-delimited SSE event stream
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Dangerous code detected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /run/job/{jobId}:
+    get:
+      operationId: getRunJobStatus
+      tags: [execution]
+      summary: Look up a code-run job by its BullMQ queue job ID
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunJobStatus"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Builds ───────────────────────────────────────────────────────────────────
+  /build:
+    post:
+      operationId: startBuild
+      tags: [builds]
+      summary: Upload a ZIP and start an APK build
+      description: |
+        Accepts a ZIP archive of a Flutter or Android project (max 10 MB).
+        Auto-detects project type from the archive contents:
+        - Contains `pubspec.yaml` → Flutter pipeline
+        - Contains `build.gradle` → Android/Gradle pipeline
+
+        Returns a `jobId` UUID. Poll `GET /api/status/{jobId}` for progress.
+        Download the APK at `GET /api/download/{jobId}` when status is `success`.
+      security:
+        - cookieAuth: []
+        - userKey: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                project:
+                  type: string
+                  format: binary
+                  description: ZIP file of the project (max 10 MB)
+              required: [project]
+      responses:
+        "200":
+          description: Build queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildResponse"
+        "400":
+          description: Invalid file or missing ZIP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited or daily build limit reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Flutter SDK and Android SDK are both unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /build/project:
+    post:
+      operationId: buildProject
+      tags: [builds]
+      summary: Build from file map (react-native/flutter/android)
+      description: |
+        Accepts a JSON map of `{ "path/to/file": "content" }` instead of a ZIP.
+        React Native projects get an instant Expo Snack preview URL (no queue).
+        Flutter and Android projects are zipped server-side and queued for build.
+      security:
+        - cookieAuth: []
+        - userKey: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectBuildRequest"
+      responses:
+        "200":
+          description: Build started or preview ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectBuildResponse"
+        "400":
+          description: Invalid request or unsupported build type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /status/{jobId}:
+    get:
+      operationId: getBuildStatus
+      tags: [builds]
+      summary: Poll build job status
+      description: |
+        Returns the full status record from the database.
+        Poll every 2–5 seconds while `status` is `queued`, `building`, or
+        `failed-will-retry`. When `status` is `success`, use the `download`
+        URL to fetch the APK.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Build status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStatus"
+        "400":
+          description: Invalid job ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /download/{jobId}:
+    get:
+      operationId: downloadApk
+      tags: [builds]
+      summary: Download the built APK
+      description: |
+        Streams the APK binary. The `Content-Disposition` header sets a
+        filename of `{language}-{jobId}.apk` (e.g. `flutter-abc123.apk`).
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: APK binary file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Build not complete, APK missing, or job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /logs/{jobId}:
+    get:
+      operationId: getBuildLogs
+      tags: [builds]
+      summary: Stream or snapshot build logs
+      description: |
+        Without `Accept: text/event-stream` — returns a JSON snapshot of all
+        current log text.
+
+        With `Accept: text/event-stream` — streams new log lines via SSE as the
+        build progresses. The stream ends with a `done` event when the build
+        reaches a terminal state.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Build logs (JSON or SSE stream)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildLogs"
+            text/event-stream:
+              schema:
+                type: string
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{id}/builds:
+    get:
+      operationId: getProjectBuilds
+      tags: [builds]
+      summary: List the last 10 builds for a project
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Build history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BuildSummary"
+        "400":
+          description: Invalid project ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Projects ─────────────────────────────────────────────────────────────────
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List the authenticated user's saved projects
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Project list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectListResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a new saved project
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a single project (must be the owner)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "404":
+          description: Project not found or not owned by caller
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project's name, type, or files
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectRequest"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Permanently delete a project and its versions
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  id:      { type: string }
+                required: [success, id]
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{id}/duplicate:
+    post:
+      operationId: duplicateProject
+      tags: [projects]
+      summary: Create a copy of a project
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: Duplicated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{id}/share:
+    post:
+      operationId: shareProject
+      tags: [projects]
+      summary: Generate or retrieve a public share link
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Share link (created or reused)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Versions ─────────────────────────────────────────────────────────────────
+  /projects/{id}/versions:
+    get:
+      operationId: listVersions
+      tags: [versions]
+      summary: List version snapshots for a project (no file contents)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VersionSummary"
+                required: [versions]
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: createVersion
+      tags: [versions]
+      summary: Save a version snapshot of the current project files
+      description: Max 10 versions per project (oldest is deleted when exceeded).
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVersionRequest"
+      responses:
+        "201":
+          description: Version created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionSummary"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{id}/versions/{versionId}:
+    get:
+      operationId: getVersion
+      tags: [versions]
+      summary: Get a specific version snapshot (includes file contents)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version with file contents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionDetail"
+        "404":
+          description: Project or version not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{id}/versions/{versionId}/restore:
+    post:
+      operationId: restoreVersion
+      tags: [versions]
+      summary: Restore a snapshot — overwrites the project's current files
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Project updated with restored files
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "404":
+          description: Project or version not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Sharing / Explore ────────────────────────────────────────────────────────
+  /explore:
+    get:
+      operationId: exploreProjects
+      tags: [projects]
+      summary: Public ranked list of shared projects
+      description: Returns shared projects sorted by engagement (views, forks, runs). No auth required.
+      responses:
+        "200":
+          description: Explore feed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExploreResponse"
+
+  /share/{shareId}:
+    get:
+      operationId: getSharedProject
+      tags: [projects]
+      summary: Load a publicly shared project (increments view count)
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-f0-9]{8}$"
+      responses:
+        "200":
+          description: Shared project data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SharedProjectResponse"
+        "404":
+          description: Share link not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /share/{shareId}/stats:
+    get:
+      operationId: getShareStats
+      tags: [projects]
+      summary: Read share counters without incrementing the view count
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-f0-9]{8}$"
+      responses:
+        "200":
+          description: Share statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareStats"
+        "404":
+          description: Share not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /share/{shareId}/event:
+    post:
+      operationId: recordShareEvent
+      tags: [projects]
+      summary: Record a fork or run event for a shared project
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-f0-9]{8}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareEventRequest"
+      responses:
+        "200":
+          description: Event recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+        "400":
+          description: Invalid event type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Share not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Usage ────────────────────────────────────────────────────────────────────
+  /usage:
+    get:
+      operationId: getUsage
+      tags: [usage]
+      summary: Get today's execution and build usage for the current user
+      description: |
+        Identifies the user by (in priority order):
+        1. Authenticated JWT cookie / Bearer token
+        2. `X-User-Key` header
+        3. IP address fallback
+      security:
+        - cookieAuth: []
+        - userKey: []
+        - {}
+      responses:
+        "200":
+          description: Daily usage summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageResponse"
+
+  # ── Admin ────────────────────────────────────────────────────────────────────
+  /metrics:
+    get:
+      operationId: getMetrics
+      tags: [admin]
+      summary: Runtime metrics snapshot (admin only)
+      description: |
+        Returns in-memory + Redis-backed counters for the current UTC day.
+        Queue depths and active-user counts are refreshed live before returning.
+
+        **Auth**: `Authorization: Bearer {ADMIN_TOKEN}` or
+        `Authorization: Basic base64(:ADMIN_TOKEN)`
+      security:
+        - adminToken: []
+      responses:
+        "200":
+          description: Metrics snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricsSnapshot"
+        "401":
+          description: Missing or invalid admin token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/build-errors:
+    get:
+      operationId: getBuildErrors
+      tags: [admin]
+      summary: Recent structured build error log (admin only)
+      description: |
+        Returns the last N build error records from the JSONL error log.
+        Each record includes build ID, error type (retriable/permanent/system),
+        and attempt number.
+
+        **Auth**: same as `/metrics`.
+      security:
+        - adminToken: []
+      responses:
+        "200":
+          description: Build error log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  errors:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BuildErrorRecord"
+                required: [count, errors]
+        "401":
+          description: Missing or invalid admin token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /docs:
+    get:
+      operationId: getApiDocs
+      tags: [health]
+      summary: Swagger UI — interactive API documentation
+      responses:
+        "200":
+          description: Swagger UI HTML page
+          content:
+            text/html:
+              schema:
+                type: string

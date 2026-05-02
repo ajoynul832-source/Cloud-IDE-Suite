@@ -1,0 +1,104 @@
+YOU ARE BUILDING PHASE 8: DOCUMENTATION & DEPLOYMENT
+
+CURRENT STATE:
+- No API docs
+- No deployment guide
+- No troubleshooting guide
+- Unclear how to scale
+
+WHAT YOU MUST BUILD:
+
+1. API DOCUMENTATION (OpenAPI/Swagger)
+   Generate from code:
+   - All endpoints: GET/POST/PUT/DELETE
+   - Parameters, response schemas
+   - Auth requirements
+   - Rate limits
+   - Error codes
+   
+   Publish at: /api/docs (Swagger UI)
+
+2. DEPLOYMENT GUIDE
+   - README.md:
+     * Prerequisites: Node 18+, PostgreSQL 14+, Redis 6+, Flutter (optional)
+     * Environment variables: JWT_SECRET, DB_URL, REDIS_URL, GITHUB_TOKEN (opt)
+     * Installation: npm install
+     * Run: npm start (or docker)
+     * Tests: npm test
+   
+   - Docker setup: Dockerfile + docker-compose.yml
+   
+   - Environment checklist:
+     ```
+     REQUIRED:
+     - JWT_SECRET (generate: openssl rand -hex 32)
+     - DATABASE_URL=postgresql://...
+     - REDIS_URL=redis://...
+     
+     OPTIONAL:
+     - FLUTTER_ENABLED=true/false (auto-detect)
+     - ANDROID_ENABLED=true/false (auto-detect)
+     - GITHUB_TOKEN (for Android builds via GitHub)
+     - STORAGE_TYPE=disk|s3 (default: disk)
+     - MAX_CONCURRENT_RUNS=8
+     - DAILY_RUN_LIMIT=50
+     - DAILY_BUILD_LIMIT=3
+     ```
+
+3. OPERATIONAL RUNBOOK
+   - Startup checklist:
+     * Verify Flutter (if enabled)
+     * Verify Redis connection
+     * Verify PostgreSQL connection
+     * Check disk space
+     * Migrate database schema
+   
+   - Troubleshooting:
+     * "Build queue stuck": Check Redis, restart queue processor
+     * "APK not downloading": Check disk space, verify apk_path in DB
+     * "Job timeout": Check server load, increase timeout in env var
+     * "Auth failing": Verify JWT_SECRET matches across servers
+   
+   - Scaling guide:
+     * Multiple queue workers: Run processor on separate node (scale horizontally)
+     * Multiple API servers: Load balance, share DB + Redis
+     * Database: Use managed PostgreSQL (Neon, AWS RDS)
+     * Redis: Use managed Redis (AWS ElastiCache, Upstash)
+     * APK storage: Switch to S3 for distributed storage
+     * CDN: Optional, for shared project preview
+
+4. TESTING GUIDE
+   - Manual test script: tests/manual-test.sh
+     * Create user + login
+     * Create project
+     * Run JavaScript code
+     * Save project
+     * Share project
+     * Fork shared project
+     * Build Flutter APK
+     * Download APK
+     * Check user limits
+   
+   - Automated tests (Jest):
+     * Unit tests for validators, queue logic, auth
+     * Integration tests for full workflows
+     * Load tests: 100 concurrent users, measure latency
+
+5. MONITORING DASHBOARD (OPTIONAL)
+   - If using Prometheus/Grafana:
+     * Expose /metrics endpoint
+     * Graphs: request rate, error rate, queue depth, execution time
+   - Alerts: error rate > 5%, queue depth > 50, disk < 10%
+
+6. CHANGELOG
+   - Record all phases + features built
+   - Include breaking changes, new env vars, migration steps
+
+TEST:
+✅ API docs readable at /api/docs
+✅ README instructions clear and complete
+✅ Startup checklist catches missing env vars
+✅ Manual test script passes all steps
+✅ Deployment on fresh server succeeds
+
+STOP HERE. DOCUMENTATION IS DONE.

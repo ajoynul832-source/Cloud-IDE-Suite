@@ -10,6 +10,7 @@ import usageRouter        from "./usage";
 import authRouter         from "./auth";
 import shareRouter        from "./share";
 import metricsRouter      from "./metrics";
+import docsRouter         from "./docs";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(usageRouter);
 router.use(shareRouter);
 router.use(buildRouter);
 router.use(metricsRouter);
+router.use(docsRouter);
 
 export default router;

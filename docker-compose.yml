@@ -1,0 +1,89 @@
+services:
+  # ── API Server ────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      DATABASE_URL: "postgresql://ide:idepassword@postgres:5432/cloud_ide"
+      REDIS_URL: "redis://redis:6379"
+      # REQUIRED: set a real secret before deploying
+      SESSION_SECRET: "${SESSION_SECRET:-change_me_generate_with_openssl_rand_hex_32}"
+      # OPTIONAL: Google OAuth
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      # OPTIONAL: Separate admin token (defaults to SESSION_SECRET)
+      ADMIN_TOKEN: "${ADMIN_TOKEN:-}"
+      # OPTIONAL: Build SDK paths (mount volumes if building APKs)
+      ANDROID_HOME: "${ANDROID_HOME:-}"
+      JAVA_HOME: "${JAVA_HOME:-}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+    volumes:
+      - apk_storage:/tmp/apk_builds
+      - api_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cloud_ide
+      POSTGRES_USER: ide
+      POSTGRES_PASSWORD: idepassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ide -d cloud_ide"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+  apk_storage:
+  api_logs:
+
+# Usage:
+#   export SESSION_SECRET=$(openssl rand -hex 32)
+#   docker compose up -d
+#
+# First run — apply DB schema:
+#   docker compose exec api node -e "
+#     import('@workspace/db').then(({db}) => console.log('DB ready'))
+#   "
+#   # Or from host (requires DATABASE_URL env var):
+#   pnpm --filter @workspace/db run push
