@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import IDE from "@/pages/IDE";
+import SharedProject from "@/pages/SharedProject";
 
 const queryClient = new QueryClient();
 
@@ -11,6 +12,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={IDE} />
+      <Route path="/p/:shareId" component={SharedProject} />
       <Route component={NotFound} />
     </Switch>
   );

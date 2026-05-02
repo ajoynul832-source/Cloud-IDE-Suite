@@ -151,6 +151,16 @@ export interface ProjectResponse {
   project: Project;
 }
 
+export interface ShareResponse {
+  shareUrl: string;
+  shareId: string;
+}
+
+export interface SharedProjectResponse {
+  project: Project;
+  shareId: string;
+}
+
 export interface ErrorResponse {
   error: string;
 }

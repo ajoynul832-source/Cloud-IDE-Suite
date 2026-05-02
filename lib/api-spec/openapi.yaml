@@ -376,6 +376,67 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /projects/{id}/share:
+    post:
+      operationId: shareProject
+      tags: [projects]
+      summary: Generate a public share link for a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: x-user-key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Share link created or reused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareResponse"
+        "401":
+          description: Missing user key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /share/{shareId}:
+    get:
+      operationId: getSharedProject
+      tags: [projects]
+      summary: Load a publicly shared project (no auth required)
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shared project data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SharedProjectResponse"
+        "404":
+          description: Share link not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -587,6 +648,24 @@ components:
         project:
           $ref: "#/components/schemas/Project"
       required: [project]
+
+    ShareResponse:
+      type: object
+      properties:
+        shareUrl:
+          type: string
+        shareId:
+          type: string
+      required: [shareUrl, shareId]
+
+    SharedProjectResponse:
+      type: object
+      properties:
+        project:
+          $ref: "#/components/schemas/Project"
+        shareId:
+          type: string
+      required: [project, shareId]
 
     ErrorResponse:
       type: object

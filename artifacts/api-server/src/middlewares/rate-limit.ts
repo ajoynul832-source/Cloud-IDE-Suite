@@ -37,3 +37,13 @@ export const projectLimiter = rateLimit({
   keyGenerator: keyGen,
   message: { error: "Too many requests. Try again shortly." },
 });
+
+/** 20 share link generates or lookups / minute per IP */
+export const shareLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip ?? "unknown",
+  message: { error: "Too many share requests. Try again shortly." },
+});

@@ -7,6 +7,7 @@ import { PreviewPanel, PanelTab } from "@/components/PreviewPanel";
 import { Toolbar } from "@/components/Toolbar";
 import { TemplateSelector } from "@/components/TemplateSelector";
 import { ProjectsModal } from "@/components/ProjectsModal";
+import { ShareModal } from "@/components/ShareModal";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useBuild } from "@/hooks/useBuild";
 import { useRun } from "@/hooks/useRun";
@@ -45,9 +46,10 @@ export default function IDE() {
   const [rightPanelTab, setRightPanelTab] = useState<PanelTab>("preview");
   const [showTemplates, setShowTemplates] = useState(false);
   const [showProjects, setShowProjects] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
 
-  // Project save/load state
+  // Project persistence state
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentProjectName, setCurrentProjectName] = useState<string>("Untitled Project");
 
@@ -55,6 +57,7 @@ export default function IDE() {
 
   const currentLanguage = getDisplayLanguage(activeFile ?? Object.keys(files)[0] ?? "");
   const canRun = !!activeFile && !!getExecLanguage(activeFile);
+  const canShare = !!currentProjectId;
 
   const handleSelectFile = (path: string) => {
     if (!openFiles.includes(path)) setOpenFiles((prev) => [...prev, path]);
@@ -99,7 +102,7 @@ export default function IDE() {
     }
 
     const isRN = Object.values(files).some(
-      (c) => c.includes("react-native") || c.includes("expo")
+      (c) => c.includes("react-native") || c.includes("expo"),
     );
     setRightPanelTab(isRN ? "preview" : "build");
   };
@@ -147,12 +150,13 @@ export default function IDE() {
         onBuild={handleBuild}
         onNewProject={() => setShowTemplates(true)}
         onOpenProjects={() => setShowProjects(true)}
+        onShare={() => setShowShare(true)}
         buildStatus={status?.status}
         jobId={jobId}
         currentLanguage={currentLanguage}
         canRun={canRun}
+        canShare={canShare}
         projectName={currentProjectName}
-        hasUnsavedChanges={!!Object.keys(files).length}
       />
 
       <div className="flex-1 overflow-hidden">
@@ -235,6 +239,14 @@ export default function IDE() {
           onLoad={handleLoadProject}
           onSaved={handleProjectSaved}
           onClose={() => setShowProjects(false)}
+        />
+      )}
+
+      {showShare && currentProjectId && (
+        <ShareModal
+          projectId={currentProjectId}
+          projectName={currentProjectName}
+          onClose={() => setShowShare(false)}
         />
       )}
     </div>

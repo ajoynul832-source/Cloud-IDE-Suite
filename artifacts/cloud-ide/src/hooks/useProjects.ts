@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { getUserKey } from "@/lib/user-key";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "/api";
 
 function headers(): Record<string, string> {
   return {
@@ -31,7 +31,7 @@ export function useProjects() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE}/api/projects`, { headers: headers() });
+      const res = await fetch(`${BASE}/projects`, { headers: headers() });
       const data = await res.json() as { projects?: ProjectSummary[]; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to load projects");
       setProjects(data.projects ?? []);
@@ -50,7 +50,7 @@ export function useProjects() {
   ): Promise<ProjectSummary | null> => {
     setError(null);
     try {
-      const url = existingId ? `${BASE}/api/projects/${existingId}` : `${BASE}/api/projects`;
+      const url = existingId ? `${BASE}/projects/${existingId}` : `${BASE}/projects`;
       const method = existingId ? "PUT" : "POST";
       const res = await fetch(url, {
         method,
@@ -76,7 +76,7 @@ export function useProjects() {
   const loadProject = useCallback(async (id: string): Promise<FullProject | null> => {
     setError(null);
     try {
-      const res = await fetch(`${BASE}/api/projects/${id}`, { headers: headers() });
+      const res = await fetch(`${BASE}/projects/${id}`, { headers: headers() });
       const data = await res.json() as { project?: FullProject; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to load project");
       return data.project ?? null;
@@ -89,7 +89,7 @@ export function useProjects() {
   const deleteProject = useCallback(async (id: string): Promise<boolean> => {
     setError(null);
     try {
-      const res = await fetch(`${BASE}/api/projects/${id}`, {
+      const res = await fetch(`${BASE}/projects/${id}`, {
         method: "DELETE",
         headers: headers(),
       });

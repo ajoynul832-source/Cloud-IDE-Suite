@@ -28,6 +28,8 @@ export * from "./projectResponse";
 export * from "./projectSummary";
 export * from "./runRequest";
 export * from "./runResult";
+export * from "./sharedProjectResponse";
+export * from "./shareResponse";
 export * from "./startBuildBody";
 export * from "./updateProjectRequest";
 export * from "./updateProjectRequestFiles";

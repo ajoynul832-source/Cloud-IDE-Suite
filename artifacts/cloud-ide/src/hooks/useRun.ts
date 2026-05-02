@@ -42,10 +42,8 @@ export function useRun() {
     setIsRunning(true);
     setStream({ chunks: [], result: null });
 
-    const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, "");
-
     try {
-      const res = await fetch(`${baseUrl}/api/run/stream`, {
+      const res = await fetch(`/api/run/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ language, code, filename }),

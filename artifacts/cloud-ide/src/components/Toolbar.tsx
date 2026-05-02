@@ -1,4 +1,4 @@
-import { Play, Box, Download, Loader2, FolderOpen, ChevronDown, Save, Database } from "lucide-react";
+import { Play, Box, Download, Loader2, FolderOpen, ChevronDown, Database, Share2 } from "lucide-react";
 import { Button } from "./ui/button";
 
 interface ToolbarProps {
@@ -8,12 +8,13 @@ interface ToolbarProps {
   onBuild: () => void;
   onNewProject: () => void;
   onOpenProjects: () => void;
+  onShare?: () => void;
   buildStatus?: string | null;
   jobId?: string | null;
   currentLanguage?: string;
   canRun?: boolean;
+  canShare?: boolean;
   projectName?: string;
-  hasUnsavedChanges?: boolean;
 }
 
 export function Toolbar({
@@ -23,14 +24,14 @@ export function Toolbar({
   onBuild,
   onNewProject,
   onOpenProjects,
+  onShare,
   buildStatus,
   jobId,
   currentLanguage,
   canRun,
+  canShare,
   projectName,
 }: ToolbarProps) {
-  const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, "");
-
   return (
     <div className="h-12 bg-card border-b border-border flex items-center justify-between px-4 shrink-0 gap-2">
       {/* Left: brand + project nav */}
@@ -66,11 +67,27 @@ export function Toolbar({
           <span className="hidden md:block">Projects</span>
         </button>
 
+        {/* Share — only shown when a project is saved */}
+        {canShare && onShare && (
+          <button
+            data-testid="button-share"
+            onClick={onShare}
+            title="Share this project"
+            className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded hover:bg-primary/10 shrink-0"
+          >
+            <Share2 size={13} />
+            <span className="hidden md:block">Share</span>
+          </button>
+        )}
+
         {/* Current project name */}
         {projectName && (
           <>
             <div className="w-px h-4 bg-border shrink-0" />
-            <span className="text-xs font-mono text-muted-foreground truncate max-w-[140px]" title={projectName}>
+            <span
+              className="text-xs font-mono text-muted-foreground truncate max-w-[140px]"
+              title={projectName}
+            >
               {projectName}
             </span>
           </>
@@ -93,10 +110,16 @@ export function Toolbar({
           size="sm"
           onClick={onRun}
           disabled={isRunning || !canRun}
-          title={canRun ? "Run current file (JS, TS, Python, HTML)" : "Open a JS, TS, Python, or HTML file to run"}
+          title={
+            canRun
+              ? "Run current file (JS, TS, Python, HTML)"
+              : "Open a JS, TS, Python, or HTML file to run"
+          }
           className={[
             "font-mono text-xs h-7 px-3",
-            canRun ? "hover:text-primary hover:border-primary" : "opacity-40 cursor-not-allowed",
+            canRun
+              ? "hover:text-primary hover:border-primary"
+              : "opacity-40 cursor-not-allowed",
           ].join(" ")}
         >
           {isRunning ? (
@@ -131,7 +154,11 @@ export function Toolbar({
             asChild
             className="font-mono text-xs h-7 px-3 border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
           >
-            <a href={`${baseUrl}/api/download/${jobId}`} target="_blank" rel="noopener noreferrer">
+            <a
+              href={`/api/download/${jobId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <Download size={12} className="mr-1.5" />
               Download APK
             </a>

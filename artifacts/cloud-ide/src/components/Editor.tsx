@@ -25,12 +25,13 @@ interface EditorProps {
   initialContent: string;
   filename: string;
   onChange: (content: string) => void;
+  /** When true, the editor is non-editable (read-only view). Default: false */
+  readOnly?: boolean;
 }
 
 function getLanguageExtension(filename: string): Extension {
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
   switch (ext) {
-    // Web
     case "html": case "htm": return html();
     case "css": case "scss": case "less": return css();
     case "js": case "jsx": return javascript({ jsx: true });
@@ -39,33 +40,26 @@ function getLanguageExtension(filename: string): Extension {
     case "json": return json();
     case "xml": case "plist": case "xcconfig": case "gradle": return xml();
     case "md": case "markdown": return markdown();
-    // JVM / Android
     case "java": return java();
-    case "kt": case "kts": return java(); // Kotlin — closest available
+    case "kt": case "kts": return java();
     case "groovy": return java();
-    // C family / NDK / iOS
     case "c": case "h": case "cc": case "cpp": case "cxx": case "hpp": case "hxx": return cpp();
-    case "cs": return cpp(); // C# — cpp is a reasonable fallback
-    case "m": case "mm": return cpp(); // Objective-C
-    // Swift — use JS as closest available fallback (curly braces, keywords)
+    case "cs": return cpp();
+    case "m": case "mm": return cpp();
     case "swift": return javascript();
-    // Scripting / cross-platform
     case "py": return python();
     case "rs": return rust();
     case "go": return go();
-    // Dart / Flutter — JS is close enough for block highlighting
     case "dart": return javascript();
-    // Config files
-    case "yaml": case "yml": return javascript(); // YAML — plaintext with some highlighting
+    case "yaml": case "yml": return javascript();
     case "toml": case "ini": case "properties": return javascript();
-    // Shell
     case "sh": case "bash": case "zsh": return javascript();
     default: return javascript();
   }
 }
 
 export const Editor = forwardRef<EditorRef, EditorProps>(
-  ({ initialContent, filename, onChange }, ref) => {
+  ({ initialContent, filename, onChange, readOnly = false }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
 
@@ -76,48 +70,48 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
     useEffect(() => {
       if (!containerRef.current) return;
 
-      const state = EditorState.create({
-        doc: initialContent,
-        extensions: [
-          lineNumbers(),
-          highlightActiveLine(),
-          highlightActiveLineGutter(),
-          history(),
-          bracketMatching(),
-          closeBrackets(),
-          indentOnInput(),
-          keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
-          getLanguageExtension(filename),
-          vscodeDark,
-          autocompletion(),
+      const extensions: Extension[] = [
+        lineNumbers(),
+        highlightActiveLine(),
+        highlightActiveLineGutter(),
+        history(),
+        bracketMatching(),
+        closeBrackets(),
+        indentOnInput(),
+        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+        getLanguageExtension(filename),
+        vscodeDark,
+        autocompletion(),
+        EditorView.theme({
+          "&": { height: "100%", fontSize: "13px", fontFamily: "Menlo, Monaco, 'Courier New', monospace" },
+          ".cm-scroller": { overflow: "auto", height: "100%" },
+          ".cm-content": { padding: "8px 0" },
+        }),
+      ];
+
+      if (readOnly) {
+        extensions.push(EditorView.editable.of(false));
+        extensions.push(EditorState.readOnly.of(true));
+      } else {
+        extensions.push(
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-              onChange(update.state.doc.toString());
-            }
+            if (update.docChanged) onChange(update.state.doc.toString());
           }),
-          EditorView.theme({
-            "&": { height: "100%", fontSize: "13px", fontFamily: "Menlo, Monaco, 'Courier New', monospace" },
-            ".cm-scroller": { overflow: "auto", height: "100%" },
-            ".cm-content": { padding: "8px 0" },
-          }),
-        ],
-      });
+        );
+      }
 
-      const view = new EditorView({
-        state,
-        parent: containerRef.current,
-      });
-
+      const state = EditorState.create({ doc: initialContent, extensions });
+      const view = new EditorView({ state, parent: containerRef.current });
       viewRef.current = view;
 
       return () => {
         view.destroy();
         viewRef.current = null;
       };
-    }, [filename]); // Re-create on filename change
+    }, [filename, readOnly]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return <div className="w-full h-full overflow-hidden" ref={containerRef} />;
-  }
+  },
 );
 
 Editor.displayName = "Editor";

@@ -198,3 +198,38 @@ export const DeleteProjectResponse = zod.object({
   success: zod.boolean(),
   id: zod.string(),
 });
+
+/**
+ * @summary Generate a public share link for a project
+ */
+export const ShareProjectParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const ShareProjectHeader = zod.object({
+  "x-user-key": zod.string(),
+});
+
+export const ShareProjectResponse = zod.object({
+  shareUrl: zod.string(),
+  shareId: zod.string(),
+});
+
+/**
+ * @summary Load a publicly shared project (no auth required)
+ */
+export const GetSharedProjectParams = zod.object({
+  shareId: zod.coerce.string(),
+});
+
+export const GetSharedProjectResponse = zod.object({
+  project: zod.object({
+    id: zod.string(),
+    name: zod.string(),
+    projectType: zod.string(),
+    files: zod.record(zod.string(), zod.string()).nullish(),
+    createdAt: zod.string(),
+    updatedAt: zod.string(),
+  }),
+  shareId: zod.string(),
+});

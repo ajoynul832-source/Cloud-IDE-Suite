@@ -87,12 +87,10 @@ export function useBuild() {
     const type = detectProjectType(files);
     setProjectType(type);
 
-    const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, "");
-
     try {
       // React Native → JSON body to /build/project (creates Expo Snack)
       if (type === "react-native") {
-        const res = await fetch(`${baseUrl}/api/build/project`, {
+        const res = await fetch(`/api/build/project`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type, files, name: "CloudIDE App" }),
@@ -125,7 +123,7 @@ export function useBuild() {
       const formData = new FormData();
       formData.append("project", blob, "project.zip");
 
-      const res = await fetch(`${baseUrl}/api/build`, {
+      const res = await fetch(`/api/build`, {
         method: "POST",
         body: formData,
       });

@@ -101,6 +101,39 @@ All handlers stream via Server-Sent Events (`POST /api/run/stream`). Each line o
 | `buildLimiter` | `/api/build`, `/api/build/project` | 5 req/min per IP |
 | `projectLimiter` | `/api/projects/*` | 60 req/min per IP |
 
+## Project Sharing System
+
+### Backend
+- `POST /api/projects/:id/share` — generates (or reuses) an 8-char hex share ID (e.g. `abc12345`), stores in `sharesTable`, returns `{ shareUrl: "/ide/p/abc12345", shareId }`. Idempotent — same project always gets the same link.
+- `GET /api/share/:shareId` — public endpoint (no auth). Returns full project data without userKey. Rate-limited to 20 req/min by IP.
+
+### Share URL Format
+`/ide/p/<shareId>` — e.g. `/ide/p/5501de83`
+
+### Shared View (`/p/:shareId` route in cloud-ide router)
+- Full read-only CodeMirror 6 editor (non-editable via `EditorState.readOnly` + `EditorView.editable`)
+- File explorer, tab bar, Preview + Console panels
+- Run button (executes via SSE, no auth required)
+- "read-only · fork to edit" watermark in editor
+- "read-only" badge in toolbar
+
+### Fork Flow
+"Fork Project" button → `POST /api/projects` under forker's user key → navigates to `/` (main IDE). Original project is untouched.
+
+### Share Button in IDE
+Toolbar shows "Share" button only when `currentProjectId` is set (project has been saved). Opens `ShareModal` with:
+- "Generate Share Link" button (calls `/api/projects/:id/share`)
+- Displays full URL once generated
+- "Copy Link" (clipboard) + "Preview" (new tab) actions
+
+### Database Table
+```
+sharesTable:
+  shareId    text PK (8-char hex, e.g. "5501de83")
+  projectId  uuid NOT NULL references projects(id) ON DELETE CASCADE
+  createdAt  timestamp default now()
+```
+
 ## Core API Endpoints
 
 | Method | Path | Description |

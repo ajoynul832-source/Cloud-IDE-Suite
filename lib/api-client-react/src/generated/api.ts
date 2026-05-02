@@ -30,6 +30,8 @@ import type {
   ProjectResponse,
   RunRequest,
   RunResult,
+  ShareResponse,
+  SharedProjectResponse,
   StartBuildBody,
   UpdateProjectRequest,
 } from "./api.schemas";
@@ -1103,3 +1105,175 @@ export const useDeleteProject = <
 > => {
   return useMutation(getDeleteProjectMutationOptions(options));
 };
+
+/**
+ * @summary Generate a public share link for a project
+ */
+export const getShareProjectUrl = (id: string) => {
+  return `/api/projects/${id}/share`;
+};
+
+export const shareProject = async (
+  id: string,
+  options?: RequestInit,
+): Promise<ShareResponse> => {
+  return customFetch<ShareResponse>(getShareProjectUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getShareProjectMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof shareProject>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof shareProject>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["shareProject"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof shareProject>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return shareProject(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ShareProjectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof shareProject>>
+>;
+
+export type ShareProjectMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Generate a public share link for a project
+ */
+export const useShareProject = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof shareProject>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof shareProject>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getShareProjectMutationOptions(options));
+};
+
+/**
+ * @summary Load a publicly shared project (no auth required)
+ */
+export const getGetSharedProjectUrl = (shareId: string) => {
+  return `/api/share/${shareId}`;
+};
+
+export const getSharedProject = async (
+  shareId: string,
+  options?: RequestInit,
+): Promise<SharedProjectResponse> => {
+  return customFetch<SharedProjectResponse>(getGetSharedProjectUrl(shareId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSharedProjectQueryKey = (shareId: string) => {
+  return [`/api/share/${shareId}`] as const;
+};
+
+export const getGetSharedProjectQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSharedProject>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  shareId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSharedProject>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetSharedProjectQueryKey(shareId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSharedProject>>
+  > = ({ signal }) => getSharedProject(shareId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!shareId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSharedProject>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSharedProjectQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSharedProject>>
+>;
+export type GetSharedProjectQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Load a publicly shared project (no auth required)
+ */
+
+export function useGetSharedProject<
+  TData = Awaited<ReturnType<typeof getSharedProject>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  shareId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSharedProject>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSharedProjectQueryOptions(shareId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
