@@ -197,6 +197,69 @@ Key resolution order: `userId` from JWT → `X-User-Key` header → IP address
 - Run button works (anonymous, usage tracked by IP)
 - "Fork Project" button → requires login → creates copy under authenticated user
 
+## Flutter APK Build System — Phase 3 (Complete)
+
+### Infrastructure
+- **Pre-flight check** — `checkFlutter()` runs on startup: sets `FLUTTER_DISABLED=1` if flutter binary is absent; logs CRITICAL error. All build endpoints return 503 when disabled.
+- **APK storage** — `/tmp/apk_builds` (or `APK_STORAGE_PATH` env var). Max 50 APKs; oldest pruned when cap exceeded.
+- **BullMQ `buildJobs` queue** — concurrency 2, backed by Redis. Separate from the code-execution queue.
+
+### `builds` Table
+```
+builds:
+  id            uuid PK (gen_random_uuid())
+  user_id       uuid nullable FK → users(id) ON DELETE SET NULL
+  project_id    uuid nullable FK → projects(id) ON DELETE SET NULL
+  language      text ('flutter' | 'react-native' | 'android')
+  status        text ('queued' | 'building' | 'complete' | 'failed')
+  stage         text nullable ('uploading' | 'extracting' | 'running-pub-get' | 'building-apk' | 'packaging')
+  queue_position integer
+  log_text      text (accumulating build log; live-streamed via SSE)
+  apk_path      text nullable (permanent storage path; survives restart)
+  apk_size      integer nullable
+  error_message text nullable
+  preview_url / embed_url / qr_url  text nullable (react-native Expo Snack)
+  created_at    timestamp
+  completed_at  timestamp nullable
+```
+
+### Worker Stages (buildJob.ts)
+1. `extracting` — unzip to temp dir, validate pubspec.yaml + lib/main.dart
+2. `running-pub-get` — `flutter pub get`
+3. `building-apk` — `flutter build apk --debug`
+4. `packaging` — copy APK to `/tmp/apk_builds/{buildId}-{ts}.apk`, record path + size in DB
+
+All stdout/stderr appended to `builds.log_text` in real time.
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `lib/flutter.ts` | Pre-flight check, `isFlutterAvailable()`, `flutterBin()` |
+| `lib/apk-storage.ts` | `storeApk()`, `apkExists()`, `pruneOldApks()` |
+| `lib/build-queue.ts` | `getBuildQueue()`, `startBuildWorker()` |
+| `workers/buildJob.ts` | Full Flutter build pipeline processor |
+| `routes/build.ts` | All build HTTP endpoints (status, download, logs, history) |
+| `routes/project-build.ts` | POST /api/build/project (Expo Snack + Flutter/Android) |
+
+### Rebuild Loop Prevention
+- 10 active builds per authenticated user max → 429 `QUEUE_FULL`
+- 3 builds/day per user → 429 `DAILY_LIMIT_REACHED`
+
+### Phase 3 Spec Tests (all pass)
+| Test | Result |
+|------|--------|
+| Flutter binary not found → CRITICAL log + FLUTTER_DISABLED=1 | ✅ |
+| POST /api/build returns 503 when Flutter disabled | ✅ |
+| POST /api/build/project flutter returns 503 | ✅ |
+| GET /api/status/:jobId — valid UUID not in DB → 404 | ✅ |
+| GET /api/download/:jobId — not in DB → 404 | ✅ |
+| GET /api/logs/:jobId — not in DB → 404 | ✅ |
+| APK storage directory created on startup | ✅ |
+| React Native Expo Snack build creates DB record | ✅ |
+| 4th build in one day → 429 DAILY_LIMIT_REACHED | ✅ |
+| GET /api/projects/:projectId/builds returns [] for unknown project | ✅ |
+| Build DB records survive restart (DB-backed, not in-memory) | ✅ |
+
 ## Core API Endpoints
 
 | Method | Path | Auth | Description |

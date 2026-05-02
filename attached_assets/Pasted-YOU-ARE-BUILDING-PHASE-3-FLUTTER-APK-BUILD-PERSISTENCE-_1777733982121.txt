@@ -1,0 +1,91 @@
+YOU ARE BUILDING PHASE 3: FLUTTER APK BUILD PERSISTENCE
+
+CURRENT STATE:
+- APK files in tmpfs (lost on restart)
+- Build queue is single-threaded, in-memory
+- No build verification
+- No storage backend
+
+WHAT YOU MUST BUILD:
+
+1. PRE-FLIGHT CHECK
+   - On server startup, run: which flutter && flutter --version
+   - If missing, log CRITICAL error and set process.env.FLUTTER_DISABLED=1
+   - If enabled, log: "Flutter available at [path]"
+   - All build endpoints check this env var; return 503 if disabled
+
+2. APK STORAGE
+   - Create /tmp/apk_builds directory (or use process.env.APK_STORAGE_PATH)
+   - OR: Use S3/R2 if available (check for AWS credentials)
+   - Store APK file: /tmp/apk_builds/{jobId}-{timestamp}.apk
+   - Keep max 50 APKs on disk; delete oldest if over limit
+
+3. BUILD JOB SCHEMA (in database)
+   Create builds table:
+     * id (uuid, primary key) — jobId
+     * user_id (uuid, FK to users)
+     * project_id (uuid, FK to projects)
+     * language (text: 'flutter', 'react-native', 'android')
+     * status (text: 'queued', 'building', 'complete', 'failed')
+     * stage (text: 'uploading', 'extracting', 'running-pub-get', 'building-apk', 'packaging')
+     * queue_position (integer)
+     * log_text (text, accumulating)
+     * apk_path (text nullable)
+     * apk_size (integer)
+     * error_message (text nullable)
+     * created_at (timestamp)
+     * completed_at (timestamp nullable)
+
+4. REPLACE POST /api/build LOGIC
+   OLD: Execute immediately, lose job on restart
+   NEW:
+   - Check daily build limit (SELECT COUNT(*) WHERE user_id=userId AND DATE(created_at)=TODAY)
+   - If limit >= 3, return 429 { remaining: 0 }
+   - Create build row: INSERT INTO builds (id, user_id, project_id, status, stage) VALUES (...)
+   - Add to BullMQ build queue: await buildQueue.add('flutter-build', { jobId, projectId, files })
+   - Return { jobId, status: 'queued', queuePosition: N }
+
+5. BUILD QUEUE PROCESSOR
+   - Create processors/buildJob.ts
+   - For each build job:
+     * stage = 'extracting': extract ZIP to temp dir
+     * stage = 'running-pub-get': run `flutter pub get`
+     * stage = 'building-apk': run `flutter build apk --debug`
+     * stage = 'packaging': copy APK to storage, record apk_path in DB
+     * Update DB log_text with each stage output
+     * On error: UPDATE builds SET status='failed', error_message=...
+
+6. STREAM LOGS IN REAL TIME
+   - GET /api/logs/:jobId
+   - SELECT log_text FROM builds WHERE id=jobId
+   - Stream log_text as SSE (one chunk per second if new data)
+   - Return { status, stage, logText, queuePosition }
+
+7. APK DOWNLOAD
+   - GET /api/download/:jobId
+   - SELECT apk_path FROM builds WHERE id=jobId AND status='complete'
+   - If not found, return 404
+   - Stream file to browser with Content-Disposition: attachment; filename=app.apk
+
+8. PREVENT REBUILD LOOPS
+   - One build per project at a time
+   - If user submits build while one is running, queue the new one
+   - Don't allow more than 10 builds in queue per user
+
+9. BUILD HISTORY (UI READY)
+   - GET /api/projects/:projectId/builds
+   - Return last 10 builds: { jobId, status, stage, createdAt, completedAt, apkSize, errorMessage }
+   - (UI will display this in Build Log tab)
+
+TEST:
+✅ flutter --version detected on startup
+✅ Submit Flutter APK build, appears in queue
+✅ Check /api/status/:jobId returns correct stage
+✅ APK file saved to disk after completion
+✅ Can download APK via /api/download/:jobId
+✅ Build limit enforced (4th build rejected)
+✅ Build queue persists if server restarts (DB-backed)
+
+CRITICAL: APK files must survive server restart via file system or DB record.
+
+STOP HERE. FLUTTER APK BUILD MUST WORK END-TO-END BEFORE PHASE 4.
