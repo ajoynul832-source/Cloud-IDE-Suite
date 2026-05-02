@@ -260,6 +260,35 @@ All stdout/stderr appended to `builds.log_text` in real time.
 | GET /api/projects/:projectId/builds returns [] for unknown project | ✅ |
 | Build DB records survive restart (DB-backed, not in-memory) | ✅ |
 
+## Bull Board Admin Dashboard
+
+Real-time queue monitor served at **`/api/admin/queues`**.
+
+- Shows both queues: `codeRuns` (concurrency 8) and `buildJobs` (concurrency 2)
+- Per-job details: data payload, logs, attempt count, timestamps, error messages
+- Actions: retry failed jobs, clean completed/failed sets, pause/resume queues
+- Title: "Cloud IDE Queues"
+
+### Access
+
+**Protected by HTTP Basic Auth.**  
+Use any username + the value of `ADMIN_TOKEN` env var as the password.  
+Falls back to `SESSION_SECRET` if `ADMIN_TOKEN` is not set.
+
+```
+# Browser: visit /api/admin/queues — browser will prompt for credentials
+# curl:
+curl -u admin:$ADMIN_TOKEN http://localhost:80/api/admin/queues/
+```
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `src/lib/bull-board.ts` | `mountAdminBoard(app)` — creates board, wires both queues, mounts with auth |
+
+### Mounted After Workers Start
+`mountAdminBoard(app)` is called in `index.ts` after both `startWorker()` and `startBuildWorker()` so queue instances are guaranteed to exist when the board registers them.
+
 ## Core API Endpoints
 
 | Method | Path | Auth | Description |
@@ -284,6 +313,7 @@ All stdout/stderr appended to `builds.log_text` in real time.
 | GET | `/api/share/:shareId` | none | Load shared project |
 | GET | `/api/usage` | optional | Daily usage stats |
 | GET | `/api/healthz` | none | Health check |
+| GET | `/api/admin/queues` | ADMIN_TOKEN | Bull Board queue dashboard |
 
 ## Database Schema (`lib/db`)
 

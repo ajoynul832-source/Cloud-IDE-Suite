@@ -1,10 +1,11 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { ensureRedis, shutdownRedis }     from "./lib/redis";
-import { startWorker, shutdownQueue }     from "./lib/queue";
+import { ensureRedis, shutdownRedis }          from "./lib/redis";
+import { startWorker, shutdownQueue }          from "./lib/queue";
 import { startBuildWorker, shutdownBuildQueue } from "./lib/build-queue";
-import { ensureApkStorage }               from "./lib/apk-storage";
-import { checkFlutter }                   from "./lib/flutter";
+import { ensureApkStorage }                    from "./lib/apk-storage";
+import { checkFlutter }                        from "./lib/flutter";
+import { mountAdminBoard }                     from "./lib/bull-board";
 
 const rawPort = process.env["PORT"];
 if (!rawPort) throw new Error("PORT environment variable is required but was not provided.");
@@ -20,6 +21,9 @@ async function main() {
   // ── BullMQ workers ──────────────────────────────────────────────────────
   await startWorker();           // code-execution worker (codeRuns queue)
   await startBuildWorker();      // APK build worker     (buildJobs queue)
+
+  // ── Admin dashboard (Bull Board) ─────────────────────────────────────────
+  mountAdminBoard(app);
 
   // ── HTTP server ─────────────────────────────────────────────────────────
   const server = app.listen(port, (err?: Error) => {

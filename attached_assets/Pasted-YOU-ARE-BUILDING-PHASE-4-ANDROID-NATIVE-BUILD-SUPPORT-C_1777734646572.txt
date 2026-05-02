@@ -1,0 +1,83 @@
+YOU ARE BUILDING PHASE 4: ANDROID NATIVE BUILD SUPPORT
+
+CURRENT STATE:
+- Android SDK not installed on server
+- Kotlin/Java templates exist but build fails
+- No Gradle, no external CI
+
+CHOOSE ONE APPROACH:
+
+OPTION A: GITHUB ACTIONS (RECOMMENDED FOR SCALE)
+1. Create .github/workflows/android-build.yml in template projects
+2. GitHub Actions workflow:
+   - Checkout code
+   - Setup Android SDK via setup-android@v2
+   - Run: ./gradlew build
+   - Upload APK to artifact store
+3. POST /api/build/android
+   - Push project to temp GitHub repo (or use gh-actions-runner)
+   - Trigger workflow
+   - Poll for completion
+   - Download APK from artifact
+4. CAVEAT: Requires GitHub token, org repo access
+
+OPTION B: GRADLE + SDK (LOCAL, SIMPLE)
+1. Install Android SDK + Gradle on server
+2. Add to Dockerfile/deployment script:
+   - export ANDROID_SDK_ROOT=/opt/android-sdk
+   - wget + unzip Android SDK
+   - Install build-tools, emulator, etc.
+3. POST /api/build/android same as Flutter pipeline
+4. BullMQ processor runs: ./gradlew build --project-dir=[extracted]
+
+PICK ONE. I RECOMMEND OPTION A (GitHub Actions) FOR:
+- No server disk bloat
+- Parallel builds (not limited to server CPU)
+- Proven CI/CD
+- Easier scaling
+
+WHAT YOU MUST BUILD (USING CHOSEN OPTION):
+
+1. UPDATE /api/build LOGIC
+   - Detect project type: read pubspec.yaml (Flutter) vs build.gradle (Android)
+   - Route to correct processor: buildQueue.add('flutter-build', ...) OR buildQueue.add('android-build', ...)
+
+2. ANDROID BUILD PROCESSOR (GITHUB ACTIONS PATH)
+   - Create temp repo structure: src/, build.gradle, settings.gradle
+   - Copy project files into temp repo
+   - Commit to GitHub (or use actions/setup-gha-runner)
+   - POST to GitHub API: trigger workflow run
+   - Poll: GET /repos/{owner}/{repo}/actions/runs/{run_id}
+   - On complete, download APK from artifacts
+   - Same DB schema as Flutter (builds table)
+
+3. GRADLE BUILD PROCESSOR (LOCAL PATH)
+   - Extract ZIP to temp directory
+   - Validate: build.gradle exists
+   - Run: ./gradlew build -p [dir] --daemon
+   - Capture stdout/stderr (same as Flutter)
+   - Copy APK to storage
+   - Handle common errors: missing SDK, gradle wrapper not found, etc.
+
+4. ANDROID TEMPLATE FIX
+   - Update Android template in TemplateSelector
+   - Ensure build.gradle is valid, not placeholder
+   - Add minimal MainActivity.kt
+   - Verify: gradle wrapper (gradlew + gradlew.bat) included
+
+5. DISABLE ANDROID BUILD IF NOT READY
+   - If neither GitHub token nor Android SDK available, set process.env.ANDROID_DISABLED=1
+   - Return 503 on android builds: { error: "Android builds not configured" }
+
+TEST:
+✅ Create Android (Kotlin) project from template
+✅ Submit build via POST /api/build
+✅ Job appears in queue with status 'queued'
+✅ Job progresses through stages
+✅ APK is created and downloadable
+✅ If Android disabled, returns 503 with clear message
+
+ANDROID BUILDS ARE OPTIONAL FOR LAUNCH BUT MUST NOT CRASH THE SYSTEM.
+If not configured, silently disable (don't hang, don't spam errors).
+
+STOP HERE. ANDROID BUILDS WORKING OR GRACEFULLY DISABLED.

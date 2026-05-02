@@ -8,7 +8,7 @@ function keyGen(req: import("express").Request): string {
   return req.ip ?? "unknown";
 }
 
-const baseOpts = { validate: { ip: false } } as const;
+const baseOpts = { validate: { ip: false, keyGeneratorIpFallback: false } } as const;
 
 /** 30 executions / minute per user */
 export const runLimiter = rateLimit({
