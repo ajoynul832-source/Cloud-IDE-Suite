@@ -22,7 +22,8 @@ function detectProjectType(files: Record<string, string>): string {
     paths.some((p) => p.endsWith("build.gradle") || p.endsWith("gradlew"))
   )
     return "android";
-  return "flutter"; // default
+  // Plain JS/TS/Python/HTML — runnable in sandbox, no APK build needed
+  return "web";
 }
 
 export interface BuildResult {
@@ -38,7 +39,7 @@ export function useBuild() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [projectType, setProjectType] = useState<string>("flutter");
+  const [projectType, setProjectType] = useState<string>("web");
   const [previewData, setPreviewData] = useState<{
     embedUrl: string;
     qrUrl: string;

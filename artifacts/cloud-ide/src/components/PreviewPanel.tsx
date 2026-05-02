@@ -158,12 +158,18 @@ function PreviewContent({
             <p>Flutter apps cannot run directly in browser preview.</p>
             <p className="mt-2 text-primary">Click <span className="font-bold">Build APK</span> to compile.</p>
           </>
+        ) : projectType === "android" ? (
+          <>
+            <p>Android apps require a native build.</p>
+            <p className="mt-2 text-primary text-xs">Click <span className="font-bold">Build APK</span> to compile.</p>
+          </>
         ) : (
           <>
-            <p>No browser preview for this project type.</p>
-            <p className="mt-2 text-primary text-xs">
-              Use <span className="font-bold">Run</span> to execute code or{" "}
-              <span className="font-bold">Build APK</span> to compile.
+            <p className="text-base">Open a file and click <span className="text-primary font-bold">Run ▶</span></p>
+            <p className="text-xs mt-1">
+              JavaScript &amp; TypeScript → Console tab<br />
+              HTML files → renders here as a live preview<br />
+              Python → Console tab
             </p>
           </>
         )}
