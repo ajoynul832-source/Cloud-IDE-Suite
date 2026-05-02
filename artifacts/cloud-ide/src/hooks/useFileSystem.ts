@@ -3,99 +3,63 @@ import { useState, useEffect, useCallback } from "react";
 const STORAGE_KEY = "cloudide_files";
 
 const DEFAULT_FILES: Record<string, string> = {
-  "lib/main.dart": `import 'package:flutter/material.dart';
+  "index.js": `// Welcome to Cloud IDE!
+// Click Run ▶ to execute this file.
 
-void main() {
-  runApp(const MyApp());
+console.log("Hello from Cloud IDE!");
+
+// Try some JavaScript:
+const numbers = [1, 2, 3, 4, 5];
+const doubled = numbers.map(n => n * 2);
+console.log("Doubled:", doubled);
+
+const sum = numbers.reduce((a, b) => a + b, 0);
+console.log("Sum:", sum);
+
+// Async/await works too:
+async function greet(name) {
+  return \`Hello, \${name}!\`;
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
+greet("World").then(msg => console.log(msg));
 `,
-  "pubspec.yaml": `name: flutter_app
-description: A new Flutter project.
-publish_to: 'none'
-version: 1.0.0+1
-
-environment:
-  sdk: '>=3.2.0 <4.0.0'
-
-dependencies:
-  flutter:
-    sdk: flutter
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
-
-flutter:
-  uses-material-design: true
+  "index.html": `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HTML Preview</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background: #0d1117; color: #e6edf3; }
+    h1 { color: #58a6ff; }
+    button { padding: 0.5rem 1rem; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; }
+    button:hover { background: #2ea043; }
+    #output { margin-top: 1rem; padding: 1rem; background: #161b22; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>HTML Preview</h1>
+  <p>Click Run ▶ to render this HTML in the Preview panel.</p>
+  <button onclick="document.getElementById('output').textContent = 'Button clicked! ' + new Date().toLocaleTimeString()">
+    Click me
+  </button>
+  <div id="output">Output will appear here.</div>
+</body>
+</html>
 `,
-  "README.md": `# My Flutter App
+  "README.md": `# Cloud IDE
 
-Edit files on the left, click Run to preview, or Build APK to compile.
-`
+Welcome! This is your starter workspace.
+
+## Quick start
+- **index.js** — Click **Run** to execute JavaScript in the Console
+- **index.html** — Click **Run** to render HTML in the Preview panel
+
+## Templates
+Click **New** in the toolbar to load a Flutter, React Native, Python, or other template.
+
+## Build APK
+Click **Build APK** to compile Flutter or Android projects.
+`,
 };
 
 export function useFileSystem() {
