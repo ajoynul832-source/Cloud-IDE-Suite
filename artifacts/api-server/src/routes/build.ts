@@ -12,10 +12,12 @@ import multer        from "multer";
 import fs            from "fs";
 import fsp           from "fs/promises";
 import os            from "os";
+import unzipper      from "unzipper";
 import { db, buildsTable } from "@workspace/db";
 import { eq, desc, and, or, inArray, count } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { isFlutterAvailable } from "../lib/flutter";
+import { isAndroidAvailable } from "../lib/android";
 import { apkExists }           from "../lib/apk-storage";
 import { getBuildQueue }       from "../lib/build-queue";
 import { buildLimiter }        from "../middlewares/rate-limit";
@@ -47,6 +49,36 @@ const upload = multer({
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const FLUTTER_503 = { error: "Flutter SDK is not installed on this server. APK builds are unavailable.", code: "FLUTTER_DISABLED" };
+const ANDROID_503 = { error: "Android SDK / Gradle is not configured on this server. Android APK builds are unavailable.", code: "ANDROID_DISABLED" };
+
+/**
+ * Peek inside a ZIP (without extracting) to determine whether it is a
+ * Flutter project (contains pubspec.yaml) or an Android project (contains
+ * root-level build.gradle / build.gradle.kts).
+ * Returns "flutter" | "android" | "unknown".
+ */
+async function detectZipProjectType(zipPath: string): Promise<"flutter" | "android" | "unknown"> {
+  return new Promise((resolve) => {
+    const entries: string[] = [];
+    fs.createReadStream(zipPath)
+      .pipe(unzipper.Parse({ forceStream: true }))
+      .on("entry", (entry: unzipper.Entry) => {
+        entries.push(entry.path);
+        entry.autodrain();
+      })
+      .on("close", () => {
+        // Strip a single top-level directory prefix (nested ZIPs)
+        const norm = entries.map((e) => {
+          const parts = e.replace(/\\/g, "/").split("/");
+          return parts.length > 2 ? parts.slice(1).join("/") : e;
+        });
+        if (norm.some((e) => e === "pubspec.yaml")) return resolve("flutter");
+        if (norm.some((e) => e === "build.gradle" || e === "build.gradle.kts")) return resolve("android");
+        resolve("unknown");
+      })
+      .on("error", () => resolve("unknown"));
+  });
+}
 
 async function countActiveBuildsForUser(userId: string): Promise<number> {
   const rows = await db.select({ c: count() })
@@ -61,12 +93,21 @@ async function countActiveBuildsForUser(userId: string): Promise<number> {
 // ─── POST /api/build — multipart ZIP upload ───────────────────────────────────
 
 router.post("/build", optionalAuth, buildLimiter, (req, res, next) => {
-  if (!isFlutterAvailable()) { res.status(503).json(FLUTTER_503); return; }
+  // Guard: at least one build type must be available
+  if (!isFlutterAvailable() && !isAndroidAvailable()) {
+    res.status(503).json({
+      error: "No build backends configured on this server (Flutter SDK and Android SDK are both missing).",
+      code: "BUILD_BACKENDS_DISABLED",
+    });
+    return;
+  }
 
   upload.single("project")(req, res, async (err) => {
     if (err) {
-      const msg = err.message === "Only ZIP files are allowed"   ? err.message
-                : (err as NodeJS.ErrnoException).code === "LIMIT_FILE_SIZE" ? "File too large (max 10 MB)"
+      const msg = err.message === "Only ZIP files are allowed"
+                ? err.message
+                : (err as NodeJS.ErrnoException).code === "LIMIT_FILE_SIZE"
+                ? "File too large (max 10 MB)"
                 : "Upload failed";
       res.status(400).json({ error: msg });
       return;
@@ -84,7 +125,6 @@ router.post("/build", optionalAuth, buildLimiter, (req, res, next) => {
       return;
     }
 
-    // Enforce 10-build queue limit per authenticated user
     if (req.user?.userId) {
       const active = await countActiveBuildsForUser(req.user.userId);
       if (active >= 10) {
@@ -95,24 +135,38 @@ router.post("/build", optionalAuth, buildLimiter, (req, res, next) => {
 
     try {
       const buildId = randomUUID();
-      const zipPath = req.file.path; // already saved by multer to tmpdir
+      const zipPath = req.file.path;
 
-      // Persist build record
+      // Peek inside the ZIP to route to the right build backend
+      const projectType = await detectZipProjectType(zipPath);
+
+      if (projectType === "android") {
+        if (!isAndroidAvailable()) { res.status(503).json(ANDROID_503); return; }
+
+        await db.insert(buildsTable).values({
+          id: buildId, userId: req.user?.userId ?? null, language: "android",
+          status: "queued", logText: `[${new Date().toISOString()}] Queued android build\n`,
+        });
+        const queue = getBuildQueue();
+        const waiting = await queue.getWaitingCount();
+        await queue.add("android-build", { buildId, zipPath, language: "android" });
+        logger.info({ buildId, zipPath, projectType }, "android build queued (upload)");
+        res.json({ jobId: buildId, status: "queued", queuePosition: waiting, language: "android" });
+        return;
+      }
+
+      // Default: Flutter (also for "unknown" — let Flutter validator catch bad ZIPs)
+      if (!isFlutterAvailable()) { res.status(503).json(FLUTTER_503); return; }
+
       await db.insert(buildsTable).values({
-        id: buildId,
-        userId: req.user?.userId ?? null,
-        language: "flutter",
-        status: "queued",
-        logText: `[${new Date().toISOString()}] Queued flutter build\n`,
+        id: buildId, userId: req.user?.userId ?? null, language: "flutter",
+        status: "queued", logText: `[${new Date().toISOString()}] Queued flutter build\n`,
       });
-
-      // Enqueue
       const queue = getBuildQueue();
       const waiting = await queue.getWaitingCount();
       await queue.add("flutter-build", { buildId, zipPath, language: "flutter" });
-
-      logger.info({ buildId, zipPath }, "build queued (upload)");
-      res.json({ jobId: buildId, status: "queued", queuePosition: waiting });
+      logger.info({ buildId, zipPath, projectType }, "flutter build queued (upload)");
+      res.json({ jobId: buildId, status: "queued", queuePosition: waiting, language: "flutter" });
     } catch (e) {
       next(e);
     }

@@ -20,6 +20,7 @@ import { buildLimiter } from "../middlewares/rate-limit";
 import { optionalAuth } from "../middlewares/require-auth";
 import { checkAndIncrementBuilds, resolveUsageKey } from "../lib/usage";
 import { isFlutterAvailable } from "../lib/flutter";
+import { isAndroidAvailable } from "../lib/android";
 import { getBuildQueue }      from "../lib/build-queue";
 
 const router = Router();
@@ -168,8 +169,8 @@ router.post("/build/project", optionalAuth, buildLimiter, async (req, res) => {
     return;
   }
 
-  // ── Flutter / Android → BullMQ queue ────────────────────────────────────
-  if (type === "flutter" || type === "android") {
+  // ── Flutter → BullMQ queue ───────────────────────────────────────────────
+  if (type === "flutter") {
     if (!isFlutterAvailable()) {
       res.status(503).json({
         error: "Flutter SDK is not installed on this server. APK builds are unavailable.",
@@ -178,7 +179,6 @@ router.post("/build/project", optionalAuth, buildLimiter, async (req, res) => {
       return;
     }
 
-    // 10-build queue limit per authenticated user
     if (req.user?.userId) {
       const active = await countActiveBuildsForUser(req.user.userId);
       if (active >= 10) {
@@ -188,33 +188,69 @@ router.post("/build/project", optionalAuth, buildLimiter, async (req, res) => {
     }
 
     try {
-      // Write ZIP in memory so worker doesn't have to re-read files object
       const zipPath = path.join(os.tmpdir(), `build_${buildId}.zip`);
       await writeZip(files, zipPath);
 
       await db.insert(buildsTable).values({
-        id:        buildId,
-        userId:    req.user?.userId ?? null,
-        projectId: projectId ?? null,
-        language:  type,
-        status:    "queued",
-        logText:   `[${new Date().toISOString()}] Queued ${type} build\n`,
+        id: buildId, userId: req.user?.userId ?? null, projectId: projectId ?? null,
+        language: "flutter", status: "queued",
+        logText: `[${new Date().toISOString()}] Queued flutter build\n`,
       });
 
       const queue = getBuildQueue();
       const waiting = await queue.getWaitingCount();
-      await queue.add("flutter-build", { buildId, zipPath, language: type });
+      await queue.add("flutter-build", { buildId, zipPath, language: "flutter" });
 
       res.json({
-        jobId:    buildId,
-        status:   "queued",
-        queuePosition: waiting,
-        message:  `${type === "flutter" ? "Flutter" : "Android"} build queued. Poll /api/status/${buildId} for updates.`,
+        jobId: buildId, status: "queued", queuePosition: waiting,
+        message: `Flutter build queued. Poll /api/status/${buildId} for updates.`,
       });
     } catch (err) {
-      logger.error({ err, buildId }, "build queue failed");
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      res.status(500).json({ error: `Failed to queue build: ${msg}` });
+      logger.error({ err, buildId }, "flutter build queue failed");
+      res.status(500).json({ error: `Failed to queue build: ${err instanceof Error ? err.message : "Unknown error"}` });
+    }
+    return;
+  }
+
+  // ── Android (Kotlin/Java) → BullMQ queue ────────────────────────────────
+  if (type === "android") {
+    if (!isAndroidAvailable()) {
+      res.status(503).json({
+        error: "Android SDK / Gradle is not configured on this server. Android APK builds are unavailable.",
+        code: "ANDROID_DISABLED",
+      });
+      return;
+    }
+
+    if (req.user?.userId) {
+      const active = await countActiveBuildsForUser(req.user.userId);
+      if (active >= 10) {
+        res.status(429).json({ error: "Too many builds in queue. Wait for some to complete.", code: "QUEUE_FULL" });
+        return;
+      }
+    }
+
+    try {
+      const zipPath = path.join(os.tmpdir(), `android_build_${buildId}.zip`);
+      await writeZip(files, zipPath);
+
+      await db.insert(buildsTable).values({
+        id: buildId, userId: req.user?.userId ?? null, projectId: projectId ?? null,
+        language: "android", status: "queued",
+        logText: `[${new Date().toISOString()}] Queued android build\n`,
+      });
+
+      const queue = getBuildQueue();
+      const waiting = await queue.getWaitingCount();
+      await queue.add("android-build", { buildId, zipPath, language: "android" });
+
+      res.json({
+        jobId: buildId, status: "queued", queuePosition: waiting,
+        message: `Android build queued. Poll /api/status/${buildId} for updates.`,
+      });
+    } catch (err) {
+      logger.error({ err, buildId }, "android build queue failed");
+      res.status(500).json({ error: `Failed to queue build: ${err instanceof Error ? err.message : "Unknown error"}` });
     }
     return;
   }

@@ -277,6 +277,18 @@ class MainActivity : AppCompatActivity() {
     </application>
 </manifest>
 `,
+      "app/src/main/res/values/strings.xml": `<resources>
+    <string name="app_name">My App</string>
+</resources>
+`,
+      "app/src/main/res/values/themes.xml": `<resources>
+    <style name="Theme.App" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">#4ade80</item>
+        <item name="colorPrimaryDark">#22c55e</item>
+        <item name="colorAccent">#4ade80</item>
+    </style>
+</resources>
+`,
       "app/build.gradle.kts": `plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -295,9 +307,7 @@ android {
     }
 
     buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
+        release { isMinifyEnabled = false }
     }
 
     compileOptions {
@@ -305,9 +315,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_1_8
     }
 
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
+    kotlinOptions { jvmTarget = "1.8" }
 }
 
 dependencies {
@@ -315,14 +323,59 @@ dependencies {
     implementation("com.google.android.material:material:1.10.0")
 }
 `,
+      "build.gradle.kts": `plugins {
+    id("com.android.application") version "8.1.4" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.10" apply false
+}
+`,
+      "settings.gradle.kts": `pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "MyApp"
+include(":app")
+`,
+      "gradle/wrapper/gradle-wrapper.properties": `distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.4-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+`,
+      "gradlew": `#!/bin/sh
+# Gradle start up script for UN*X
+APP_HOME="$(cd "$(dirname "$0")" && pwd)"
+APP_NAME="Gradle"
+CLASSPATH="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+DEFAULT_JVM_OPTS='-Dfile.encoding=UTF-8 "-Xmx64m" "-Xms64m"'
+set -- "$@" org.gradle.wrapper.GradleWrapperMain
+exec "$JAVA_HOME/bin/java" $DEFAULT_JVM_OPTS -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+`,
       "README.md": `# Android App (Kotlin)
 
+## Prerequisites
+- Android Studio (recommended) **or** Android SDK + Java 17 + Gradle 8.4
+
 ## Build
-Open in Android Studio, or run:
-\`\`\`
+\`\`\`bash
 ./gradlew assembleDebug
 \`\`\`
 APK output: \`app/build/outputs/apk/debug/app-debug.apk\`
+
+## Build via Cloud IDE
+Upload this project as a ZIP to the Cloud IDE build endpoint.
+Requires Android SDK to be configured on the server.
 `,
     },
   },
@@ -395,8 +448,8 @@ public class MainActivity extends AppCompatActivity {
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:allowBackup="true"
-        android:label="MyApp"
-        android:theme="@style/Theme.AppCompat.Light">
+        android:label="@string/app_name"
+        android:theme="@style/Theme.App">
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -408,6 +461,18 @@ public class MainActivity extends AppCompatActivity {
     </application>
 </manifest>
 `,
+      "app/src/main/res/values/strings.xml": `<resources>
+    <string name="app_name">My App</string>
+</resources>
+`,
+      "app/src/main/res/values/themes.xml": `<resources>
+    <style name="Theme.App" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">#4ade80</item>
+        <item name="colorPrimaryDark">#22c55e</item>
+        <item name="colorAccent">#4ade80</item>
+    </style>
+</resources>
+`,
       "app/build.gradle": `plugins {
     id 'com.android.application'
 }
@@ -415,12 +480,22 @@ public class MainActivity extends AppCompatActivity {
 android {
     namespace 'com.example.app'
     compileSdk 34
+
     defaultConfig {
         applicationId "com.example.app"
         minSdk 24
         targetSdk 34
         versionCode 1
         versionName "1.0"
+    }
+
+    buildTypes {
+        release { minifyEnabled false }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 }
 
@@ -429,12 +504,56 @@ dependencies {
     implementation 'com.google.android.material:material:1.10.0'
 }
 `,
+      "build.gradle": `plugins {
+    id 'com.android.application' version '8.1.4' apply false
+}
+`,
+      "settings.gradle": `pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'MyApp'
+include ':app'
+`,
+      "gradle/wrapper/gradle-wrapper.properties": `distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.4-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+`,
+      "gradlew": `#!/bin/sh
+# Gradle start up script for UN*X
+APP_HOME="$(cd "$(dirname "$0")" && pwd)"
+CLASSPATH="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+DEFAULT_JVM_OPTS='-Dfile.encoding=UTF-8 "-Xmx64m" "-Xms64m"'
+exec "$JAVA_HOME/bin/java" $DEFAULT_JVM_OPTS -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+`,
       "README.md": `# Android App (Java)
 
+## Prerequisites
+- Android Studio (recommended) **or** Android SDK + Java 17 + Gradle 8.4
+
 ## Build
-\`\`\`
+\`\`\`bash
 ./gradlew assembleDebug
 \`\`\`
+APK output: \`app/build/outputs/apk/debug/app-debug.apk\`
+
+## Build via Cloud IDE
+Upload this project as a ZIP to the Cloud IDE build endpoint.
+Requires Android SDK to be configured on the server.
 `,
     },
   },
@@ -986,48 +1105,48 @@ cargo tauri android dev
       "main.go": `package main
 
 import (
-	"fmt"
-	"log"
+        "fmt"
+        "log"
 
-	"golang.org/x/mobile/app"
-	"golang.org/x/mobile/event/lifecycle"
-	"golang.org/x/mobile/event/paint"
-	"golang.org/x/mobile/event/size"
-	"golang.org/x/mobile/gl"
+        "golang.org/x/mobile/app"
+        "golang.org/x/mobile/event/lifecycle"
+        "golang.org/x/mobile/event/paint"
+        "golang.org/x/mobile/event/size"
+        "golang.org/x/mobile/gl"
 )
 
 func main() {
-	app.Main(func(a app.App) {
-		var glctx gl.Context
-		for e := range a.Events() {
-			switch e := a.Filter(e).(type) {
-			case lifecycle.Event:
-				switch e.Crosses(lifecycle.StageVisible) {
-				case lifecycle.CrossOn:
-					glctx, _ = e.DrawContext.(gl.Context)
-				case lifecycle.CrossOff:
-					glctx = nil
-				}
-			case paint.Event:
-				if glctx == nil || e.External {
-					continue
-				}
-				// Clear to dark background
-				glctx.ClearColor(0.05, 0.05, 0.05, 1)
-				glctx.Clear(gl.COLOR_BUFFER_BIT)
-				a.Publish()
-			case size.Event:
-				log.Printf("Window size: %v", e)
-			}
-		}
-	})
+        app.Main(func(a app.App) {
+                var glctx gl.Context
+                for e := range a.Events() {
+                        switch e := a.Filter(e).(type) {
+                        case lifecycle.Event:
+                                switch e.Crosses(lifecycle.StageVisible) {
+                                case lifecycle.CrossOn:
+                                        glctx, _ = e.DrawContext.(gl.Context)
+                                case lifecycle.CrossOff:
+                                        glctx = nil
+                                }
+                        case paint.Event:
+                                if glctx == nil || e.External {
+                                        continue
+                                }
+                                // Clear to dark background
+                                glctx.ClearColor(0.05, 0.05, 0.05, 1)
+                                glctx.Clear(gl.COLOR_BUFFER_BIT)
+                                a.Publish()
+                        case size.Event:
+                                log.Printf("Window size: %v", e)
+                        }
+                }
+        })
 }
 
 // Shared library function callable from Android/iOS
 //
 //export Greet
 func Greet(name string) string {
-	return fmt.Sprintf("Hello, %s! From Go.", name)
+        return fmt.Sprintf("Hello, %s! From Go.", name)
 }
 `,
       "go.mod": `module example.com/mobileapp
@@ -1042,22 +1161,22 @@ require (
 
 // Counter is a simple counter that can be bound to Android/iOS via gomobile.
 type Counter struct {
-	value int
+        value int
 }
 
 // Increment increments the counter.
 func (c *Counter) Increment() {
-	c.value++
+        c.value++
 }
 
 // Reset resets the counter to zero.
 func (c *Counter) Reset() {
-	c.value = 0
+        c.value = 0
 }
 
 // Value returns the current count.
 func (c *Counter) Value() int {
-	return c.value
+        return c.value
 }
 `,
       "README.md": `# Go Mobile App (gomobile)

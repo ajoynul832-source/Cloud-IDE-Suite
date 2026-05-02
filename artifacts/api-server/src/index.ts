@@ -5,6 +5,7 @@ import { startWorker, shutdownQueue }          from "./lib/queue";
 import { startBuildWorker, shutdownBuildQueue } from "./lib/build-queue";
 import { ensureApkStorage }                    from "./lib/apk-storage";
 import { checkFlutter }                        from "./lib/flutter";
+import { checkAndroid }                        from "./lib/android";
 import { mountAdminBoard }                     from "./lib/bull-board";
 
 const rawPort = process.env["PORT"];
@@ -17,6 +18,7 @@ async function main() {
   await ensureRedis();
   await ensureApkStorage();
   await checkFlutter();          // sets FLUTTER_DISABLED env var; never throws
+  await checkAndroid();          // sets ANDROID_DISABLED env var; never throws
 
   // ── BullMQ workers ──────────────────────────────────────────────────────
   await startWorker();           // code-execution worker (codeRuns queue)
