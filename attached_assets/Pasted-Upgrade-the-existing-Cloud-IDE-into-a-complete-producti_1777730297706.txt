@@ -1,0 +1,198 @@
+Upgrade the existing Cloud IDE into a complete production-ready platform.
+
+DO NOT rebuild UI.
+USE the current editor, file system, templates, execution engine, and sharing system.
+
+This task is about adding missing infrastructure, scaling, discovery, and reliability.
+
+---
+
+1. EXPLORE / TRENDING SYSTEM
+
+Create:
+
+GET /api/explore
+
+- Return shared projects only
+- Include:
+  shareId, title, language, stats (views, forks, runs)
+- Compute ranking score:
+  score = (forksCount * 5) + (runsCount * 2) + uniqueViews
+- Sort descending
+- Limit 20 results
+
+Frontend:
+
+- Route: /ide/explore
+- Grid UI of project cards
+- Infinite scroll
+- Card shows:
+  - title
+  - language badge
+  - stats
+  - Open + Fork buttons
+
+---
+
+2. USER ACCOUNT SYSTEM
+
+Add authentication:
+
+- Email + password OR OAuth (Google)
+- Replace localStorage userKey with real userId
+- Store user in database
+
+Projects:
+
+- Linked to userId
+- Only owner can edit/delete
+
+---
+
+3. PROJECT AUTOSAVE + VERSIONING
+
+- Auto-save every few seconds
+- Add versions table:
+  projectId, snapshot, createdAt
+- Allow restore previous version
+
+---
+
+4. EXECUTION SCALING
+
+Upgrade /api/run:
+
+- Add queue (BullMQ + Redis)
+- Limit concurrent executions
+- Per-user rate limits
+- Sandbox isolation:
+  - CPU limit
+  - Memory limit
+  - timeout kill
+
+---
+
+5. BUILD SYSTEM IMPROVEMENTS
+
+Upgrade /api/build:
+
+- Add job queue
+- Add retry logic (max 2 retries)
+- Stream logs in real time
+- Show stages:
+  - uploading
+  - building
+  - packaging
+
+Integrations:
+
+- React Native → Expo EAS
+- Flutter → Codemagic
+- Android → GitHub Actions
+
+---
+
+6. PERFORMANCE OPTIMIZATION
+
+- Cache execution results where possible
+- Reduce cold start
+- Lazy-load editor components
+- Optimize API response sizes
+
+---
+
+7. MONETIZATION LAYER (BASIC)
+
+Add usage tracking per user:
+
+- runsCount
+- buildsCount
+
+Limits:
+
+- Free tier:
+  
+  - limited runs/day
+  - limited builds/day
+
+- Paid tier:
+  
+  - higher limits
+  - priority queue
+
+---
+
+8. PROJECT STORAGE + MANAGEMENT
+
+- Improve CRUD
+- Add:
+  - rename project
+  - duplicate project
+  - delete confirmation
+- Add search/filter
+
+---
+
+9. ERROR HANDLING
+
+- All endpoints return clean JSON errors
+- No crashes
+- Log errors server-side
+- Show user-friendly messages
+
+---
+
+10. SECURITY
+
+- Sanitize all inputs
+- Prevent arbitrary command execution
+- Restrict file system access
+- Hash sensitive data
+
+---
+
+11. CODE ARCHITECTURE
+
+Refactor execution engine:
+
+Use handler map:
+
+languageHandlers = {
+javascript: handler,
+python: handler,
+typescript: handler
+}
+
+Make system extensible.
+
+---
+
+12. FINAL RESULT
+
+User can:
+
+- Sign up / log in
+- Create projects
+- Edit code
+- Auto-save
+- Run code (real output)
+- Share projects
+- Explore public projects
+- Fork projects
+- Build mobile apps (via cloud)
+- Download APK
+- Use system reliably at scale
+
+---
+
+IMPORTANT RULES
+
+- No fake features
+- No placeholder logic
+- Must integrate with existing system
+- Must keep UI intact
+- Must be production-ready
+
+---
+
+This is a full platform upgrade, not a UI change.

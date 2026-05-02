@@ -75,7 +75,7 @@ export function ProjectsModal({
     if (!name && !currentProjectId) { setSaveError("Name is required"); return; }
     setSaving(true);
     setSaveError(null);
-    const effectiveName = name || projects.find((p) => p.id === currentProjectId)?.name ?? "Untitled";
+    const effectiveName = name || (projects.find((p) => p.id === currentProjectId)?.name ?? "Untitled");
     const saved = await saveProject(effectiveName, currentProjectType, currentFiles, currentProjectId ?? undefined);
     setSaving(false);
     if (saved) { onSaved(saved.id, saved.name); onClose(); }
