@@ -6,4 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./buildLogs";
+export * from "./buildResponse";
+export * from "./buildResponseStatus";
+export * from "./errorResponse";
 export * from "./healthStatus";
+export * from "./jobStatus";
+export * from "./jobStatusStatus";
+export * from "./startBuildBody";

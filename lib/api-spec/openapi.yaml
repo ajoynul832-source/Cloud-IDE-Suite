@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: builds
+    description: Flutter APK build operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,119 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /build:
+    post:
+      operationId: startBuild
+      tags: [builds]
+      summary: Start a Flutter APK build
+      description: Accept a ZIP file of a Flutter project and queue it for APK compilation
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                project:
+                  type: string
+                  format: binary
+                  description: ZIP file of the Flutter project (max 10MB)
+              required:
+                - project
+      responses:
+        "200":
+          description: Build queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildResponse"
+        "400":
+          description: Invalid request (not a zip, too large, missing fields)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /status/{jobId}:
+    get:
+      operationId: getBuildStatus
+      tags: [builds]
+      summary: Get build status
+      description: Returns the current status of a build job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStatus"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /download/{jobId}:
+    get:
+      operationId: downloadApk
+      tags: [builds]
+      summary: Download the compiled APK
+      description: Returns the APK file if the build was successful
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: APK file binary
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Job not found or build not successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /logs/{jobId}:
+    get:
+      operationId: getBuildLogs
+      tags: [builds]
+      summary: Get build logs
+      description: Returns stdout/stderr logs for a build job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Build logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildLogs"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +149,71 @@ components:
       required:
         - status
 
+    BuildResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [queued, building, success, failed]
+        queuePosition:
+          type: integer
+          description: Position in queue (0 = currently building)
+      required:
+        - jobId
+        - status
+
+    JobStatus:
+      type: object
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [queued, building, success, failed]
+        logs:
+          type: string
+          nullable: true
+        download:
+          type: string
+          nullable: true
+          description: Download URL if build succeeded
+        queuePosition:
+          type: integer
+          nullable: true
+        startedAt:
+          type: string
+          nullable: true
+        completedAt:
+          type: string
+          nullable: true
+        stage:
+          type: string
+          nullable: true
+          description: Current build stage (extracting, validating, getting deps, building apk)
+      required:
+        - jobId
+        - status
+
+    BuildLogs:
+      type: object
+      properties:
+        jobId:
+          type: string
+        logs:
+          type: string
+        stage:
+          type: string
+          nullable: true
+      required:
+        - jobId
+        - logs
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error

@@ -5,18 +5,28 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  BuildLogs,
+  BuildResponse,
+  ErrorResponse,
+  HealthStatus,
+  JobStatus,
+  StartBuildBody,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -92,6 +102,359 @@ export function useHealthCheck<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Accept a ZIP file of a Flutter project and queue it for APK compilation
+ * @summary Start a Flutter APK build
+ */
+export const getStartBuildUrl = () => {
+  return `/api/build`;
+};
+
+export const startBuild = async (
+  startBuildBody: StartBuildBody,
+  options?: RequestInit,
+): Promise<BuildResponse> => {
+  const formData = new FormData();
+  formData.append(`project`, startBuildBody.project as string | Blob);
+
+  return customFetch<BuildResponse>(getStartBuildUrl(), {
+    ...options,
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const getStartBuildMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startBuild>>,
+    TError,
+    { data: BodyType<StartBuildBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof startBuild>>,
+  TError,
+  { data: BodyType<StartBuildBody> },
+  TContext
+> => {
+  const mutationKey = ["startBuild"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof startBuild>>,
+    { data: BodyType<StartBuildBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return startBuild(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StartBuildMutationResult = NonNullable<
+  Awaited<ReturnType<typeof startBuild>>
+>;
+export type StartBuildMutationBody = BodyType<StartBuildBody>;
+export type StartBuildMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Start a Flutter APK build
+ */
+export const useStartBuild = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startBuild>>,
+    TError,
+    { data: BodyType<StartBuildBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof startBuild>>,
+  TError,
+  { data: BodyType<StartBuildBody> },
+  TContext
+> => {
+  return useMutation(getStartBuildMutationOptions(options));
+};
+
+/**
+ * Returns the current status of a build job
+ * @summary Get build status
+ */
+export const getGetBuildStatusUrl = (jobId: string) => {
+  return `/api/status/${jobId}`;
+};
+
+export const getBuildStatus = async (
+  jobId: string,
+  options?: RequestInit,
+): Promise<JobStatus> => {
+  return customFetch<JobStatus>(getGetBuildStatusUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBuildStatusQueryKey = (jobId: string) => {
+  return [`/api/status/${jobId}`] as const;
+};
+
+export const getGetBuildStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBuildStatus>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBuildStatus>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBuildStatusQueryKey(jobId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getBuildStatus>>> = ({
+    signal,
+  }) => getBuildStatus(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBuildStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBuildStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBuildStatus>>
+>;
+export type GetBuildStatusQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get build status
+ */
+
+export function useGetBuildStatus<
+  TData = Awaited<ReturnType<typeof getBuildStatus>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBuildStatus>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBuildStatusQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns the APK file if the build was successful
+ * @summary Download the compiled APK
+ */
+export const getDownloadApkUrl = (jobId: string) => {
+  return `/api/download/${jobId}`;
+};
+
+export const downloadApk = async (
+  jobId: string,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getDownloadApkUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getDownloadApkQueryKey = (jobId: string) => {
+  return [`/api/download/${jobId}`] as const;
+};
+
+export const getDownloadApkQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadApk>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof downloadApk>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getDownloadApkQueryKey(jobId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadApk>>> = ({
+    signal,
+  }) => downloadApk(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof downloadApk>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type DownloadApkQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadApk>>
+>;
+export type DownloadApkQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Download the compiled APK
+ */
+
+export function useDownloadApk<
+  TData = Awaited<ReturnType<typeof downloadApk>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof downloadApk>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getDownloadApkQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns stdout/stderr logs for a build job
+ * @summary Get build logs
+ */
+export const getGetBuildLogsUrl = (jobId: string) => {
+  return `/api/logs/${jobId}`;
+};
+
+export const getBuildLogs = async (
+  jobId: string,
+  options?: RequestInit,
+): Promise<BuildLogs> => {
+  return customFetch<BuildLogs>(getGetBuildLogsUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBuildLogsQueryKey = (jobId: string) => {
+  return [`/api/logs/${jobId}`] as const;
+};
+
+export const getGetBuildLogsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBuildLogs>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBuildLogs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBuildLogsQueryKey(jobId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getBuildLogs>>> = ({
+    signal,
+  }) => getBuildLogs(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBuildLogs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBuildLogsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBuildLogs>>
+>;
+export type GetBuildLogsQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get build logs
+ */
+
+export function useGetBuildLogs<
+  TData = Awaited<ReturnType<typeof getBuildLogs>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBuildLogs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBuildLogsQueryOptions(jobId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

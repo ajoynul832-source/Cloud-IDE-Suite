@@ -1,0 +1,199 @@
+Build a complete mobile-first cloud IDE system that allows users to write Flutter code and generate a real Android APK. The entire backend must run on Replit.
+
+---
+
+Product Goal
+
+A mobile app (or web client) sends a Flutter project to a backend hosted on Replit. The backend compiles the project into an APK and returns a downloadable file.
+
+---
+
+Backend Stack
+
+- Node.js (Express)
+- Multer (file uploads)
+- Child process execution
+- In-memory job tracking
+- File system (temporary storage)
+
+---
+
+Core API
+
+POST /build
+
+- Accept multipart/form-data
+- Field name: "project"
+- File: ZIP of Flutter project
+- Validate size (<10MB)
+- Create unique jobId
+- Store job status: "queued"
+
+GET /status/:jobId
+
+- Return:
+  {
+  jobId,
+  status: "queued | building | success | failed",
+  logs: optional string
+  }
+
+GET /download/:jobId
+
+- If build success:
+  - Return APK file
+- Else:
+  - Return error
+
+---
+
+Build Pipeline
+
+When /build is called:
+
+1. Save uploaded ZIP → /tmp/{jobId}.zip
+
+2. Extract ZIP → /tmp/project_{jobId}
+
+3. Validate Flutter structure:
+   
+   - pubspec.yaml exists
+   - lib/main.dart exists
+
+4. Update job status → "building"
+
+5. Execute commands:
+   
+   - flutter pub get
+   - flutter build apk --debug
+
+6. Output APK path:
+   /tmp/project_{jobId}/build/app/outputs/flutter-apk/app-debug.apk
+
+7. If success:
+   
+   - status = "success"
+   - store APK path
+
+8. If error:
+   
+   - status = "failed"
+   - capture stderr logs
+
+---
+
+Execution Details
+
+Use child_process.exec or spawn:
+
+- Run commands inside extracted project directory
+- Capture stdout + stderr
+- Enforce timeout (max 5 minutes)
+- Kill process if timeout exceeded
+
+---
+
+File Handling
+
+- Store all builds in /tmp
+- After completion:
+  - Keep APK for download
+  - Schedule cleanup (e.g., delete after 30 minutes)
+
+---
+
+Job Queue (simple)
+
+- Maintain array queue
+- Only 1 build at a time
+- When current finishes → process next
+
+---
+
+Security Constraints
+
+- Reject non-zip files
+- Limit file size
+- Do not allow arbitrary command execution
+- Sanitize file paths
+
+---
+
+CORS
+
+Enable CORS for mobile app access
+
+---
+
+Flutter Environment Setup (critical)
+
+Inside Replit:
+
+- Install Flutter SDK
+- Install Android SDK + Java
+- Add to PATH
+
+Commands:
+
+- flutter doctor
+- flutter build apk
+
+---
+
+Response Examples
+
+Build start
+
+{
+"jobId": "12345",
+"status": "queued"
+}
+
+Status
+
+{
+"jobId": "12345",
+"status": "building"
+}
+
+Success
+
+{
+"jobId": "12345",
+"status": "success",
+"download": "/download/12345"
+}
+
+---
+
+Deliverables
+
+- Full Express server code
+- Upload handler
+- Build execution logic
+- Queue system
+- Status tracking
+- Download endpoint
+
+---
+
+Important Requirements
+
+- DO NOT simulate builds
+- MUST attempt real Flutter APK compilation
+- MUST return real APK file if build succeeds
+
+---
+
+Optional Enhancements
+
+- Logs endpoint (/logs/:jobId)
+- Progress tracking (basic stages)
+- Multiple worker support
+- Rate limiting
+
+---
+
+Final Objective
+
+User uploads Flutter project → system compiles APK → user downloads and installs on Android device.

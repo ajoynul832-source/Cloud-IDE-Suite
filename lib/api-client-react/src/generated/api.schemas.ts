@@ -8,3 +8,58 @@
 export interface HealthStatus {
   status: string;
 }
+
+export type BuildResponseStatus =
+  (typeof BuildResponseStatus)[keyof typeof BuildResponseStatus];
+
+export const BuildResponseStatus = {
+  queued: "queued",
+  building: "building",
+  success: "success",
+  failed: "failed",
+} as const;
+
+export interface BuildResponse {
+  jobId: string;
+  status: BuildResponseStatus;
+  /** Position in queue (0 = currently building) */
+  queuePosition?: number;
+}
+
+export type JobStatusStatus =
+  (typeof JobStatusStatus)[keyof typeof JobStatusStatus];
+
+export const JobStatusStatus = {
+  queued: "queued",
+  building: "building",
+  success: "success",
+  failed: "failed",
+} as const;
+
+export interface JobStatus {
+  jobId: string;
+  status: JobStatusStatus;
+  logs?: string | null;
+  /** Download URL if build succeeded */
+  download?: string | null;
+  queuePosition?: number | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  /** Current build stage (extracting, validating, getting deps, building apk) */
+  stage?: string | null;
+}
+
+export interface BuildLogs {
+  jobId: string;
+  logs: string;
+  stage?: string | null;
+}
+
+export interface ErrorResponse {
+  error: string;
+}
+
+export type StartBuildBody = {
+  /** ZIP file of the Flutter project (max 10MB) */
+  project: unknown;
+};

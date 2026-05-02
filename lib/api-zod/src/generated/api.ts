@@ -14,3 +14,68 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Accept a ZIP file of a Flutter project and queue it for APK compilation
+ * @summary Start a Flutter APK build
+ */
+export const StartBuildBody = zod.object({
+  project: zod
+    .any()
+    .describe("ZIP file of the Flutter project (max 10MB)"),
+});
+
+export const StartBuildResponse = zod.object({
+  jobId: zod.string(),
+  status: zod.enum(["queued", "building", "success", "failed"]),
+  queuePosition: zod
+    .number()
+    .optional()
+    .describe("Position in queue (0 = currently building)"),
+});
+
+/**
+ * Returns the current status of a build job
+ * @summary Get build status
+ */
+export const GetBuildStatusParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const GetBuildStatusResponse = zod.object({
+  jobId: zod.string(),
+  status: zod.enum(["queued", "building", "success", "failed"]),
+  logs: zod.string().nullish(),
+  download: zod.string().nullish().describe("Download URL if build succeeded"),
+  queuePosition: zod.number().nullish(),
+  startedAt: zod.string().nullish(),
+  completedAt: zod.string().nullish(),
+  stage: zod
+    .string()
+    .nullish()
+    .describe(
+      "Current build stage (extracting, validating, getting deps, building apk)",
+    ),
+});
+
+/**
+ * Returns the APK file if the build was successful
+ * @summary Download the compiled APK
+ */
+export const DownloadApkParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+/**
+ * Returns stdout/stderr logs for a build job
+ * @summary Get build logs
+ */
+export const GetBuildLogsParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const GetBuildLogsResponse = zod.object({
+  jobId: zod.string(),
+  logs: zod.string(),
+  stage: zod.string().nullish(),
+});
