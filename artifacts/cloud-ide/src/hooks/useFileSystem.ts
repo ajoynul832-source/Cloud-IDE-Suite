@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 
-const STORAGE_KEY = "cloudide_files";
+// Bump this version any time the default files change — old data gets replaced
+const STORAGE_KEY    = "cloudide_files_v3";
+const STORAGE_KEY_OLD = "cloudide_files";
 
 const DEFAULT_FILES: Record<string, string> = {
   "index.js": `// Welcome to Cloud IDE!
@@ -66,13 +68,32 @@ export function useFileSystem() {
   const [files, setFiles] = useState<Record<string, string>>({});
   
   useEffect(() => {
+    // Remove legacy keys so they don't accumulate
+    localStorage.removeItem(STORAGE_KEY_OLD);
+    localStorage.removeItem("cloudide_files_v2");
+
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        setFiles(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse files", e);
+        const parsed = JSON.parse(saved) as Record<string, string>;
+        // Reject old saves that only contain mobile templates (no runnable file)
+        const keys = Object.keys(parsed);
+        const hasRunnable = keys.some(k =>
+          /\.(js|jsx|ts|tsx|py|html?)$/.test(k) &&
+          !Object.values(parsed).some(v =>
+            v.includes("from 'react-native'") || v.includes("from \"react-native\"") ||
+            v.includes("import kivy") || v.includes("from kivy")
+          )
+        );
+        if (hasRunnable) {
+          setFiles(parsed);
+        } else {
+          setFiles(DEFAULT_FILES);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_FILES));
+        }
+      } catch {
         setFiles(DEFAULT_FILES);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_FILES));
       }
     } else {
       setFiles(DEFAULT_FILES);
@@ -127,6 +148,11 @@ export function useFileSystem() {
     setFiles(templateFiles);
   }, []);
 
+  const resetToDefaults = useCallback(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_FILES));
+    setFiles(DEFAULT_FILES);
+  }, []);
+
   return {
     files,
     saveFile,
@@ -134,5 +160,6 @@ export function useFileSystem() {
     renameFile,
     deleteFile,
     loadTemplate,
+    resetToDefaults,
   };
 }

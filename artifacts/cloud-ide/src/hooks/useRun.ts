@@ -145,5 +145,13 @@ export function useRun() {
     setStream({ chunks: [], result: null });
   }, []);
 
-  return { isRunning, stream, output: stream.result, runsRemaining, runCode, clearOutput };
+  /** Show a client-side error in the console without making an API call */
+  const showClientError = useCallback((message: string) => {
+    setStream({
+      chunks: [{ type: "error", text: message }],
+      result: { stdout: "", stderr: message, exitCode: 1, duration: 0, error: "client" },
+    });
+  }, []);
+
+  return { isRunning, stream, output: stream.result, runsRemaining, runCode, clearOutput, showClientError };
 }

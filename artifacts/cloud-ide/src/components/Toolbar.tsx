@@ -1,6 +1,6 @@
 import {
   Play, Box, Download, Loader2, FolderOpen, ChevronDown,
-  Database, Share2, Compass, CheckCircle2, Gauge, LogOut, User,
+  Database, Share2, Compass, CheckCircle2, Gauge, LogOut, User, RotateCcw,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "./ui/button";
@@ -16,6 +16,7 @@ interface ToolbarProps {
   onNewProject:     () => void;
   onOpenProjects:   () => void;
   onShare?:         () => void;
+  onReset?:         () => void;
   buildStatus?:     string | null;
   jobId?:           string | null;
   currentLanguage?: string;
@@ -34,6 +35,7 @@ export function Toolbar({
   onNewProject,
   onOpenProjects,
   onShare,
+  onReset,
   buildStatus,
   jobId,
   currentLanguage,
@@ -79,6 +81,21 @@ export function Toolbar({
           <Database size={13} />
           <span className="hidden md:block">Projects</span>
         </button>
+
+        {onReset && (
+          <button
+            onClick={() => {
+              if (confirm("Reset to default JavaScript files? Your current code will be lost.")) {
+                onReset();
+              }
+            }}
+            title="Reset workspace to default JavaScript files"
+            className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-orange-400 transition-colors px-2 py-1 rounded hover:bg-orange-400/10 shrink-0"
+          >
+            <RotateCcw size={12} />
+            <span className="hidden lg:block">Reset</span>
+          </button>
+        )}
 
         <Link
           href="/explore"

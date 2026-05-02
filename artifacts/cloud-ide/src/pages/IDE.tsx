@@ -42,9 +42,9 @@ function getDisplayLanguage(filename: string): string | undefined {
 }
 
 export default function IDE() {
-  const { files, saveFile, createFile, renameFile, deleteFile, loadTemplate } = useFileSystem();
+  const { files, saveFile, createFile, renameFile, deleteFile, loadTemplate, resetToDefaults } = useFileSystem();
   const { isBuilding, startBuild, status, logs, jobId, projectType, previewData } = useBuild();
-  const { isRunning, stream, runsRemaining, runCode } = useRun();
+  const { isRunning, stream, runsRemaining, runCode, showClientError } = useRun();
   const { saveProject, createVersion } = useProjects();
   const { user } = useAuth();
 
@@ -146,6 +146,15 @@ export default function IDE() {
     });
   };
 
+  const MOBILE_IMPORT_PATTERNS = [
+    /from\s+['"]react-native['"]/,
+    /require\s*\(\s*['"]react-native['"]\s*\)/,
+    /from\s+['"]expo['"]/,
+    /from\s+['"]kivy/,
+    /import\s+kivy/,
+    /from\s+kivy\b/,
+  ];
+
   const handleRun = async () => {
     const file = activeFile;
     if (!file) return;
@@ -154,6 +163,20 @@ export default function IDE() {
     const lang = getExecLanguage(file);
     if (!lang) { setRightPanelTab("preview"); return; }
     if (lang === "html") { setHtmlPreview(content); setRightPanelTab("preview"); return; }
+
+    // Pre-flight: catch mobile-only imports before sending to executor
+    const hasMobileImport = MOBILE_IMPORT_PATTERNS.some(p => p.test(content));
+    if (hasMobileImport) {
+      setRightPanelTab("console");
+      showClientError(
+        "This file imports a mobile framework (react-native, expo, kivy) that\n" +
+        "cannot run in the browser sandbox.\n\n" +
+        "→ Use Build APK to compile it, or click New to start a\n" +
+        "  JavaScript / Python / HTML project that runs instantly."
+      );
+      return;
+    }
+
     setRightPanelTab("console");
     await runCode(lang, content, file);
   };
@@ -206,6 +229,14 @@ export default function IDE() {
         onNewProject={() => setShowTemplates(true)}
         onOpenProjects={() => user ? setShowProjects(true) : setShowSignIn(true)}
         onShare={() => user ? setShowShare(true) : setShowSignIn(true)}
+        onReset={() => {
+          resetToDefaults();
+          setOpenFiles([]);
+          setActiveFile(null);
+          setHtmlPreview(null);
+          setCurrentProjectId(null);
+          setCurrentProjectName("Untitled Project");
+        }}
         buildStatus={status?.status}
         jobId={jobId}
         currentLanguage={currentLanguage}
