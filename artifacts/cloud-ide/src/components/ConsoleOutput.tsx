@@ -56,7 +56,8 @@ export function ConsoleOutput({ stream, isRunning, runsRemaining }: ConsoleOutpu
           </kbd>{" "}
           to execute the current file.
         </p>
-        <p className="text-[10px] opacity-60">Supports: JavaScript · TypeScript · Python · HTML</p>
+        <p className="text-[10px] opacity-60">Execute: JS · TS · Python · Bash · Perl · C · C++</p>
+        <p className="text-[10px] opacity-40">Preview: HTML · CSS · Markdown · JSON · SVG</p>
         {runsRemaining !== null && runsRemaining !== undefined && (
           <p className={["text-[10px] mt-1", runsLow ? "text-orange-400" : "text-white/30"].join(" ")}>
             {runsRemaining === 0

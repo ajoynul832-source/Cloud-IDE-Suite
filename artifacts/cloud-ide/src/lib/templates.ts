@@ -1248,6 +1248,330 @@ print(sieve(50))
     },
   },
 
+  {
+    id: "api-mock",
+    name: "API Mock",
+    description: "Simulate REST API calls with mock data — fetch patterns, async/await, error handling",
+    icon: "🔌",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "api-mock.js": `// API Mock — simulates real REST API calls
+// The sandbox blocks network access, so we mock the responses here.
+// This shows real async/await + fetch patterns you can use in production.
+
+// ── Mock database ─────────────────────────────────────────────────────────────
+const DB = {
+  users: [
+    { id: 1, name: "Alice Chen",   email: "alice@example.com", role: "admin",  active: true  },
+    { id: 2, name: "Bob Smith",    email: "bob@example.com",   role: "user",   active: true  },
+    { id: 3, name: "Carol Davis",  email: "carol@example.com", role: "user",   active: false },
+    { id: 4, name: "Dave Wilson",  email: "dave@example.com",  role: "admin",  active: true  },
+  ],
+  posts: [
+    { id: 1, userId: 1, title: "Getting Started with CloudIDE", likes: 42 },
+    { id: 2, userId: 2, title: "10 JavaScript Tricks",          likes: 87 },
+    { id: 3, userId: 1, title: "Python vs JavaScript in 2024",  likes: 156 },
+  ],
+};
+
+// ── Mock fetch function ───────────────────────────────────────────────────────
+async function mockFetch(url, options = {}) {
+  await new Promise(r => setTimeout(r, 50 + Math.random() * 100)); // simulate latency
+
+  const method = (options.method ?? "GET").toUpperCase();
+  const body   = options.body ? JSON.parse(options.body) : null;
+
+  // Route: GET /users
+  if (url === "/api/users" && method === "GET") {
+    return { ok: true, status: 200, json: async () => ({ data: DB.users, total: DB.users.length }) };
+  }
+
+  // Route: GET /users/:id
+  const userMatch = url.match(/^\\/api\\/users\\/(\\d+)$/);
+  if (userMatch && method === "GET") {
+    const user = DB.users.find(u => u.id === parseInt(userMatch[1]));
+    if (!user) return { ok: false, status: 404, json: async () => ({ error: "User not found" }) };
+    return { ok: true, status: 200, json: async () => ({ data: user }) };
+  }
+
+  // Route: POST /users
+  if (url === "/api/users" && method === "POST") {
+    if (!body?.name || !body?.email) {
+      return { ok: false, status: 400, json: async () => ({ error: "name and email are required" }) };
+    }
+    const newUser = { id: DB.users.length + 1, role: "user", active: true, ...body };
+    DB.users.push(newUser);
+    return { ok: true, status: 201, json: async () => ({ data: newUser }) };
+  }
+
+  // Route: GET /posts
+  if (url === "/api/posts" && method === "GET") {
+    const enriched = DB.posts.map(p => ({
+      ...p,
+      author: DB.users.find(u => u.id === p.userId)?.name ?? "Unknown",
+    }));
+    return { ok: true, status: 200, json: async () => ({ data: enriched }) };
+  }
+
+  return { ok: false, status: 404, json: async () => ({ error: \`Route not found: \${method} \${url}\` }) };
+}
+
+// ── API client wrapper ────────────────────────────────────────────────────────
+async function apiCall(url, options = {}) {
+  try {
+    const res  = await mockFetch(url, options);
+    const data = await res.json();
+    if (!res.ok) throw new Error(\`\${res.status}: \${data.error}\`);
+    return data;
+  } catch (err) {
+    throw new Error(\`API Error — \${err.message}\`);
+  }
+}
+
+// ── Main program ──────────────────────────────────────────────────────────────
+async function main() {
+  console.log("=== GET /api/users ===");
+  const { data: users, total } = await apiCall("/api/users");
+  console.log(\`  Found \${total} users\`);
+  users.filter(u => u.active).forEach(u => console.log(\`  [\${u.id}] \${u.name} (\${u.role})\`));
+
+  console.log("\\n=== GET /api/users/2 ===");
+  const { data: bob } = await apiCall("/api/users/2");
+  console.log(\`  Name: \${bob.name}  Email: \${bob.email}\`);
+
+  console.log("\\n=== GET /api/users/99 (404) ===");
+  try { await apiCall("/api/users/99"); }
+  catch (e) { console.log(\`  Error: \${e.message}\`); }
+
+  console.log("\\n=== POST /api/users ===");
+  const { data: newUser } = await apiCall("/api/users", {
+    method: "POST",
+    body: JSON.stringify({ name: "Eve Torres", email: "eve@example.com" }),
+  });
+  console.log(\`  Created: [\${newUser.id}] \${newUser.name}\`);
+
+  console.log("\\n=== POST /api/users (400 — missing fields) ===");
+  try { await apiCall("/api/users", { method: "POST", body: JSON.stringify({ name: "Incomplete" }) }); }
+  catch (e) { console.log(\`  Error: \${e.message}\`); }
+
+  console.log("\\n=== GET /api/posts ===");
+  const { data: posts } = await apiCall("/api/posts");
+  posts.sort((a, b) => b.likes - a.likes).forEach(p =>
+    console.log(\`  [\${p.likes} ♥] \${p.title} — by \${p.author}\`)
+  );
+
+  console.log("\\n=== Parallel requests ===");
+  const [r1, r2] = await Promise.all([
+    apiCall("/api/users/1"),
+    apiCall("/api/users/4"),
+  ]);
+  console.log(\`  Parallel result: \${r1.data.name} & \${r2.data.name}\`);
+}
+
+main().catch(console.error);
+`,
+    },
+  },
+
+  {
+    id: "regex-playground",
+    name: "Regex Playground",
+    description: "Test regular expressions against text — matches, groups, replace, flags",
+    icon: "🔍",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "regex.js": `// Regex Playground — test patterns interactively
+
+function test(label, pattern, text, expected) {
+  const result = pattern.test(text);
+  const mark   = result === expected ? "✓" : "✗";
+  console.log(\`\${mark} \${label}: \${result}\`);
+}
+
+function matchAll(label, pattern, text) {
+  const matches = [...text.matchAll(pattern)];
+  console.log(\`\\n--- \${label} ---\`);
+  if (!matches.length) { console.log("  (no matches)"); return; }
+  matches.forEach((m, i) => {
+    const groups = m.groups
+      ? Object.entries(m.groups).map(([k, v]) => \`\${k}=\${JSON.stringify(v)}\`).join(", ")
+      : m.slice(1).map((g, j) => \`group\${j + 1}=\${JSON.stringify(g)}\`).join(", ");
+    console.log(\`  [\${i}] match=\${JSON.stringify(m[0])}  index=\${m.index}\${groups ? "  " + groups : ""}\`);
+  });
+}
+
+// ── 1. Basic validation ───────────────────────────────────────────────────────
+console.log("=== Email Validation ===");
+const EMAIL = /^[\\w.+-]+@[\\w-]+\\.[a-z]{2,}$/i;
+test("valid email",     EMAIL, "user@example.com",        true);
+test("valid subdomain", EMAIL, "user@mail.example.co.uk", false); // subdomain TLD
+test("missing @",       EMAIL, "userexample.com",         false);
+test("no TLD",          EMAIL, "user@example",            false);
+
+console.log("\\n=== Phone Numbers ===");
+const PHONE = /^(\\+1[- ]?)?(\\(\\d{3}\\)|\\d{3})[- ]?\\d{3}[- ]?\\d{4}$/;
+test("US with +1",     PHONE, "+1 (555) 867-5309", true);
+test("plain 10-digit", PHONE, "5558675309",        true);
+test("dashes",         PHONE, "555-867-5309",      true);
+test("too short",      PHONE, "555-867",           false);
+
+// ── 2. Named capture groups ───────────────────────────────────────────────────
+const DATE_RE = /(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})/g;
+const dateSrc  = "Launched 2024-03-15, updated 2024-11-02, deadline 2025-01-31";
+matchAll("ISO dates with named groups", DATE_RE, dateSrc);
+
+// ── 3. URL parser ─────────────────────────────────────────────────────────────
+const URL_RE = /(?<protocol>https?):\\/\\/(?<host>[^/]+)(?<path>\\/[^?#]*)?(?:\\?(?<query>[^#]*))?(?:#(?<hash>.*))?/g;
+const urls   = "Visit https://cloudide.app/ide?lang=js#console or http://example.com";
+matchAll("URL parts", URL_RE, urls);
+
+// ── 4. String replacement ─────────────────────────────────────────────────────
+console.log("\\n=== String Replace ===");
+const camel   = "getUserProfileData";
+const snake   = camel.replace(/([A-Z])/g, "_$1").toLowerCase();
+console.log(\`  camelCase → snake_case: "\${camel}" → "\${snake}"\`);
+
+const template = "Hello, {{name}}! You have {{count}} messages.";
+const result   = template.replace(/{{(\\w+)}}/g, (_, key) =>
+  ({ name: "Alice", count: 7 })[key] ?? \`{{MISSING:\${key}}}\`
+);
+console.log(\`  Template: "\${result}"\`);
+
+// ── 5. Extract all hashtags ───────────────────────────────────────────────────
+const tweet    = "Loving #JavaScript and #TypeScript! Check out #CloudIDE 🚀 #coding";
+const hashtags = tweet.match(/#\\w+/g) ?? [];
+console.log(\`\\n=== Hashtags ===\\n  \${hashtags.join(", ")}\`);
+
+// ── 6. Password strength ──────────────────────────────────────────────────────
+function passwordStrength(pw) {
+  const rules = [
+    [/[a-z]/,    "lowercase"],
+    [/[A-Z]/,    "uppercase"],
+    [/\\d/,       "digit"],
+    [/[^\\w]/,    "special char"],
+    [/.{8,}/,    "min 8 chars"],
+  ];
+  const passed = rules.filter(([re]) => re.test(pw));
+  const score  = passed.length;
+  const label  = score <= 2 ? "Weak" : score <= 3 ? "Fair" : score <= 4 ? "Good" : "Strong";
+  return { score, label, missing: rules.filter(([re]) => !re.test(pw)).map(([,l]) => l) };
+}
+console.log("\\n=== Password Strength ===");
+["abc", "password", "Pass1234", "P@ssw0rd!"].forEach(pw => {
+  const { score, label, missing } = passwordStrength(pw);
+  const missing_str = missing.length ? \`  missing: \${missing.join(", ")}\` : "";
+  console.log(\`  "\${pw.padEnd(12)}" → \${label} (\${score}/5)\${missing_str}\`);
+});
+`,
+    },
+  },
+
+  {
+    id: "data-structures",
+    name: "Data Structures",
+    description: "Linked list, hash map, binary search tree, and stack — all from scratch in JS",
+    icon: "🧱",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "data-structures.js": `// Data Structures from scratch in JavaScript
+
+// ── 1. Linked List ────────────────────────────────────────────────────────────
+class ListNode { constructor(val) { this.val = val; this.next = null; } }
+
+class LinkedList {
+  constructor() { this.head = null; this.size = 0; }
+  append(val)   { const n = new ListNode(val); if (!this.head) { this.head = n; } else { let c = this.head; while (c.next) c = c.next; c.next = n; } this.size++; }
+  prepend(val)  { const n = new ListNode(val); n.next = this.head; this.head = n; this.size++; }
+  remove(val)   { if (!this.head) return; if (this.head.val === val) { this.head = this.head.next; this.size--; return; } let c = this.head; while (c.next && c.next.val !== val) c = c.next; if (c.next) { c.next = c.next.next; this.size--; } }
+  toArray()     { const arr = []; let c = this.head; while (c) { arr.push(c.val); c = c.next; } return arr; }
+  reverse()     { let prev = null, curr = this.head; while (curr) { const next = curr.next; curr.next = prev; prev = curr; curr = next; } this.head = prev; }
+}
+
+const list = new LinkedList();
+[1,2,3,4,5].forEach(v => list.append(v));
+console.log("=== Linked List ===");
+console.log("  Forward:", list.toArray());
+list.reverse();
+console.log("  Reversed:", list.toArray());
+list.remove(3);
+console.log("  After remove(3):", list.toArray(), "| size:", list.size);
+
+// ── 2. HashMap (separate chaining) ───────────────────────────────────────────
+class HashMap {
+  constructor(capacity = 16) { this.buckets = Array.from({ length: capacity }, () => []); this.capacity = capacity; this.count = 0; }
+  _hash(key)    { let h = 0; for (const c of String(key)) h = (h * 31 + c.charCodeAt(0)) % this.capacity; return h; }
+  set(key, val) { const b = this.buckets[this._hash(key)]; const existing = b.find(([k]) => k === key); if (existing) { existing[1] = val; } else { b.push([key, val]); this.count++; } }
+  get(key)      { const b = this.buckets[this._hash(key)]; return b.find(([k]) => k === key)?.[1]; }
+  has(key)      { return this.get(key) !== undefined; }
+  delete(key)   { const i = this._hash(key); const b = this.buckets[i]; const idx = b.findIndex(([k]) => k === key); if (idx >= 0) { b.splice(idx, 1); this.count--; } }
+  keys()        { return this.buckets.flat().map(([k]) => k); }
+}
+
+console.log("\\n=== HashMap ===");
+const map = new HashMap();
+map.set("name", "Alice"); map.set("age", 30); map.set("city", "NYC");
+console.log("  name:", map.get("name"), "| age:", map.get("age"));
+console.log("  has('city'):", map.has("city"), "| has('zip'):", map.has("zip"));
+map.delete("age");
+console.log("  After delete('age') — keys:", map.keys().join(", "), "| count:", map.count);
+
+// ── 3. Binary Search Tree ─────────────────────────────────────────────────────
+class BSTNode { constructor(val) { this.val = val; this.left = this.right = null; } }
+
+class BST {
+  constructor() { this.root = null; }
+  insert(val) {
+    const n = new BSTNode(val);
+    if (!this.root) { this.root = n; return; }
+    let c = this.root;
+    while (true) {
+      if (val < c.val) { if (!c.left)  { c.left  = n; return; } c = c.left;  }
+      else             { if (!c.right) { c.right = n; return; } c = c.right; }
+    }
+  }
+  inorder(node = this.root, res = []) { if (node) { this.inorder(node.left, res); res.push(node.val); this.inorder(node.right, res); } return res; }
+  search(val, node = this.root) { if (!node) return false; if (val === node.val) return true; return val < node.val ? this.search(val, node.left) : this.search(val, node.right); }
+  height(node = this.root) { if (!node) return 0; return 1 + Math.max(this.height(node.left), this.height(node.right)); }
+}
+
+console.log("\\n=== Binary Search Tree ===");
+const bst = new BST();
+[50, 30, 70, 20, 40, 60, 80].forEach(v => bst.insert(v));
+console.log("  Inorder (sorted):", bst.inorder());
+console.log("  Search 40:", bst.search(40), "| Search 55:", bst.search(55));
+console.log("  Height:", bst.height());
+
+// ── 4. Stack ──────────────────────────────────────────────────────────────────
+class Stack {
+  constructor() { this.data = []; }
+  push(v)  { this.data.push(v); }
+  pop()    { return this.data.pop(); }
+  peek()   { return this.data[this.data.length - 1]; }
+  isEmpty(){ return this.data.length === 0; }
+  get size(){ return this.data.length; }
+}
+
+function isBalanced(s) {
+  const stack = new Stack();
+  const pairs = { ")": "(", "]": "[", "}": "{" };
+  for (const c of s) {
+    if ("([{".includes(c)) stack.push(c);
+    else if (c in pairs) { if (stack.isEmpty() || stack.pop() !== pairs[c]) return false; }
+  }
+  return stack.isEmpty();
+}
+
+console.log("\\n=== Stack (Balanced Brackets) ===");
+["{[()]}", "{[(])}", "((()))", "((())", "[]{}()"].forEach(s =>
+  console.log(\`  "\${s}" → \${isBalanced(s) ? "✓ balanced" : "✗ unbalanced"}\`)
+);
+`,
+    },
+  },
+
   // ── Mobile / Build Required ────────────────────────────────────────────────
   {
     id: "flutter",
