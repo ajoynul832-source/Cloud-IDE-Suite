@@ -113,12 +113,19 @@ export function AIChat({ onClose, currentFile, currentCode, currentContent, onIn
       ? `\n\nContext: ${currentFile ? `User is editing "${currentFile}".` : "User has code open."}\nCurrent code:\n\`\`\`\n${effectiveCode.slice(0, 2000)}\n\`\`\``
       : "";
 
+    const streamId = (Date.now() + 1).toString();
+
+    // Add a placeholder assistant message that will be updated as tokens stream in
+    const placeholder: Message = { role: "assistant", content: "", id: streamId };
+    setMessages((prev) => [...prev, placeholder]);
+
     try {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          stream: true,
           messages: [
             { role: "system", content: SYSTEM_PROMPT + contextInfo },
             ...messages.map((m) => ({ role: m.role, content: m.content })),
@@ -127,29 +134,59 @@ export function AIChat({ onClose, currentFile, currentCode, currentContent, onIn
         }),
       });
 
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(err.error ?? `HTTP ${res.status}`);
       }
 
-      const data = await res.json() as { reply?: string; error?: string };
-      if (data.error) throw new Error(data.error);
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = "";
 
-      const assistantMsg: Message = {
-        role: "assistant",
-        content: data.reply ?? "Sorry, I couldn't generate a response.",
-        id: (Date.now() + 1).toString(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6).trim();
+          if (payload === "[DONE]") break;
+
+          try {
+            const parsed = JSON.parse(payload) as { delta?: string; error?: string };
+            if (parsed.error) throw new Error(parsed.error);
+            if (parsed.delta) {
+              fullContent += parsed.delta;
+              // Update the placeholder message with accumulated content
+              setMessages((prev) =>
+                prev.map((m) => m.id === streamId ? { ...m, content: fullContent } : m)
+              );
+            }
+          } catch (parseErr) {
+            // Skip malformed SSE lines
+            if (parseErr instanceof SyntaxError) continue;
+            throw parseErr;
+          }
+        }
+      }
+
+      // Ensure we have at least something
+      if (!fullContent) {
+        setMessages((prev) =>
+          prev.map((m) => m.id === streamId ? { ...m, content: "Sorry, I couldn't generate a response." } : m)
+        );
+      }
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: `Error: ${err instanceof Error ? err.message : "Failed to connect to AI service"}`,
-          id: (Date.now() + 1).toString(),
-        },
-      ]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === streamId
+            ? { ...m, content: `Error: ${err instanceof Error ? err.message : "Failed to connect to AI service"}` }
+            : m
+        )
+      );
     } finally {
       setLoading(false);
     }

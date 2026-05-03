@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StreamState } from "@/hooks/useRun";
-import { Trash2, Clock, Copy, Check, Terminal, ChevronDown, ChevronRight } from "lucide-react";
+import { Trash2, Clock, Copy, Check, Terminal, ChevronDown, ChevronRight, Sparkles, Loader2, ChevronUp } from "lucide-react";
 
 interface ConsoleOutputProps {
   stream:          StreamState;
@@ -92,6 +92,42 @@ export function ConsoleOutput({ stream, isRunning, runsRemaining, stdinInput, on
   const [showTimestamps, setShowTimestamps] = useState(false);
   const [copied,         setCopied]         = useState(false);
   const [stdinOpen,      setStdinOpen]      = useState(false);
+  const [explaining,     setExplaining]     = useState<number | null>(null);
+  const [explanations,   setExplanations]   = useState<Map<number, string>>(new Map());
+  const [expandedExpls,  setExpandedExpls]  = useState<Set<number>>(new Set());
+
+  const explainError = async (chunkIndex: number, errorText: string) => {
+    setExplaining(chunkIndex);
+    setExpandedExpls((prev) => { const s = new Set(prev); s.add(chunkIndex); return s; });
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an expert debugging assistant. Explain the error in 2–3 plain sentences, then give a specific fix in 1–2 sentences. Be concise and direct. No markdown headers.",
+            },
+            { role: "user", content: `Error output:\n${errorText}` },
+          ],
+        }),
+      });
+      const data = await res.json() as { reply?: string; error?: string };
+      const text = data.reply ?? data.error ?? "Could not explain — AI service unavailable.";
+      setExplanations((prev) => { const m = new Map(prev); m.set(chunkIndex, text); return m; });
+    } catch {
+      setExplanations((prev) => {
+        const m = new Map(prev);
+        m.set(chunkIndex, "Could not explain — AI service unavailable.");
+        return m;
+      });
+    } finally {
+      setExplaining(null);
+    }
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -260,22 +296,73 @@ export function ConsoleOutput({ stream, isRunning, runsRemaining, stdinInput, on
       {/* Output area */}
       <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         {visibleChunks.map((chunk, i) => (
-          <div key={i} className={[
-            "flex items-start gap-2.5 leading-relaxed",
-            chunk.type === "stderr" ? "bg-red-500/8 px-2 py-1 rounded border-l-2 border-red-400/40" : "",
-          ].join(" ")}>
-            {showTimestamps && (
-              <span className="shrink-0 text-white/25 text-[9px] pt-0.5 select-none font-mono">
-                [{fmtTime(chunk.timestamp)}]
-              </span>
-            )}
-            <pre
-              className={[
-                "whitespace-pre-wrap text-[11px] flex-1 min-w-0 font-mono",
-                chunk.type === "stderr" ? "text-red-300 font-semibold" : "text-white/80",
-              ].join(" ")}
-              dangerouslySetInnerHTML={{ __html: ansiToHtml(chunk.text) }}
-            />
+          <div key={i}>
+            <div className={[
+              "flex items-start gap-2.5 leading-relaxed group",
+              chunk.type === "stderr" ? "bg-red-500/8 px-2 py-1 rounded-t border-l-2 border-red-400/40" : "",
+            ].join(" ")}>
+              {showTimestamps && (
+                <span className="shrink-0 text-white/25 text-[9px] pt-0.5 select-none font-mono">
+                  [{fmtTime(chunk.timestamp)}]
+                </span>
+              )}
+              <pre
+                className={[
+                  "whitespace-pre-wrap text-[11px] flex-1 min-w-0 font-mono",
+                  chunk.type === "stderr" ? "text-red-300 font-semibold" : "text-white/80",
+                ].join(" ")}
+                dangerouslySetInnerHTML={{ __html: ansiToHtml(chunk.text) }}
+              />
+              {chunk.type === "stderr" && !isRunning && (
+                <button
+                  onClick={() =>
+                    expandedExpls.has(i)
+                      ? setExpandedExpls((s) => { const n = new Set(s); n.delete(i); return n; })
+                      : explainError(i, chunk.text)
+                  }
+                  title="Explain this error with AI"
+                  disabled={explaining === i}
+                  className="shrink-0 mt-0.5 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono text-red-400/60 hover:text-[#4ade80] hover:bg-[#4ade80]/8 border border-transparent hover:border-[#4ade80]/20 transition-all opacity-0 group-hover:opacity-100 disabled:cursor-not-allowed"
+                >
+                  {explaining === i
+                    ? <Loader2 size={9} className="animate-spin" />
+                    : expandedExpls.has(i)
+                      ? <ChevronUp size={9} />
+                      : <Sparkles size={9} />
+                  }
+                  {explaining === i ? "…" : expandedExpls.has(i) ? "hide" : "explain"}
+                </button>
+              )}
+            </div>
+
+            {/* AI explanation panel */}
+            <AnimatePresence>
+              {chunk.type === "stderr" && expandedExpls.has(i) && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="ml-2 px-3 py-2 bg-[#4ade80]/5 border-l-2 border-[#4ade80]/30 border-b border-b-[#4ade80]/10 rounded-b text-[10px] font-mono text-white/65 leading-relaxed">
+                    {explaining === i ? (
+                      <span className="text-white/40 flex items-center gap-1.5">
+                        <Loader2 size={10} className="animate-spin text-[#4ade80]" />
+                        Asking AI to explain this error…
+                      </span>
+                    ) : explanations.get(i) ? (
+                      <div className="flex gap-2">
+                        <Sparkles size={10} className="text-[#4ade80] shrink-0 mt-0.5" />
+                        <span className="whitespace-pre-wrap">{explanations.get(i)}</span>
+                      </div>
+                    ) : (
+                      <span className="text-white/30">Loading explanation…</span>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         ))}
 

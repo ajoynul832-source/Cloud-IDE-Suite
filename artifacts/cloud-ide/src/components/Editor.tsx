@@ -19,7 +19,7 @@ import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { dracula } from "@uiw/codemirror-theme-dracula";
 import { monokai } from "@uiw/codemirror-theme-monokai";
 import { githubDark } from "@uiw/codemirror-theme-github";
-import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
+import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap, CompletionContext, CompletionResult } from "@codemirror/autocomplete";
 import { bracketMatching, indentOnInput, syntaxTree, foldGutter, foldKeymap, indentUnit } from "@codemirror/language";
 
 // ── Theme system ───────────────────────────────────────────────────────────────
@@ -152,6 +152,52 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
       const ext          = filename.split(".").pop()?.toLowerCase() ?? "";
       const canLint      = LINTABLE_EXTS.has(ext);
 
+      // ── AI inline completion source (Ctrl+Space to trigger) ─────────────────
+      // Fetches a suggestion from /api/ai/complete using the code context.
+      const aiCompletionSource = async (context: CompletionContext): Promise<CompletionResult | null> => {
+        if (!context.explicit) return null; // only on Ctrl+Space, not while typing
+
+        const pos    = context.pos;
+        const text   = context.state.doc.toString();
+        const prefix = text.slice(Math.max(0, pos - 800), pos);
+        const suffix = text.slice(pos, Math.min(text.length, pos + 200));
+
+        try {
+          const ctrl = new AbortController();
+          const tid  = setTimeout(() => ctrl.abort(), 10_000);
+          const res  = await fetch("/api/ai/complete", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prefix, suffix, filename }),
+            signal: ctrl.signal,
+          });
+          clearTimeout(tid);
+
+          if (!res.ok) return null;
+          const data = await res.json() as { completion?: string };
+          const completion = data.completion?.trim();
+          if (!completion) return null;
+
+          const lines = completion.split("\n");
+          const label = lines[0].slice(0, 70) + (lines.length > 1 ? " …" : "");
+
+          return {
+            from: pos,
+            options: [{
+              label,
+              detail: "✨ AI",
+              apply: completion,
+              boost: 99,
+              type: "text",
+            }],
+            validFor: /.*/,
+          };
+        } catch {
+          return null;
+        }
+      };
+
       const extensions: Extension[] = [
         lineNumbers(),
         highlightActiveLine(),
@@ -188,7 +234,7 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
         ]),
         getLanguageExtension(filename),
         getThemeExtension(theme),
-        autocompletion({ defaultKeymap: false }),
+        autocompletion({ defaultKeymap: false, override: [aiCompletionSource] }),
         search({ top: true }),
         keymap.of(searchKeymap),
         EditorView.theme({
