@@ -547,6 +547,8 @@ export default function IDE() {
         showBuildButton={isMobileProject}
         onDownload={handleDownload}
         onFormat={handleFormat}
+        wordWrap={wordWrap}
+        onWordWrapToggle={toggleWordWrap}
       />
 
       {/* Guest warning banner */}
@@ -646,6 +648,7 @@ export default function IDE() {
               snackPlatform={snackPlatform}
               onPlatform={setSnackPlatform}
               onSyncNow={syncNow}
+              files={files}
             />
           </ResizablePanel>
         </ResizablePanelGroup>

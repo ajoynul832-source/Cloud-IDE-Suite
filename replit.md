@@ -74,7 +74,7 @@ A professional browser-based code IDE with:
 - **CodeMirror 6 editor** with syntax highlighting for 20+ languages, 4 themes
 - **Multi-tab editor** with localStorage-based file persistence
 - **File tree** with folder grouping, language icons, inline rename, create/delete, expand/collapse
-- **30+ project templates** — Quick Start, More Languages, Mobile/Build Required sections
+- **35+ project templates** — Quick Start (Runnable Now), More Runnable, Live Preview, Mobile sections
 - **SSE streaming execution** — real-time line-by-line output via `POST /api/run/stream`
 - **Stdin support** — collapsible Stdin panel in Console tab; programs using `input()` / `scanf()` / `cin >>` work with provided input
 - **Project save/load** — PostgreSQL-backed, scoped per authenticated user
@@ -82,12 +82,30 @@ A professional browser-based code IDE with:
 - **Resizable panels**: file tree, editor, preview/log panel
 - **Language badge + cursor position** in StatusBar (line/column)
 - **Live auto-preview** — HTML/CSS/Markdown/JSON/SVG auto-refresh on every keystroke (500ms debounce); pulsing green "Live" badge on Preview tab
+- **React Native Web runner** — Mobile/RN templates run live in browser (Web tab) via RNW 0.19.12 + Babel standalone; no Expo API for web preview
+- **Expo Snack QR codes** — Android/iOS tabs sync to Expo Snack for real-device testing via Expo Go
 - **Version history** — up to 10 snapshots per project with restore
 - **Settings panel** — gear icon or Ctrl+, → theme, font size (10–24px), word wrap
+- **Word wrap toggle** — toolbar WrapText button (Alt+Z) with visual on/off state
 - **Keyboard shortcuts** — ? → modal with full list; Ctrl+Enter=run, Ctrl+Shift+F=format, Ctrl+,=settings
 - **Prettier formatting** — Ctrl+Shift+F, supports JS/TS/JSON/HTML/CSS/Markdown
 - **Explore gallery** — search + language filter chips, fork/view counts
 - **SharedProject page** — read-only view, fork CTA, stats
+
+### React Native Web Preview (How It Works)
+1. `useSnackSync` detects `from 'react-native'` / `from 'expo'` imports → sets `isRNProject=true`
+2. IDE auto-switches right panel to "Phone Preview", passes `files` prop to PreviewPanel → MobilePreview
+3. `MobilePreview` debounces file changes (2 s), calls `generateReactNativeWebPreview(files)`
+4. `transformRNCode()` in `preview-generators.ts` rewrites imports to globals:
+   - `import { View } from 'react-native'` → `const { View } = ReactNativeWeb;`
+   - `import React, { useState } from 'react'` → `const { useState } = React;`
+   - `export default function App()` → `function App()`
+5. Transformed code stored as JSON in `<script type="application/json">` (HTML-safe)
+6. CDN scripts: React 18 UMD + ReactDOM + RNW 0.19.12 + Babel standalone 7.23
+7. Babel transforms JSX; indirect `eval()` runs code in global scope → `window.App`
+8. `AppRegistry.runApplication()` mounts App into `<div id="root">`
+9. Whole page served as `blob://` URL in iframe (no CORS, no network round-trip)
+- Android/iOS tabs still use Expo Snack for QR code generation
 
 ### Supported Languages (CodeMirror 6 editor)
 

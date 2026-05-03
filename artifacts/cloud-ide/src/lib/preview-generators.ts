@@ -1,7 +1,9 @@
 /**
- * Client-side preview generators for CSS, Markdown, JSON, and SVG.
+ * Client-side preview generators for CSS, Markdown, JSON, SVG, and
+ * React Native Web (live in-browser runner via Babel + RNW).
+ *
  * Each function returns a complete, self-contained HTML string that
- * can be set as the srcDoc of a sandboxed iframe.
+ * can be set as the srcDoc of a sandboxed iframe, or served via a blob URL.
  */
 
 // ─── CSS Preview ─────────────────────────────────────────────────────────────
@@ -13,11 +15,9 @@ export function generateCSSPreview(css: string): string {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>CSS Preview</title>
   <style>
-    /* ── Sensible reset so user CSS starts clean ── */
     *, *::before, *::after { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif; font-size: 16px; line-height: 1.5; }
-    /* ─────────────────────────────────────────────── */
     /* USER CSS — everything below is your stylesheet */
     ${css}
   </style>
@@ -28,111 +28,80 @@ export function generateCSSPreview(css: string): string {
     <header class="header site-header top-bar">
       <div class="brand logo site-title">
         <h1>CSS <span class="accent highlight">Preview</span></h1>
+        <p class="subtitle tagline">Your styles applied below</p>
       </div>
-      <nav class="nav navigation menu">
-        <a href="#" class="link nav-link active current">Home</a>
-        <a href="#" class="link nav-link">About</a>
-        <a href="#" class="link nav-link">Work</a>
-        <a href="#" class="link nav-link">Contact</a>
+      <nav class="nav navbar menu">
+        <a class="link nav-link" href="#">Home</a>
+        <a class="link nav-link active current" href="#">About</a>
+        <a class="link nav-link" href="#">Work</a>
+        <button class="btn button cta primary">Get Started</button>
       </nav>
     </header>
 
-    <main class="main content body">
+    <main class="main content main-content">
 
       <section class="section hero banner">
-        <h2 class="title heading section-title">Welcome to the Preview</h2>
-        <p class="text description subtitle lead">
-          Your styles are applied to all these elements. Edit the CSS and click
-          <strong>Run</strong> to see changes instantly.
+        <h2 class="title heading hero-title">Hero Section</h2>
+        <p class="text body-text lead description">
+          This preview page contains common HTML elements so you can see how
+          your stylesheet affects real content. Edit the CSS on the left to
+          watch it update here in real time.
         </p>
-        <p>
-          This is regular <strong>bold text</strong>, <em>italic text</em>,
-          <a href="#" class="link">a hyperlink</a>, and
-          <code class="code inline-code">inline code</code>.
-        </p>
-      </section>
-
-      <section class="section buttons-section">
-        <h3 class="title section-title">Buttons &amp; Inputs</h3>
-        <div class="row flex-row button-group" style="display:flex;gap:.6rem;flex-wrap:wrap;margin:.75rem 0">
-          <button class="btn button primary cta">Primary</button>
-          <button class="btn button secondary">Secondary</button>
-          <button class="btn button outline ghost">Outline</button>
-          <button class="btn button danger destructive">Danger</button>
-          <button class="btn button sm small" disabled>Disabled</button>
-        </div>
-        <div class="field form-group" style="display:flex;flex-direction:column;gap:.5rem;max-width:320px">
-          <input  type="text"     class="input field-input text-input" placeholder="Text input…">
-          <input  type="email"    class="input field-input email-input" placeholder="Email address…">
-          <select class="input select dropdown">
-            <option>Option one</option><option>Option two</option><option>Option three</option>
-          </select>
-          <textarea class="input textarea" rows="3" placeholder="Textarea…"></textarea>
+        <div class="actions buttons">
+          <button class="btn button primary cta">Primary Action</button>
+          <button class="btn button secondary outline">Secondary</button>
         </div>
       </section>
 
-      <section class="section cards-section">
-        <h3 class="title section-title">Cards</h3>
-        <div class="grid cards card-grid" style="display:flex;gap:1rem;flex-wrap:wrap">
-          <div class="card item box panel">
-            <div class="card-header"><h4 class="card-title">Card One</h4></div>
-            <div class="card-body"><p class="card-text text">Sample card with typical content.</p></div>
-            <div class="card-footer"><button class="btn button">Action</button></div>
-          </div>
-          <div class="card item box panel featured highlight active">
-            <div class="card-header"><h4 class="card-title">Featured</h4></div>
-            <div class="card-body"><p class="card-text text">A featured / highlighted variant.</p></div>
-            <div class="card-footer">
-              <span class="badge tag chip label pill">NEW</span>
-            </div>
-          </div>
-          <div class="card item box panel dark">
-            <div class="card-header"><h4 class="card-title">Dark Card</h4></div>
-            <div class="card-body"><p class="card-text text">Dark variant with more classes.</p></div>
-          </div>
+      <section class="section cards grid">
+        <div class="card box panel">
+          <h3 class="card-title title">Card One</h3>
+          <p class="card-body text">Flexbox, Grid, custom properties — all your layout tools, live.</p>
+          <span class="badge tag label">New</span>
+        </div>
+        <div class="card box panel">
+          <h3 class="card-title title">Card Two</h3>
+          <p class="card-body text">Animate hover states, transitions, and transforms instantly.</p>
+          <span class="badge tag label secondary">Beta</span>
+        </div>
+        <div class="card box panel">
+          <h3 class="card-title title">Card Three</h3>
+          <p class="card-body text">Media queries, dark mode, custom fonts — all reflected here.</p>
+          <span class="badge tag label accent">Hot</span>
         </div>
       </section>
 
-      <section class="section lists-section">
-        <h3 class="title section-title">Lists &amp; Tables</h3>
-        <ul class="list ul items">
+      <section class="section form-section">
+        <form class="form">
+          <label class="label field-label">Email address</label>
+          <input class="input field text-field" type="email" placeholder="you@example.com" />
+          <label class="label field-label">Message</label>
+          <textarea class="textarea field" rows="3" placeholder="Write something…"></textarea>
+          <button class="btn button submit primary" type="submit">Send</button>
+        </form>
+      </section>
+
+      <section class="section typography-section">
+        <h1 class="heading h1">Heading 1</h1>
+        <h2 class="heading h2">Heading 2</h2>
+        <h3 class="heading h3">Heading 3</h3>
+        <p class="text paragraph">Regular paragraph text with <strong class="strong bold">bold</strong>,
+          <em class="em italic">italic</em>, and <code class="code inline-code">inline code</code>.</p>
+        <ul class="list ul">
           <li class="item list-item">List item one</li>
-          <li class="item list-item active selected">Active item two</li>
+          <li class="item list-item">List item two</li>
           <li class="item list-item">List item three</li>
         </ul>
-        <table class="table data-table" style="margin-top:1rem;width:100%;max-width:480px">
-          <thead class="thead table-head">
-            <tr><th>Language</th><th>Runs</th><th>Status</th></tr>
-          </thead>
-          <tbody class="tbody table-body">
-            <tr class="row tr even"><td>JavaScript</td><td>1,240</td><td class="status success">Active</td></tr>
-            <tr class="row tr odd"> <td>Python</td>    <td>892</td>  <td class="status success">Active</td></tr>
-            <tr class="row tr even"><td>C / C++</td>   <td>134</td>  <td class="status new">New</td></tr>
-          </tbody>
-        </table>
-      </section>
-
-      <section class="section alerts-section">
-        <h3 class="title section-title">Alerts &amp; Badges</h3>
-        <div class="alert notification message info"    role="alert">ℹ Info alert message</div>
-        <div class="alert notification message success" role="alert">✓ Success alert message</div>
-        <div class="alert notification message warning" role="alert">⚠ Warning alert message</div>
-        <div class="alert notification message error danger" role="alert">✕ Error / danger alert</div>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">
-          <span class="badge tag chip label pill">Default</span>
-          <span class="badge tag chip label pill primary">Primary</span>
-          <span class="badge tag chip label pill success">Success</span>
-          <span class="badge tag chip label pill warning">Warning</span>
-          <span class="badge tag chip label pill error danger">Error</span>
-        </div>
+        <blockquote class="blockquote quote">
+          "Design is not just what it looks like and feels like. Design is how it works."
+        </blockquote>
       </section>
 
     </main>
 
     <footer class="footer site-footer bottom-bar">
-      <p class="copyright text muted">© 2024 CloudIDE CSS Preview — styles applied live.</p>
+      <p class="copyright text">&copy; 2025 CSS Preview — CloudIDE</p>
     </footer>
-
   </div>
 </body>
 </html>`;
@@ -140,335 +109,459 @@ export function generateCSSPreview(css: string): string {
 
 // ─── Markdown Preview ─────────────────────────────────────────────────────────
 export function generateMarkdownPreview(markdown: string): string {
-  // The actual parsing runs inside the sandboxed iframe via inline JS
-  const escaped = JSON.stringify(markdown);
+  const escape = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const lines   = markdown.split("\n");
+  const html: string[] = [];
+  let inCode    = false;
+  let codeLang  = "";
+  let codeLines: string[] = [];
+  let inUl      = false;
+  let inOl      = false;
+  let ulDepth   = 0;
+
+  const closeList = () => {
+    if (inUl)      { html.push("</ul>"); inUl = false; }
+    else if (inOl) { html.push("</ol>"); inOl = false; }
+  };
+
+  const inlineMarkdown = (text: string): string => {
+    return escape(text)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+      .replace(/~~([^~]+)~~/g, "<del>$1</del>")
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine;
+
+    if (line.startsWith("```")) {
+      if (inCode) {
+        html.push(`<pre><code class="language-${escape(codeLang)}">${codeLines.map(escape).join("\n")}</code></pre>`);
+        inCode = false; codeLines = []; codeLang = "";
+      } else {
+        closeList();
+        inCode = true; codeLang = line.slice(3).trim();
+      }
+      continue;
+    }
+    if (inCode) { codeLines.push(line); continue; }
+
+    if (line.startsWith("# "))       { closeList(); html.push(`<h1>${inlineMarkdown(line.slice(2))}</h1>`);  continue; }
+    if (line.startsWith("## "))      { closeList(); html.push(`<h2>${inlineMarkdown(line.slice(3))}</h2>`);  continue; }
+    if (line.startsWith("### "))     { closeList(); html.push(`<h3>${inlineMarkdown(line.slice(4))}</h3>`);  continue; }
+    if (line.startsWith("#### "))    { closeList(); html.push(`<h4>${inlineMarkdown(line.slice(5))}</h4>`);  continue; }
+    if (line.startsWith("##### "))   { closeList(); html.push(`<h5>${inlineMarkdown(line.slice(6))}</h5>`);  continue; }
+    if (line.startsWith("###### "))  { closeList(); html.push(`<h6>${inlineMarkdown(line.slice(7))}</h6>`);  continue; }
+    if (line.startsWith("> "))       { closeList(); html.push(`<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`); continue; }
+    if (/^[-*+] /.test(line))        {
+      if (!inUl) { closeList(); html.push("<ul>"); inUl = true; }
+      html.push(`<li>${inlineMarkdown(line.slice(2))}</li>`);
+      continue;
+    }
+    if (/^\d+\. /.test(line))        {
+      if (!inOl) { closeList(); html.push("<ol>"); inOl = true; }
+      html.push(`<li>${inlineMarkdown(line.replace(/^\d+\. /, ""))}</li>`);
+      continue;
+    }
+    if (/^[-*_]{3,}$/.test(line.trim())) { closeList(); html.push("<hr>"); continue; }
+    if (line.trim() === "") { closeList(); html.push("<p></p>"); continue; }
+
+    const isTable = line.includes("|");
+    if (isTable && !inUl && !inOl) {
+      const cells = line.split("|").filter(c => c.trim() !== "").map(c => inlineMarkdown(c.trim()));
+      if (line.replace(/[\s|-]/g, "") === "") { continue; }
+      html.push(`<tr>${cells.map(c => `<td>${c}</td>`).join("")}</tr>`);
+      continue;
+    }
+
+    closeList();
+    html.push(`<p>${inlineMarkdown(line)}</p>`);
+  }
+  closeList();
+  if (inCode) {
+    html.push(`<pre><code class="language-${escape(codeLang)}">${codeLines.map(escape).join("\n")}</code></pre>`);
+  }
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Markdown Preview</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    body {
-      background: #0d1117;
-      color: #e6edf3;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 15px;
-      line-height: 1.7;
-      max-width: 780px;
-      margin: 0 auto;
-      padding: 2rem 1.5rem 4rem;
-    }
-    h1,h2 { border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom:.3em; }
-    h1 { font-size:2em;    color:#fff;    margin-top:1em; }
-    h2 { font-size:1.5em;  color:#e6edf3; margin-top:1.25em; }
-    h3 { font-size:1.25em; margin-top:1em; }
-    h4,h5,h6 { margin-top:.75em; }
-    h1,h2,h3,h4,h5,h6 { font-weight:600; line-height:1.25; }
-    p  { margin:.75em 0; }
-    a  { color:#58a6ff; }
-    a:hover { text-decoration:underline; }
-    code {
-      background: rgba(110,118,129,.2);
-      padding:.2em .4em;
-      border-radius:4px;
-      font-family:'Menlo','Monaco','Courier New',monospace;
-      font-size:.88em;
-      color:#f78166;
-    }
-    pre {
-      background:#161b22;
-      border:1px solid rgba(255,255,255,.1);
-      border-radius:8px;
-      padding:1rem;
-      overflow-x:auto;
-      margin:1em 0;
-    }
-    pre code { background:none; padding:0; color:#e6edf3; font-size:.88em; }
-    blockquote {
-      border-left:4px solid #4ade80;
-      margin:1em 0;
-      padding:.5em 1em;
-      color:#8b949e;
-      background:rgba(74,222,128,.05);
-      border-radius:0 6px 6px 0;
-    }
-    ul,ol { padding-left:2em; margin:.75em 0; }
-    li { margin:.2em 0; }
-    hr { border:none; border-top:1px solid rgba(255,255,255,.1); margin:2em 0; }
-    table { border-collapse:collapse; width:100%; margin:1em 0; }
-    th,td { border:1px solid rgba(255,255,255,.1); padding:.5em .75em; text-align:left; }
-    th { background:rgba(255,255,255,.06); font-weight:600; }
-    tr:nth-child(even) td { background:rgba(255,255,255,.02); }
-    img { max-width:100%; border-radius:6px; }
-    strong { color:#e6edf3; }
-    del { color:#8b949e; }
-    .task-item { list-style:none; margin-left:-1.5em; }
+    :root { --bg: #0d1117; --fg: #e6edf3; --muted: #7d8590; --border: #30363d;
+            --code-bg: #161b22; --link: #58a6ff; --accent: #4ade80; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--fg); font: 15px/1.7 'Segoe UI', system-ui, sans-serif; padding: 32px max(16px, calc(50% - 380px)); }
+    h1, h2, h3, h4, h5, h6 { color: var(--fg); font-weight: 600; margin: 1.4em 0 .5em; line-height: 1.3; }
+    h1 { font-size: 1.9em; border-bottom: 1px solid var(--border); padding-bottom: .4em; }
+    h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: .3em; }
+    h3 { font-size: 1.2em; } h4 { font-size: 1em; }
+    p { margin: .7em 0; color: var(--fg); }
+    a { color: var(--link); text-decoration: none; } a:hover { text-decoration: underline; }
+    strong { font-weight: 700; } em { font-style: italic; } del { opacity: .6; }
+    code { font: 13px/1.4 'SF Mono', Menlo, Consolas, monospace; background: var(--code-bg);
+           color: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+    pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+          padding: 16px; overflow-x: auto; margin: 1em 0; }
+    pre code { background: none; border: none; padding: 0; color: var(--fg); font-size: 13px; }
+    blockquote { border-left: 3px solid var(--accent); margin: 1em 0; padding: .4em 1em;
+                 color: var(--muted); background: var(--code-bg); border-radius: 0 6px 6px 0; }
+    ul, ol { padding-left: 1.6em; margin: .6em 0; }
+    li { margin: .25em 0; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    td, th { border: 1px solid var(--border); padding: 8px 12px; font-size: .9em; }
+    tr:nth-child(even) { background: var(--code-bg); }
+    p:empty { height: .4em; }
   </style>
 </head>
-<body>
-  <div id="root"></div>
-  <script>
-    var src = ${escaped};
-
-    function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-    function parse(md) {
-      // Stash fenced code blocks
-      var codeBlocks = [];
-      var out = md.replace(/\`\`\`(\\w*)\\n?([\\s\\S]*?)\`\`\`/g, function(_,lang,code){
-        codeBlocks.push({lang:lang||'',code:code});
-        return '\\x00CB'+(codeBlocks.length-1)+'\\x00';
-      });
-
-      // Stash inline code
-      var inlineCodes = [];
-      out = out.replace(/\`([^\`\\n]+)\`/g, function(_,code){
-        inlineCodes.push(code);
-        return '\\x00IC'+(inlineCodes.length-1)+'\\x00';
-      });
-
-      // Escape remaining HTML
-      out = esc(out);
-
-      // Headings
-      out = out.replace(/^(#{1,6})\\s+(.+)$/gm, function(_,h,t){
-        return '<h'+h.length+'>'+t.trim()+'</h'+h.length+'>';
-      });
-
-      // Bold + italic
-      out = out.replace(/\\*\\*\\*(.+?)\\*\\*\\*/g, '<strong><em>$1</em></strong>');
-      out = out.replace(/\\*\\*(.+?)\\*\\*/g,       '<strong>$1</strong>');
-      out = out.replace(/__(.+?)__/g,                '<strong>$1</strong>');
-      out = out.replace(/\\*([^*\\n]+?)\\*/g,        '<em>$1</em>');
-      out = out.replace(/_([^_\\n]+?)_/g,            '<em>$1</em>');
-      out = out.replace(/~~(.+?)~~/g,                '<del>$1</del>');
-
-      // Images before links
-      out = out.replace(/!\\[([^\\]]*)\\]\\(([^)]+)\\)/g, '<img alt="$1" src="$2">');
-      // Links
-      out = out.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g,
-        '<a href="$2" target="_blank" rel="noopener">$1</a>');
-
-      // Blockquotes
-      out = out.replace(/^&gt;\\s*(.+)$/gm, '<blockquote>$1</blockquote>');
-
-      // HR
-      out = out.replace(/^[-*_]{3,}\\s*$/gm, '<hr>');
-
-      // Tables
-      out = out.replace(/((?:^\\|.+\\|\\s*\\n)+)/gm, function(table){
-        var rows = table.trim().split('\\n');
-        var result = '<table>';
-        var isHead = true;
-        rows.forEach(function(row){
-          if (/^[\\|\\s\\-:]+$/.test(row)){ isHead=false; return; }
-          var cells = row.split('|').slice(1,-1);
-          var tag = isHead ? 'th' : 'td';
-          result += '<tr>' + cells.map(function(c){ return '<'+tag+'>'+c.trim()+'</'+tag+'>'; }).join('') + '</tr>';
-          if (isHead) isHead = false;
-        });
-        return result + '</table>';
-      });
-
-      // Task list items
-      out = out.replace(/^\\s*- \\[x\\] (.+)$/gim, '<li class="task-item">☑ $1</li>');
-      out = out.replace(/^\\s*- \\[ \\] (.+)$/gim, '<li class="task-item">☐ $1</li>');
-
-      // Unordered lists
-      out = out.replace(/((?:^\\s*[-*+] .+\\n?)+)/gm, function(block){
-        var items = block.trim().split('\\n').map(function(l){
-          return '<li>'+l.replace(/^\\s*[-*+] /,'')+'</li>';
-        });
-        return '<ul>'+items.join('')+'</ul>\\n';
-      });
-
-      // Ordered lists
-      out = out.replace(/((?:^\\d+\\. .+\\n?)+)/gm, function(block){
-        var items = block.trim().split('\\n').map(function(l){
-          return '<li>'+l.replace(/^\\d+\\. /,'')+'</li>';
-        });
-        return '<ol>'+items.join('')+'</ol>\\n';
-      });
-
-      // Paragraphs (lines not starting with a tag)
-      out = out.replace(/^([^<\\n][^\\n]*)$/gm, '<p>$1</p>');
-
-      // Restore inline code
-      out = out.replace(/\\x00IC(\\d+)\\x00/g, function(_,i){
-        return '<code>'+esc(inlineCodes[+i])+'</code>';
-      });
-
-      // Restore code blocks
-      out = out.replace(/\\x00CB(\\d+)\\x00/g, function(_,i){
-        var b = codeBlocks[+i];
-        return '<pre><code class="lang-'+b.lang+'">'+esc(b.code.replace(/\\n$/,''))+'</code></pre>';
-      });
-
-      return out;
-    }
-
-    document.getElementById('root').innerHTML = parse(src);
-  </script>
-</body>
+<body>${html.join("\n")}</body>
 </html>`;
 }
 
-// ─── JSON Viewer ──────────────────────────────────────────────────────────────
-export function generateJSONPreview(jsonContent: string): string {
-  const escaped = JSON.stringify(jsonContent);
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>JSON Viewer</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    body {
-      background: #0d1117;
-      color: #e6edf3;
-      font-family: 'Menlo','Monaco','Courier New',monospace;
-      font-size: 13px;
-      line-height: 1.6;
-      margin: 0;
-      padding: 1rem;
-    }
-    .meta { font-size: .8em; color: #8b949e; margin-bottom: .75rem; padding: .4rem .75rem; background: rgba(255,255,255,.04); border-radius: 6px; display:flex; gap:1rem; flex-wrap:wrap; }
-    .valid  { color: #4ade80; }
-    .error  { color: #ff7b72; background: rgba(255,123,114,.08); border:1px solid rgba(255,123,114,.2); padding:1rem; border-radius:8px; white-space:pre-wrap; }
-    .key    { color: #79c0ff; }
-    .str    { color: #a5d6ff; }
-    .num    { color: #f78166; }
-    .bool   { color: #ff7b72; font-weight:600; }
-    .null   { color: #8b949e; font-style:italic; }
-    pre     { margin: 0; white-space: pre-wrap; word-break: break-all; }
-  </style>
-</head>
-<body>
-  <div id="root"></div>
-  <script>
-    var raw = ${escaped};
-    var root = document.getElementById('root');
+// ─── JSON Preview ─────────────────────────────────────────────────────────────
+export function generateJSONPreview(jsonStr: string): string {
+  let parsed: unknown;
+  let parseError: string | null = null;
+  try { parsed = JSON.parse(jsonStr); }
+  catch (e) { parseError = e instanceof Error ? e.message : "Invalid JSON"; }
 
-    function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-    function hl(json) {
-      return esc(json).replace(
-        /("(\\\\u[a-zA-Z0-9]{4}|\\\\[^u]|[^\\\\"])*"(\\s*:)?|\\b(true|false|null)\\b|-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)/g,
-        function(m){
-          var cls = 'num';
-          if (/^"/.test(m))          cls = /:$/.test(m) ? 'key' : 'str';
-          else if (/true|false/.test(m)) cls = 'bool';
-          else if (/null/.test(m))       cls = 'null';
-          return '<span class="'+cls+'">'+m+'</span>';
-        }
+  const colorize = (obj: unknown, depth = 0): string => {
+    const indent = "  ".repeat(depth);
+    const inner  = "  ".repeat(depth + 1);
+    if (obj === null) return '<span class="null">null</span>';
+    if (typeof obj === "boolean")
+      return `<span class="${obj ? "bool-t" : "bool-f"}">${obj}</span>`;
+    if (typeof obj === "number")
+      return `<span class="num">${obj}</span>`;
+    if (typeof obj === "string")
+      return `<span class="str">"${obj.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}"</span>`;
+    if (Array.isArray(obj)) {
+      if (obj.length === 0) return "[]";
+      const items = obj.map((v, i) =>
+        `${inner}${colorize(v, depth + 1)}${i < obj.length - 1 ? "," : ""}`
       );
+      return `[\n${items.join("\n")}\n${indent}]`;
     }
+    if (typeof obj === "object") {
+      const entries = Object.entries(obj as Record<string, unknown>);
+      if (entries.length === 0) return "{}";
+      const items = entries.map(([k, v], i) =>
+        `${inner}<span class="key">"${k.replace(/"/g,"&quot;")}"</span>: ${colorize(v, depth + 1)}${i < entries.length - 1 ? "," : ""}`
+      );
+      return `{\n${items.join("\n")}\n${indent}}`;
+    }
+    return String(obj);
+  };
 
-    function countNodes(val) {
-      if (typeof val !== 'object' || val === null) return 1;
-      return Object.values(val).reduce(function(a,v){ return a + countNodes(v); }, 0);
-    }
+  const body = parseError
+    ? `<div class="err">⚠ Parse error: ${parseError.replace(/</g,"&lt;")}</div>`
+    : `<pre>${colorize(parsed)}</pre>`;
 
-    try {
-      var parsed = JSON.parse(raw);
-      var pretty = JSON.stringify(parsed, null, 2);
-      var type   = Array.isArray(parsed) ? 'array['+parsed.length+']' : typeof parsed;
-      var nodes  = countNodes(parsed);
-      root.innerHTML =
-        '<div class="meta">' +
-          '<span class="valid">✓ Valid JSON</span>' +
-          '<span>' + raw.length.toLocaleString() + ' chars</span>' +
-          '<span>type: ' + type + '</span>' +
-          '<span>' + nodes.toLocaleString() + ' values</span>' +
-        '</div>' +
-        '<pre>' + hl(pretty) + '</pre>';
-    } catch(e) {
-      root.innerHTML =
-        '<div class="error"><strong>Invalid JSON</strong>\\n' + e.message + '\\n\\n' + esc(raw) + '</div>';
-    }
-  </script>
-</body>
-</html>`;
+  return `<!DOCTYPE html>
+<html><head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JSON Preview</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0d1117;color:#e6edf3;font:13px/1.6 'SF Mono',Menlo,Consolas,monospace;padding:16px}
+    pre{white-space:pre-wrap;word-break:break-all}
+    .key{color:#79c0ff} .str{color:#a5d6ff} .num{color:#79c0ff}
+    .bool-t{color:#4ade80} .bool-f{color:#f97316} .null{color:#7d8590;font-style:italic}
+    .err{color:#ff7b72;background:#3d1c1c;border:1px solid #8b2020;border-radius:6px;padding:12px}
+  </style>
+</head><body>${body}</body></html>`;
 }
 
-// ─── SVG Preview ──────────────────────────────────────────────────────────────
-export function generateSVGPreview(svg: string): string {
-  // Allow either raw SVG or an XML declaration header
-  const sanitized = svg.replace(/<\?xml[^?]*\?>\s*/i, "").trim();
+// ─── SVG Preview ─────────────────────────────────────────────────────────────
+export function generateSVGPreview(svgSource: string): string {
+  const escaped = svgSource
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
   return `<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SVG Preview</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    body {
-      background: #1c2128;
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-      gap: 1rem;
-    }
-    .wrapper {
-      background: white;
-      border-radius: 10px;
-      padding: 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      max-width: 100%;
-      box-shadow: 0 8px 32px rgba(0,0,0,.4);
-    }
-    .wrapper svg { max-width: 100%; height: auto; display:block; }
-    .meta {
-      font-family: monospace;
-      font-size: 11px;
-      color: rgba(255,255,255,.3);
-      text-align: center;
-    }
-    .error {
-      font-family: monospace;
-      font-size: 12px;
-      color: #ff7b72;
-      background: rgba(255,123,114,.1);
-      border: 1px solid rgba(255,123,114,.2);
-      border-radius: 8px;
-      padding: 1rem;
-      max-width: 480px;
-    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;background:#0d1117;color:#e6edf3;font:12px 'SF Mono',Menlo,monospace}
+    #canvas{display:flex;align-items:center;justify-content:center;height:calc(100% - 40px);padding:20px}
+    #canvas svg{max-width:100%;max-height:100%;width:auto;height:auto}
+    #meta{height:40px;border-top:1px solid #30363d;display:flex;align-items:center;
+          padding:0 16px;color:#7d8590;font-size:11px;gap:12px}
+    #err{color:#ff7b72;padding:20px}
   </style>
 </head>
 <body>
-  <div id="wrapper" class="wrapper"></div>
-  <div class="meta" id="meta"></div>
+  <div id="canvas">
+    <div id="err"></div>
+  </div>
+  <div id="meta"><span id="meta-text"></span></div>
   <script>
-    var svgStr = ${JSON.stringify(sanitized)};
-    var wrapper = document.getElementById('wrapper');
-    var meta    = document.getElementById('meta');
+    var src = ${JSON.stringify(svgSource).replace(/<\/script/gi, '<\\/script')};
+    var canvas  = document.getElementById('canvas');
+    var errEl   = document.getElementById('err');
+    var meta    = document.getElementById('meta-text');
     try {
-      var parser = new DOMParser();
-      var doc    = parser.parseFromString(svgStr, 'image/svg+xml');
-      var err    = doc.querySelector('parsererror');
+      var parser  = new DOMParser();
+      var doc     = parser.parseFromString(src, 'image/svg+xml');
+      var err     = doc.querySelector('parsererror');
       if (err) throw new Error(err.textContent);
-      var svgEl  = doc.documentElement;
+      var svgEl   = doc.documentElement;
+      var wrapper = document.createElement('div');
       wrapper.appendChild(document.importNode(svgEl, true));
+      canvas.appendChild(wrapper);
       var w = svgEl.getAttribute('width')  || svgEl.getAttribute('viewBox')?.split(' ')[2] || '?';
       var h = svgEl.getAttribute('height') || svgEl.getAttribute('viewBox')?.split(' ')[3] || '?';
       meta.textContent = w + ' × ' + h + ' · SVG Preview';
     } catch(e) {
-      wrapper.parentNode.replaceChild(
-        Object.assign(document.createElement('div'), {className:'error', textContent: 'SVG parse error: ' + e.message}),
-        wrapper
-      );
+      errEl.textContent = 'SVG parse error: ' + e.message;
     }
+  </script>
+</body>
+</html>`;
+}
+
+// ─── React Native Web Preview ─────────────────────────────────────────────────
+//
+// Transforms React Native source code to run directly in the browser using
+// React Native Web (RNW). No Expo Snack API call needed — works instantly.
+//
+// Steps:
+//  1. transformRNCode()  — replaces import/export with global variable refs
+//  2. Babel standalone   — handles JSX → createElement at runtime in browser
+//  3. Indirect eval      — runs code in global scope so App becomes window.App
+//  4. AppRegistry        — mounts the App component via RNW
+
+function transformRNCode(code: string): string {
+  let out = code;
+
+  // Remove TypeScript type imports
+  out = out.replace(/import\s+type\s+[^\n]*\n?/g, "");
+
+  // import React, { useState, useEffect } from 'react'
+  // → const { useState, useEffect } = React;
+  out = out.replace(
+    /import\s+React\s*,\s*\{([^}]+)\}\s+from\s+['"]react['"]\s*;?/g,
+    (_, h) => `const { ${h.trim()} } = React;`,
+  );
+
+  // import React from 'react' → (remove — React is a global)
+  out = out.replace(/import\s+React\s+from\s+['"]react['"]\s*;?\n?/g, "");
+
+  // import { useState } from 'react' → const { useState } = React;
+  out = out.replace(
+    /import\s+\{([^}]+)\}\s+from\s+['"]react['"]\s*;?/g,
+    (_, h) => `const { ${h.trim()} } = React;`,
+  );
+
+  // import { View, Text, ... } from 'react-native' (handles multi-line)
+  // → const { View, Text, ... } = ReactNativeWeb;
+  out = out.replace(
+    /import\s+\{([^}]+)\}\s+from\s+['"]react-native(?:-web)?['"]\s*;?/g,
+    (_, imp) => `const { ${imp.replace(/\s+/g, " ").trim()} } = ReactNativeWeb;`,
+  );
+
+  // Remove all remaining import statements (expo, third-party, etc.)
+  out = out.replace(/import\s+[^\n]+\n?/g, "");
+
+  // export default function App( → function App(
+  out = out.replace(/export\s+default\s+function\s+App\s*\(/, "function App(");
+  // export default class App → class App
+  out = out.replace(/export\s+default\s+class\s+App\b/, "class App");
+  // export default someIdentifier → var __rnExportDefault = someIdentifier
+  out = out.replace(
+    /export\s+default\s+(?!function|class)(\w+)/g,
+    "var __rnExportDefault = $1",
+  );
+  // export default function/class OtherName → function/class OtherName
+  out = out.replace(/export\s+default\s+(function|class)\s+/, "$1 ");
+  // Named exports: export const/let/var/function/class → remove export keyword
+  out = out.replace(/export\s+(const|let|var|function|class)\s+/g, "$1 ");
+
+  return out;
+}
+
+/**
+ * Generates a complete self-contained HTML page that runs React Native code
+ * live in the browser using React Native Web + Babel standalone.
+ *
+ * Works with the Expo Starter template (and any standard RN code) instantly
+ * — no server round-trip, no Expo API, no network delay beyond CDN loads.
+ */
+export function generateReactNativeWebPreview(files: Record<string, string>): string {
+  const appFile =
+    files["App.js"] ??
+    files["App.tsx"] ??
+    files["App.ts"] ??
+    Object.entries(files).find(([k]) => /^App\.[jt]sx?$/.test(k))?.[1] ??
+    Object.values(files)[0] ??
+    "";
+
+  const transformed = transformRNCode(appFile);
+
+  // Safe JSON encoding — escapes </script> so the HTML parser won't close
+  // our script tag prematurely when the user code contains that string.
+  const safeJson = JSON.stringify(transformed)
+    .replace(/<\/script/gi, "<\\/script")
+    .replace(/<!--/g, "<\\!--");
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;background:#0d1117;overflow:hidden}
+    #root{height:100%;display:flex;flex-direction:column}
+    #__err{
+      display:none;position:fixed;inset:0;background:#150a0a;
+      color:#ff9090;font:12px/1.6 'SF Mono',Monaco,Consolas,monospace;
+      padding:20px;overflow:auto;z-index:9999;white-space:pre-wrap;word-break:break-all
+    }
+    #__loading{
+      position:fixed;inset:0;background:#0d1117;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:14px;z-index:8888
+    }
+    .spin{width:28px;height:28px;border:2px solid #4ade8025;border-top-color:#4ade80;
+          border-radius:50%;animation:s .8s linear infinite}
+    @keyframes s{to{transform:rotate(360deg)}}
+    .loadtxt{color:#4ade8090;font:12px/1 'SF Mono',Monaco,monospace}
+    .loadtxt2{color:#ffffff25;font:11px/1 'SF Mono',Monaco,monospace}
+  </style>
+</head>
+<body>
+  <div id="__loading">
+    <div class="spin"></div>
+    <span class="loadtxt">Loading React Native Web…</span>
+    <span class="loadtxt2">First load may take a few seconds</span>
+  </div>
+  <div id="root"></div>
+  <div id="__err"></div>
+
+  <!-- User code stored as JSON — safe from HTML injection -->
+  <script id="__rncode" type="application/json">${safeJson}</script>
+
+  <!-- React Native Web stack loaded from CDN -->
+  <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/react-native-web@0.19.12/dist/index.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+
+  <script>
+    (function () {
+      var loadingEl = document.getElementById('__loading');
+      var errEl     = document.getElementById('__err');
+
+      function showErr(msg) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        errEl.style.display = 'block';
+        errEl.textContent = '\\u26a0\\ufe0f  ' + String(msg);
+      }
+
+      window.onerror = function (m, _s, _l, _c, e) {
+        showErr(e ? (e.stack || e.message) : m);
+        return true;
+      };
+      window.addEventListener('unhandledrejection', function (e) {
+        showErr(e.reason
+          ? (e.reason.stack || e.reason.message || String(e.reason))
+          : 'Unhandled promise rejection');
+      });
+
+      var RNW = window.ReactNativeWeb;
+
+      // Expose common RNW exports as globals so user code (post-import-transform)
+      // can reference View, Text, StyleSheet, etc. directly.
+      [
+        'View','Text','StyleSheet','TouchableOpacity','Pressable','ScrollView',
+        'FlatList','SectionList','SafeAreaView','StatusBar','Image','TextInput',
+        'Switch','ActivityIndicator','Modal','Dimensions','Platform','Animated',
+        'Easing','KeyboardAvoidingView','RefreshControl','VirtualizedList',
+        'TouchableHighlight','TouchableWithoutFeedback','ImageBackground',
+        'Alert','Linking','PixelRatio','BackHandler','Keyboard','LayoutAnimation',
+        'AppRegistry',
+      ].forEach(function (k) { if (RNW[k] !== undefined) window[k] = RNW[k]; });
+
+      // Expose React hooks & utilities as globals
+      [
+        'useState','useEffect','useCallback','useMemo','useRef','useContext',
+        'createContext','useReducer','useLayoutEffect','useInsertionEffect',
+        'forwardRef','memo','Fragment','createElement','cloneElement','Children',
+        'Component','PureComponent','createRef',
+      ].forEach(function (k) { if (window.React[k] !== undefined) window[k] = window.React[k]; });
+
+      // Read user code from JSON script tag
+      var codeEl = document.getElementById('__rncode');
+      if (!codeEl) { showErr('Internal error: code element missing'); return; }
+
+      var userCode;
+      try { userCode = JSON.parse(codeEl.textContent); }
+      catch (e) { showErr('Internal error parsing code: ' + e.message); return; }
+
+      // Compile JSX with Babel (react preset only — no module transform)
+      var compiled;
+      try {
+        compiled = Babel.transform(userCode, {
+          presets: [['react', { runtime: 'classic' }]],
+          filename: 'App.js',
+        }).code;
+        // Strip "use strict" so indirect eval runs in sloppy mode.
+        // In sloppy mode, function declarations in eval go to global scope
+        // (i.e. window.App = function App(){...}).
+        compiled = compiled.replace(/^['"]use strict['"];\s*/m, '');
+      } catch (e) {
+        showErr('Compile error:\\n\\n' + (e.message || String(e)));
+        return;
+      }
+
+      // Run in global scope via indirect eval.
+      // Sloppy-mode function declarations are hoisted to window, so
+      // "function App(){}" becomes window.App automatically.
+      try {
+        var geval = eval; // indirect eval — executes in global scope
+        geval(compiled);
+      } catch (e) {
+        showErr('Runtime error:\\n\\n' + (e.stack || e.message));
+        return;
+      }
+
+      // Locate the App component
+      var AppComp = window.App || window.__rnExportDefault;
+      if (!AppComp) {
+        showErr(
+          'No "App" component found.\\n\\n' +
+          'Make sure your file contains:\\n\\n' +
+          '  export default function App() {\\n' +
+          '    return <View>...</View>;\\n' +
+          '  }\\n\\n' +
+          'or:\\n\\n' +
+          '  const App = () => <View>...</View>;\\n' +
+          '  export default App;'
+        );
+        return;
+      }
+
+      // Hide loading spinner, mount the app
+      if (loadingEl) loadingEl.style.display = 'none';
+      try {
+        RNW.AppRegistry.registerComponent('__CloudIDEApp__', function () { return AppComp; });
+        RNW.AppRegistry.runApplication('__CloudIDEApp__', {
+          rootTag: document.getElementById('root'),
+          initialProps: {},
+        });
+      } catch (e) {
+        showErr('Mount error:\\n\\n' + (e.stack || e.message));
+      }
+    })();
   </script>
 </body>
 </html>`;

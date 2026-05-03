@@ -111,13 +111,12 @@ function HeroDemo() {
   }, [tab]);
 
   useEffect(() => {
-    if (charIdx < demo.code.length) {
-      const t = setTimeout(() => {
-        setDisplayed(demo.code.slice(0, charIdx + 1));
-        setCharIdx(i => i + 1);
-      }, 12);
-      return () => clearTimeout(t);
-    }
+    if (charIdx >= demo.code.length) return;
+    const t = setTimeout(() => {
+      setDisplayed(demo.code.slice(0, charIdx + 1));
+      setCharIdx(i => i + 1);
+    }, 12);
+    return () => clearTimeout(t);
   }, [charIdx, demo.code]);
 
   return (

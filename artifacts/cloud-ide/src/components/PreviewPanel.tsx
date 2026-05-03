@@ -21,7 +21,7 @@ interface PreviewPanelProps {
   stdinInput?:    string;
   onStdinChange?: (v: string) => void;
 
-  // Mobile preview (Expo Snack live sync)
+  // Mobile preview
   isRNProject?:   boolean;
   snackData?:     SnackSyncData | null;
   embedUrl?:      string | null;
@@ -30,6 +30,7 @@ interface PreviewPanelProps {
   snackPlatform?: SnackPlatform;
   onPlatform?:    (p: SnackPlatform) => void;
   onSyncNow?:     () => void;
+  files?:         Record<string, string>;
 }
 
 export function PreviewPanel({
@@ -39,6 +40,7 @@ export function PreviewPanel({
   stdinInput, onStdinChange,
   isRNProject, snackData, embedUrl, isSyncing, syncError,
   snackPlatform = "android", onPlatform, onSyncNow,
+  files,
 }: PreviewPanelProps) {
   const defaultStream: StreamState = { chunks: [], result: null };
 
@@ -71,16 +73,10 @@ export function PreviewPanel({
                 className="ml-1.5 inline-block w-1.5 h-1.5 bg-[#4ade80] rounded-full animate-pulse align-middle"
               />
             )}
-            {id === "preview" && isRNProject && snackData && (
+            {id === "preview" && isRNProject && (
               <span
-                title="Expo Snack live preview"
+                title="React Native Web live preview"
                 className="ml-1.5 inline-block w-1.5 h-1.5 bg-[#4ade80] rounded-full animate-pulse align-middle"
-              />
-            )}
-            {id === "preview" && isRNProject && isSyncing && (
-              <span
-                title="Syncing to Expo…"
-                className="ml-1.5 inline-block w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse align-middle"
               />
             )}
             {id === "build" && isBuilding && (
@@ -105,6 +101,7 @@ export function PreviewPanel({
               platform={snackPlatform}
               setPlatform={onPlatform ?? (() => {})}
               syncNow={onSyncNow ?? (() => {})}
+              files={files}
             />
           ) : (
             <WebPreviewContent htmlPreview={htmlPreview} />

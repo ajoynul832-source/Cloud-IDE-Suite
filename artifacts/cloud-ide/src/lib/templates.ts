@@ -3462,6 +3462,136 @@ dependencies {
 `,
     },
   },
+
+  // ── Fibonacci ──────────────────────────────────────────────────────────────
+  {
+    id: "js-fibonacci",
+    name: "Fibonacci",
+    description: "Three implementations compared: iterative, memoized recursive, and generator",
+    icon: "🌀",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "fibonacci.js": `// Fibonacci Algorithms — run with ▶ or Ctrl+Enter
+// ───────────────────────────────────────────────────────
+
+// 1. Iterative  O(n) time  O(1) space
+function fibIterative(n) {
+  if (n <= 1) return n;
+  let [a, b] = [0, 1];
+  for (let i = 2; i <= n; i++) [a, b] = [b, a + b];
+  return b;
+}
+
+// 2. Memoized recursive  O(n) time  O(n) space
+const memo = new Map();
+function fibMemo(n) {
+  if (n <= 1) return n;
+  if (memo.has(n)) return memo.get(n);
+  const result = fibMemo(n - 1) + fibMemo(n - 2);
+  memo.set(n, result);
+  return result;
+}
+
+// 3. Lazy generator (infinite sequence)
+function* fibGen() {
+  let [a, b] = [0, 1];
+  while (true) { yield a; [a, b] = [b, a + b]; }
+}
+
+// ── Sequence ─────────────────────────────────────────────
+console.log("=== First 15 Fibonacci Numbers ===");
+const gen = fibGen();
+const seq = Array.from({ length: 15 }, () => gen.next().value);
+console.log(seq.join("  "));
+
+// ── Performance comparison ───────────────────────────────
+console.log("\\n=== Performance (n = 40) ===");
+const N = 40;
+
+console.time("iterative");
+const r1 = fibIterative(N);
+console.timeEnd("iterative");
+console.log(\`iterative → fib(\${N}) = \${r1}\`);
+
+console.time("memoized");
+const r2 = fibMemo(N);
+console.timeEnd("memoized");
+console.log(\`memoized  → fib(\${N}) = \${r2}\`);
+
+// ── Fun fact: Golden Ratio ────────────────────────────────
+console.log("\\n=== Golden Ratio Approximation ===");
+const ratio = fibIterative(50) / fibIterative(49);
+console.log(\`fib(50) / fib(49) ≈ \${ratio.toFixed(15)}\`);
+console.log(\`Golden ratio  φ  ≈ 1.618033988749895\`);
+`,
+    },
+  },
+
+  // ── Sorting Algorithms ─────────────────────────────────────────────────────
+  {
+    id: "js-sorting",
+    name: "Sorting Algorithms",
+    description: "Bubble, Quick, Merge sort side-by-side with a performance benchmark",
+    icon: "📊",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "sorting.js": `// Sorting Algorithms — run with ▶ or Ctrl+Enter
+// ───────────────────────────────────────────────────────
+
+// Bubble Sort  O(n²)
+function bubbleSort(arr) {
+  const a = [...arr];
+  for (let i = 0; i < a.length; i++)
+    for (let j = 0; j < a.length - i - 1; j++)
+      if (a[j] > a[j + 1]) [a[j], a[j + 1]] = [a[j + 1], a[j]];
+  return a;
+}
+
+// Quick Sort  O(n log n) average
+function quickSort(arr) {
+  if (arr.length <= 1) return arr;
+  const pivot = arr[Math.floor(arr.length / 2)];
+  return [
+    ...quickSort(arr.filter(x => x <  pivot)),
+    ...arr.filter(x => x === pivot),
+    ...quickSort(arr.filter(x => x >  pivot)),
+  ];
+}
+
+// Merge Sort  O(n log n) guaranteed
+function mergeSort(arr) {
+  if (arr.length <= 1) return arr;
+  const mid = Math.floor(arr.length / 2);
+  const merge = (l, r) => {
+    const out = [];
+    while (l.length && r.length)
+      out.push(l[0] <= r[0] ? l.shift() : r.shift());
+    return [...out, ...l, ...r];
+  };
+  return merge(mergeSort(arr.slice(0, mid)), mergeSort(arr.slice(mid)));
+}
+
+// ── Demo on small array ──────────────────────────────────
+const sample = [64, 34, 25, 12, 22, 11, 90, 3, 47, 58, 7, 83];
+console.log("Input:       ", sample.join("  "));
+console.log("Bubble Sort: ", bubbleSort(sample).join("  "));
+console.log("Quick Sort:  ", quickSort(sample).join("  "));
+console.log("Merge Sort:  ", mergeSort(sample).join("  "));
+console.log("Built-in:    ", [...sample].sort((a, b) => a - b).join("  "));
+
+// ── Benchmark on 2 000 random numbers ───────────────────
+console.log("\\n=== Benchmark (n = 2 000) ===");
+const big = Array.from({ length: 2000 }, () => Math.random());
+
+console.time("bubbleSort"); bubbleSort(big); console.timeEnd("bubbleSort");
+console.time("quickSort");  quickSort(big);  console.timeEnd("quickSort");
+console.time("mergeSort");  mergeSort(big);  console.timeEnd("mergeSort");
+console.time("built-in");   [...big].sort((a, b) => a - b); console.timeEnd("built-in");
+`,
+    },
+  },
 ];
 
 export function getTemplateById(id: string): ProjectTemplate | undefined {

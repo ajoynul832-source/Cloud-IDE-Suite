@@ -49,7 +49,8 @@ export function useBuild() {
   const buildStatus = useGetBuildStatus(jobId || "", {
     query: {
       enabled: !!jobId && isBuilding,
-      refetchInterval: (query) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      refetchInterval: (query: any) => {
         const state = query.state.data;
         if (state?.status === "success" || state?.status === "failed") return false;
         return 2000;

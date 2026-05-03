@@ -1,10 +1,9 @@
 import {
   Play, Box, Download, Loader2, FolderOpen, ChevronDown,
   Database, Share2, Compass, CheckCircle2, LogOut, User, RotateCcw,
-  Settings, HelpCircle, Archive, Wand2,
+  Settings, HelpCircle, Archive, Wand2, WrapText,
 } from "lucide-react";
 import { Link } from "wouter";
-import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 
 export type AutosaveStatus = "idle" | "saving" | "saved";
@@ -32,6 +31,8 @@ interface ToolbarProps {
   showBuildButton?:  boolean;
   onDownload?:       () => void;
   onFormat?:         () => void;
+  wordWrap?:         boolean;
+  onWordWrapToggle?: () => void;
 }
 
 export function Toolbar({
@@ -57,6 +58,8 @@ export function Toolbar({
   showBuildButton = false,
   onDownload,
   onFormat,
+  wordWrap,
+  onWordWrapToggle,
 }: ToolbarProps) {
   const { user, logout } = useAuth();
   const runDisabled = isRunning || !canRun || runsRemaining === 0;
@@ -221,6 +224,22 @@ export function Toolbar({
           <span className="text-xs font-mono text-red-400">Build failed</span>
         )}
 
+        {/* Word wrap toggle */}
+        {onWordWrapToggle && (
+          <button
+            onClick={onWordWrapToggle}
+            title={`Word wrap: ${wordWrap ? "on" : "off"}  (Alt+Z)`}
+            className={[
+              "w-7 h-7 flex items-center justify-center rounded transition-colors",
+              wordWrap
+                ? "text-[#4ade80] bg-[#4ade80]/10 hover:bg-[#4ade80]/20"
+                : "text-white/40 hover:text-white hover:bg-white/8",
+            ].join(" ")}
+          >
+            <WrapText size={13} />
+          </button>
+        )}
+
         {/* Format code */}
         {onFormat && (
           <button
@@ -250,7 +269,7 @@ export function Toolbar({
         {onShowSettings && (
           <button
             onClick={onShowSettings}
-            title="Editor settings"
+            title="Editor settings  (Ctrl+,)"
             className="w-7 h-7 flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/8 transition-colors"
           >
             <Settings size={13} />
@@ -261,7 +280,7 @@ export function Toolbar({
         {onShowShortcuts && (
           <button
             onClick={onShowShortcuts}
-            title="Keyboard shortcuts (?)"
+            title="Keyboard shortcuts  (?)"
             className="w-7 h-7 flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/8 transition-colors font-mono text-xs font-bold"
           >
             <HelpCircle size={13} />

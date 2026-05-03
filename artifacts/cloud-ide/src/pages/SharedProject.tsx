@@ -434,7 +434,6 @@ export default function SharedProject() {
               onTabChange={setRightPanelTab}
               stream={stream}
               htmlPreview={htmlPreview}
-              projectType={sharedData.project.projectType}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
