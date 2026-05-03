@@ -366,7 +366,8 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
             Press Esc to cancel
           </p>
         </div>
-      </div>
-    </div>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

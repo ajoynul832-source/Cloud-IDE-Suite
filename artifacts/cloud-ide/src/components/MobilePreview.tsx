@@ -230,6 +230,6 @@ function WebEmptyState() {
         <p>✓ Animated, Dimensions</p>
         <p>✓ Image, TextInput</p>
       </div>
-    </motion.div>
+    </div>
   );
 }
