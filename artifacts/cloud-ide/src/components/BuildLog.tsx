@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { AlertTriangle, ExternalLink, Terminal, CheckCircle, Smartphone, Globe, Code } from "lucide-react";
 
 interface BuildLogProps {
@@ -71,34 +72,57 @@ function BuildCapabilities() {
 
   return (
     <div className="h-full bg-[#0d1117] font-mono text-xs p-4 overflow-y-auto">
-      <div className="flex items-center gap-2 mb-4">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-2 mb-4"
+      >
         <Terminal size={13} className="text-white/30" />
         <span className="text-white/50 text-[11px]">Build Log</span>
         <span className="text-white/20 text-[10px]">— no build started yet</span>
-      </div>
+      </motion.div>
 
       {/* React Native works now */}
-      <div className="mb-4 p-3 rounded-lg bg-[#4ade80]/8 border border-[#4ade80]/15">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="mb-4 p-3 rounded-lg bg-gradient-to-br from-[#4ade80]/12 to-[#4ade80]/4 border border-[#4ade80]/25 backdrop-blur-sm shadow-[0_8px_32px_rgba(74,222,128,0.1)]"
+      >
         <div className="flex items-center gap-2 mb-1">
-          <Smartphone size={12} className="text-[#4ade80]" />
+          <motion.div
+            animate={{ scale: [1, 1.1, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <Smartphone size={12} className="text-[#4ade80]" />
+          </motion.div>
           <span className="text-[#4ade80] text-[11px] font-semibold">React Native → Works right now</span>
         </div>
         <p className="text-[#4ade80]/50 text-[10px] leading-relaxed">
           Choose a React Native template and click <strong className="text-[#4ade80]/70">Preview</strong> — instant
           phone simulator via Expo Snack. No SDK install, no build queue.
         </p>
-      </div>
+      </motion.div>
 
       {/* All build types */}
-      <div className="space-y-2 mb-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="space-y-2 mb-4">
         <p className="text-[9px] uppercase tracking-widest text-white/25 mb-2">All supported build targets</p>
-        {capabilities.map((cap) => (
-          <div key={cap.name} className={[
-            "flex items-start gap-3 p-2.5 rounded-lg border",
-            cap.works
-              ? "border-[#4ade80]/15 bg-[#4ade80]/5"
-              : "border-white/8 bg-white/[0.02]",
-          ].join(" ")}>
+        {capabilities.map((cap, i) => (
+          <motion.div
+            key={cap.name}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.08 }}
+            className={[
+              "flex items-start gap-3 p-2.5 rounded-lg border transition-all hover:scale-[1.02]",
+              cap.works
+                ? "border-[#4ade80]/25 bg-gradient-to-br from-[#4ade80]/10 to-[#4ade80]/3 backdrop-blur-sm shadow-[0_4px_16px_rgba(74,222,128,0.08)]"
+                : "border-white/8 bg-white/[0.02] hover:border-white/15",
+            ].join(" ")}>
             <span className="text-sm shrink-0 mt-0.5">{cap.icon}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -115,12 +139,16 @@ function BuildCapabilities() {
               <p className="text-white/30 text-[10px] mt-0.5">{cap.desc}</p>
               <p className="text-white/20 text-[9px] mt-0.5 italic">{cap.requirement}</p>
             </div>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {/* Self-host call to action */}
-      <div className="p-3 rounded-lg bg-amber-500/8 border border-amber-500/15">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="p-3 rounded-lg bg-gradient-to-br from-amber-500/12 to-amber-500/4 border border-amber-500/25 backdrop-blur-sm shadow-[0_8px_32px_rgba(217,119,6,0.08)]">
         <div className="flex items-center gap-2 mb-1.5">
           <Globe size={11} className="text-amber-400" />
           <span className="text-amber-400 text-[11px] font-semibold">Want Flutter/Android/Capacitor builds?</span>
@@ -134,7 +162,7 @@ function BuildCapabilities() {
           <p className="text-[#4ade80]/70">docker compose up -d   # uses Dockerfile.sdk</p>
           <p className="text-white/20 mt-1">See DEPLOY.md for full instructions</p>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -147,8 +175,12 @@ function SdkMissingView({ error, type }: { error?: string | null; type?: string 
 
   return (
     <div className="h-full bg-[#0d1117] font-mono text-xs p-4 flex flex-col gap-4 overflow-y-auto">
-      <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
-        <AlertTriangle size={14} className="text-orange-400 shrink-0 mt-0.5" />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="flex items-start gap-3 p-3 rounded-lg bg-gradient-to-br from-orange-500/15 to-orange-500/5 border border-orange-500/30 backdrop-blur-sm shadow-[0_8px_32px_rgba(249,115,22,0.1)]"
+      >
+        <AlertTriangle size={14} className="text-orange-400 shrink-0 mt-0.5 animate-pulse" />
         <div className="space-y-1">
           <p className="text-orange-300 font-semibold text-[11px]">
             {isCapacitor ? "Capacitor SDK Not Available" : "Build SDK Not Available"}
@@ -159,10 +191,14 @@ function SdkMissingView({ error, type }: { error?: string | null; type?: string 
               : "Flutter SDK is not installed in this environment. APK builds require self-hosting with the SDK image."}
           </p>
         </div>
-      </div>
+      </motion.div>
 
       {/* Quick fix */}
-      <div className="space-y-2">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="space-y-2">
         <p className="text-white/50 text-[11px] font-semibold flex items-center gap-2">
           <Code size={11} />
           To enable {isCapacitor ? "HTML/JS → APK" : isFlutter ? "Flutter APK" : "APK"} builds:
@@ -177,10 +213,14 @@ function SdkMissingView({ error, type }: { error?: string | null; type?: string 
           <p className="text-white/30 mt-1"># SDK image includes:</p>
           <p className="text-white/20">  Flutter SDK + Android SDK + Capacitor + Java 17</p>
         </div>
-      </div>
+      </motion.div>
 
       {/* Alternative for React Native */}
-      <div className="p-3 rounded-lg bg-cyan-500/8 border border-cyan-500/20 text-[10px]">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="p-3 rounded-lg bg-gradient-to-br from-cyan-500/12 to-cyan-500/4 border border-cyan-500/30 backdrop-blur-sm text-[10px] shadow-[0_8px_32px_rgba(34,211,238,0.08)]">
         <p className="text-cyan-400 font-semibold mb-1 flex items-center gap-1.5">
           <Smartphone size={10} />
           React Native works right now — no build needed
@@ -189,7 +229,7 @@ function SdkMissingView({ error, type }: { error?: string | null; type?: string 
           Switch to a React Native template → click Preview → instant phone simulator via Expo Snack.
           No SDK, no queue, no waiting.
         </p>
-      </div>
+      </motion.div>
 
       {isFlutter && (
         <a

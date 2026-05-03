@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { X, Zap, Smartphone, Star, Search } from "lucide-react";
 import { PROJECT_TEMPLATES, ProjectTemplate } from "@/lib/templates";
 
@@ -64,18 +65,23 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
   const totalResults = quickStart.length + moreRunnable.length + livePreview.length + mobile.length;
 
   const renderCard = (template: ProjectTemplate, compact = false) => (
-    <button
+    <motion.button
       key={template.id}
       data-testid={`template-${template.id}`}
       onMouseEnter={() => setHovered(template.id)}
       onMouseLeave={() => setHovered(null)}
       onClick={() => onSelect(template)}
+      initial={{ opacity: 0, scale: 0.92 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileHover={{ scale: 1.04, y: -4 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
       className={[
         "text-left rounded-lg border transition-all duration-150 cursor-pointer",
         compact ? "p-3" : "p-4",
         hovered === template.id
-          ? "border-primary bg-primary/10"
-          : "border-border bg-background hover:border-primary/50",
+          ? "border-[#4ade80] bg-gradient-to-br from-[#4ade80]/15 to-[#4ade80]/5 shadow-[0_8px_32px_rgba(74,222,128,0.15)]"
+          : "border-white/12 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]",
       ].join(" ")}
     >
       <div className="flex items-start gap-3">
@@ -108,96 +114,162 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
           )}
         </div>
       </div>
-    </button>
+    </motion.button>
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="relative w-full max-w-3xl max-h-[88vh] flex flex-col bg-card border border-border rounded-lg shadow-2xl overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ type: "spring", damping: 20, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-3xl max-h-[88vh] flex flex-col bg-gradient-to-b from-[#1c2128] to-[#161b22] border border-white/12 rounded-xl shadow-[0_20px_80px_rgba(0,0,0,0.6)] overflow-hidden backdrop-blur-xl"
+      >
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex items-center justify-between px-6 py-4 border-b border-white/8 shrink-0 bg-gradient-to-r from-white/5 to-transparent"
+        >
           <div>
-            <h2 className="text-foreground font-mono font-bold text-sm tracking-widest uppercase">
+            <h2 className="text-white font-mono font-bold text-sm tracking-widest uppercase">
               New Project
             </h2>
-            <p className="text-muted-foreground text-xs mt-0.5 font-mono">
+            <p className="text-white/40 text-xs mt-0.5 font-mono">
               Choose a template to get started · {PROJECT_TEMPLATES.length} available
             </p>
           </div>
-          <button
+          <motion.button
             data-testid="button-close-template-selector"
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors p-1"
+            whileHover={{ rotate: 90, scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            className="text-white/40 hover:text-white/80 transition-colors p-1"
           >
             <X size={18} />
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
 
         {/* Search bar */}
-        <div className="px-6 pt-4 pb-2 shrink-0">
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="px-6 pt-4 pb-2 shrink-0"
+        >
           <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
             <input
               ref={searchRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search templates by name, language, description…"
-              className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-colors"
+              className="w-full bg-white/5 border border-white/12 rounded-lg pl-9 pr-3 py-2.5 font-mono text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-[#4ade80]/40 focus:bg-white/[0.08] transition-all"
             />
             {searchQuery && (
-              <button
+              <motion.button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors"
               >
                 <X size={12} />
-              </button>
+              </motion.button>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1">
 
           {/* Search results — flat list */}
+          <AnimatePresence mode="wait">
           {q && (
-            <div className="px-6 py-3">
+            <motion.div
+              key="search"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="px-6 py-3"
+            >
               {totalResults === 0 ? (
-                <div className="py-10 text-center text-sm font-mono text-muted-foreground">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="py-10 text-center text-sm font-mono text-white/30"
+                >
                   No templates match "{searchQuery}"
-                </div>
+                </motion.div>
               ) : (
                 <>
-                  <p className="text-[10px] font-mono text-muted-foreground/50 mb-3 uppercase tracking-widest">
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-[10px] font-mono text-white/25 mb-3 uppercase tracking-widest"
+                  >
                     {totalResults} result{totalResults !== 1 ? "s" : ""}
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  </motion.p>
+                  <motion.div
+                    layout
+                    className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+                  >
                     {[...quickStart, ...moreRunnable, ...livePreview, ...mobile].map(t => renderCard(t, true))}
-                  </div>
+                  </motion.div>
                 </>
               )}
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
 
           {/* Normal sections — only shown when not searching */}
+          <AnimatePresence mode="wait">
           {!q && (
-            <>
+            <motion.div
+              key="sections"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
               {/* Section 1: Runnable Now (featured 6) */}
-              <div className="px-6 pt-3 pb-2">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="px-6 pt-3 pb-2"
+              >
                 <div className="flex items-center gap-2 mb-3">
-                  <Star size={13} className="text-[#4ade80]" />
+                  <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 2, repeat: Infinity }}>
+                    <Star size={13} className="text-[#4ade80]" />
+                  </motion.div>
                   <h3 className="font-mono text-xs font-semibold uppercase tracking-widest text-[#4ade80]/80">
                     Runnable Now
                   </h3>
-                  <span className="text-[10px] font-mono text-muted-foreground/50">
+                  <span className="text-[10px] font-mono text-white/25">
                     — run instantly, results in seconds
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {quickStart.map(t => renderCard(t))}
-                </div>
-              </div>
+                <motion.div
+                  layout
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                >
+                  {quickStart.map((t, i) => (
+                    <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 + i * 0.05 }}>
+                      {renderCard(t)}
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </motion.div>
 
               {/* Section 2: More Runnable */}
               {moreRunnable.length > 0 && (
