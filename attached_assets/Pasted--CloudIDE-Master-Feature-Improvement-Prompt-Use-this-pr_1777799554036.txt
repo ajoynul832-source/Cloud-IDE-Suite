@@ -1,0 +1,461 @@
+# CloudIDE — Master Feature & Improvement Prompt
+
+Use this prompt (or sections of it) when working with an AI to build new features or improve existing ones. The codebase is a full-stack cloud IDE: React + TypeScript frontend (wouter routing, CodeMirror editor, shadcn/ui, Tailwind), Node.js/Express backend, BullMQ + Redis job queues, PostgreSQL via Drizzle ORM, and Flutter/Android build pipelines.
+
+---
+
+## 🧠 CONTEXT BLOCK (paste at top of every session)
+
+```
+You are working on CloudIDE — a browser-based code editor and execution platform.
+
+Stack:
+- Frontend: React + TypeScript, wouter routing, CodeMirror 6, shadcn/ui, Tailwind CSS
+- Backend: Node.js + Express, BullMQ workers, Redis, PostgreSQL (Drizzle ORM)
+- Build pipeline: Flutter SDK + Android SDK on server, APK streaming via BullMQ
+- Auth: JWT in httpOnly cookies, optional guest mode via user-key
+- Execution: sandboxed server-side runners (Python, JS, Dart, etc.) with SSE streaming
+- Sharing: public share links with fork/run event tracking, Explore gallery
+- File storage: project files stored in PostgreSQL (versions table)
+
+Key existing hooks: useRun, useBuild, useProjects, useAuth, useSnackSync
+Key existing components: Editor, FileTree, TabBar, PreviewPanel, MobilePreview, ShareModal, CommandPalette, BuildLog, ConsoleOutput, Toolbar, StatusBar
+Key existing routes: /auth, /projects, /run, /build, /share, /metrics
+```
+
+---
+
+## 🔴 CRITICAL FEATURES (add these first)
+
+### 1. AI Code Assistant (Inline + Chat)
+
+```
+Add an AI coding assistant to CloudIDE with two modes:
+
+A) INLINE COMPLETION
+- Hook: useAICompletion() in src/hooks/useAICompletion.ts
+- Trigger: debounced on cursor idle (600ms), or Ctrl+Space
+- Show ghost text in CodeMirror using ViewPlugin + DecorationSet
+- Accept with Tab, dismiss with Escape
+- API route: POST /api/ai/complete { language, prefix, suffix, filename }
+- Use streaming response, update ghost text as tokens arrive
+- Respect user setting: AI completions on/off (save to localStorage via loadPref)
+
+B) AI CHAT PANEL
+- Component: AIChat in src/components/AIChat.tsx
+- Slide-in panel (right side, same pattern as SettingsPanel)
+- Context-aware: passes current file content + language + error output as system context
+- Actions: "Fix this error", "Explain this code", "Write tests", "Refactor"
+- Renders markdown responses with code blocks (use existing preview infra)
+- Message history persisted in component state only (no DB needed)
+- Keyboard shortcut: Ctrl+I to open
+
+Add AI toggle button to Toolbar.tsx (between Run and Build buttons).
+Add AI settings section to SettingsPanel.tsx (model select, completion toggle).
+```
+
+---
+
+### 2. Real Interactive Terminal
+
+```
+Add a real interactive terminal to CloudIDE (not just read-only ConsoleOutput).
+
+BACKEND:
+- New route: POST /api/terminal/session — spawns a pty (node-pty) per user
+- WebSocket endpoint: /ws/terminal/:sessionId — bidirectional pty I/O
+- Sandbox the pty: same sandboxEnv() as execution, no network, tmp dir only
+- Session cleanup: kill pty after 30min idle, on disconnect
+- Rate limit: max 2 concurrent terminals per user (reuse checkAndIncrement pattern)
+
+FRONTEND:
+- New component: Terminal in src/components/Terminal.tsx
+- Use xterm.js with FitAddon and WebLinksAddon
+- Tab in PreviewPanel: add "Terminal" tab alongside Console/Preview/Build
+- Persist terminal session across tab switches (don't kill on tab change)
+- Support copy/paste, resize, ANSI colors (already have ansiToHtml for reference)
+- Show terminal session status in StatusBar
+
+TYPES: Add 'terminal' to the panel tab union type.
+```
+
+---
+
+### 3. OAuth Login (Google + GitHub)
+
+```
+Add OAuth 2.0 social login alongside the existing email/password JWT flow.
+
+BACKEND (src/routes/auth.ts additions):
+- GET /auth/google — redirect to Google OAuth consent
+- GET /auth/google/callback — exchange code, upsert user, set cookie via setAuthCookie()
+- GET /auth/github — redirect to GitHub OAuth
+- GET /auth/github/callback — exchange code, upsert user, set cookie
+- On upsert: if email matches existing user, link OAuth to that account
+- New DB columns: googleId, githubId, avatarUrl on users table (Drizzle migration)
+- Keep existing requireAuth() and signToken() unchanged — just call them after OAuth
+
+FRONTEND (src/pages/AuthPage.tsx or equivalent):
+- Add "Continue with Google" button (Google brand colors, Google icon)
+- Add "Continue with GitHub" button (dark, GitHub icon)
+- Place above the email/password form with an "or" divider
+- After redirect back, the cookie is already set — just call fetchUser() on mount
+- Show user avatar in Toolbar if avatarUrl is set
+```
+
+---
+
+### 4. Persistent File System Audit + Fix
+
+```
+IMPORTANT: useFileSystem.ts is currently marked "unused, legacy". Audit and fix file persistence.
+
+1. Confirm: are project files stored as JSON blobs in PostgreSQL versions table?
+2. If yes — add explicit autosave: debounced 2s after last edit (useProjects already has save, wire it up)
+3. Add visual save indicator in StatusBar: "Saved ✓" / "Saving…" / "Unsaved ●"
+4. Add Ctrl+S explicit save shortcut
+5. Add file recovery: if user opens a project and latest version is <5min old, show "Restore unsaved changes?" banner
+6. If useFileSystem was intended for something else, either remove it or document it
+
+Add to StatusBar.tsx: save state display (saved | saving | unsaved)
+Add to IDE.tsx: Ctrl+S handler calling saveProject()
+```
+
+---
+
+## 🟡 IMPORTANT FEATURES (add after critical)
+
+### 5. Git Integration
+
+```
+Add Git support to CloudIDE projects.
+
+BACKEND:
+- POST /api/git/clone { url, projectId } — shallow clone repo into temp dir, import files into project
+- POST /api/git/push { projectId, message } — commit all files + push to connected remote
+- GET /api/git/status { projectId } — returns modified/added/deleted file list
+- Store git remote URL + access token (encrypted) on project record
+
+FRONTEND:
+- New component: GitPanel in src/components/GitPanel.tsx (sidebar tab)
+- Shows: current branch, changed files list, commit message input, Push button
+- Clone modal: "Import from GitHub" button in TemplateSelector or ProjectsModal
+- File tree: show M/A/D badges on modified files (getIcon() in FileTree.tsx)
+- Status bar: show current branch name
+- For now: support GitHub only, PAT-based auth (no full OAuth app needed)
+```
+
+---
+
+### 6. npm / pub Package Manager UI
+
+```
+Add a package installer UI so users can add dependencies without editing files manually.
+
+BACKEND:
+- POST /api/packages/install { projectId, packages: string[], runtime: 'node'|'dart' }
+- Runs npm install or flutter pub add in sandboxed project dir
+- Streams install output via SSE (same pattern as runJob streaming)
+- Updates package.json or pubspec.yaml in project files after install
+- Rate limit: max 5 installs per hour per user
+
+FRONTEND:
+- New component: PackageManager in src/components/PackageManager.tsx
+- Accessible from: sidebar tab icon (box icon) or Ctrl+P shortcut
+- UI: search input → shows npm/pub registry results → Install button
+- Shows currently installed packages with version + Remove button
+- Install output streams in a mini console within the panel
+- Detect project type via existing detectProjectType() to show correct registry
+```
+
+---
+
+### 7. Deploy / Preview URLs
+
+```
+Add one-click deployment for web projects (HTML/CSS/JS, React).
+
+BACKEND:
+- POST /api/deploy { projectId } — bundles project files, uploads to CDN/object storage
+- Returns a unique URL: https://yoursite.com/preview/{deployId}
+- New route: GET /preview/:deployId — serves the deployed static files
+- Store deployments table: id, projectId, userId, url, createdAt, fileSnapshot
+- Limit: 3 active deployments per free user (use checkAndIncrement pattern)
+
+FRONTEND:
+- Add "Deploy" button to Toolbar.tsx (rocket icon, beside Share)
+- DeployModal component: shows deploy URL, copy button, QR code (like ShareModal)
+- Shows deploy history (last 3) with timestamps
+- "Open in new tab" button
+- StatusBar: show "Deployed" badge with link if active deployment exists
+
+For the URL serving: reuse generateCSSPreview/generateMarkdownPreview infra pattern.
+```
+
+---
+
+### 8. Global Find in Files
+
+```
+Add project-wide search/replace to CloudIDE.
+
+FRONTEND ONLY (files are in memory/state already):
+- New component: SearchPanel in src/components/SearchPanel.tsx
+- Keyboard shortcut: Ctrl+Shift+F to open (add to KeyboardShortcutsModal)
+- UI: search input, optional replace input, case/regex toggles
+- Results: grouped by filename, shows matching line with highlight
+- Click result: opens file in Editor and jumps to line (wire through useProjects / editor ref)
+- Replace all: updates file content in project state
+- Fuzzy option: reuse existing fuzzy() from CommandPalette.tsx
+- Show match count badge: "14 results in 3 files"
+
+Add to CommandPalette.tsx: "Search in files" command that opens SearchPanel.
+```
+
+---
+
+### 9. Environment Variables Manager
+
+```
+Add .env variable management to projects.
+
+BACKEND:
+- Store env vars encrypted in DB: new envVars column on projects (JSON, AES-256)
+- POST /api/projects/:id/env { vars: Record<string,string> } — save encrypted vars
+- GET /api/projects/:id/env — returns vars (decrypted, only for project owner)
+- Inject vars into sandboxEnv() when running code: process.env populated for JS/TS
+
+FRONTEND:
+- New component: EnvPanel in src/components/EnvPanel.tsx
+- Accessible from Toolbar or Settings: .env icon button
+- UI: key/value table, add/remove rows, show/hide values toggle (password field)
+- Warning banner: "Never commit secrets — env vars are encrypted and private"
+- Show in StatusBar: "ENV: 3 vars" when vars are set
+- In FileTree: show a virtual .env file entry (read-only, opens EnvPanel on click)
+```
+
+---
+
+### 10. Billing + Subscription UI
+
+```
+Add Stripe billing to gate the existing usage quota system.
+
+BACKEND:
+- Integrate Stripe: POST /api/billing/checkout — creates Stripe checkout session
+- POST /api/billing/webhook — handles subscription events, updates user.plan in DB
+- GET /api/billing/portal — returns Stripe customer portal URL
+- User plans: free (50 runs/day, 3 builds/day) | pro (unlimited) | team (unlimited + collab)
+- Update checkAndIncrementRuns() and checkAndIncrementBuilds() to use plan limits
+
+FRONTEND:
+- New page: src/pages/Billing.tsx
+- Show current plan, usage stats (runs used today, builds used today)
+- Upgrade button → Stripe checkout
+- Manage subscription button → Stripe portal
+- Usage bar components: visual progress toward daily limits
+- Upgrade prompt: show modal when user hits quota limit (currently probably just errors)
+- Add plan badge to user avatar in Toolbar: "PRO" tag
+```
+
+---
+
+## 🟢 POLISH & DX IMPROVEMENTS
+
+### 11. Editor Enhancements
+
+```
+Improve the CodeMirror editor (src/components/Editor.tsx):
+
+1. Multiple cursors: enable rectangularSelection and crosshairCursor extensions
+2. Code folding: add foldGutter() extension
+3. Minimap: add cm-minimap or simple line overview to scrollbar
+4. Bracket matching: bracketMatching() + closeBrackets()
+5. Auto-indent on paste
+6. Indentation guides: indentationMarkers extension
+7. Format on save: Ctrl+S triggers Prettier formatting before saving
+   - Use prettier/standalone in browser (no server round-trip)
+   - Support: JS/TS/CSS/HTML/JSON/Markdown
+8. Diff view: when viewing version history (VersionRow), show a side-by-side diff
+   - Use CodeMirror MergeView extension
+9. Sticky scroll: show current function/class context at top while scrolling
+```
+
+---
+
+### 12. Collaboration (Real-time Multiplayer)
+
+```
+Add live multiplayer editing with Yjs.
+
+BACKEND:
+- Add WebSocket server alongside Express (ws package)
+- New route: /ws/collab/:projectId — Yjs awareness + document sync
+- Use y-websocket server provider
+- Auth: validate JWT cookie on WS upgrade
+- Persist Yjs doc updates to Redis (y-redis) + periodically flush to PostgreSQL
+
+FRONTEND:
+- Install: yjs, y-websocket, y-codemirror.next
+- New hook: useCollaboration(projectId) in src/hooks/useCollaboration.ts
+- Wire Y.Doc into Editor.tsx via yCollab() extension
+- Presence: show colored cursor labels for other users (name + color)
+- UserAvatars component in Toolbar: show up to 4 avatar circles of active collaborators
+- "Share to collaborate" mode in ShareModal: generates invite link that grants write access
+- Conflict-free: Yjs CRDTs handle all conflicts automatically
+```
+
+---
+
+### 13. Mobile IDE Layout
+
+```
+The useIsMobile() hook exists but there's no mobile-specific IDE layout. Fix this.
+
+Create a responsive mobile IDE experience:
+
+1. MobileIDE layout component (src/components/MobileIDE.tsx):
+   - Bottom tab bar: Files | Editor | Preview | Console (4 tabs, swipe between)
+   - FileTree drawer: slides up from bottom (sheet component)
+   - Editor: full screen, virtual keyboard aware (viewport height adjustment)
+   - Toolbar: condensed — just Run button + hamburger menu for rest
+   
+2. In IDE.tsx: if isMobile, render <MobileIDE> instead of desktop layout
+   
+3. Touch improvements to existing components:
+   - FileTree: larger touch targets (min 44px)
+   - TabBar: horizontal scroll, swipe to close
+   - Editor: font size auto-bumped to 16px on mobile (prevents iOS zoom)
+   
+4. PWA support:
+   - Add manifest.json: name, icons, theme_color, display: standalone
+   - Add service worker for offline caching of app shell
+   - "Add to home screen" prompt after 3rd visit
+```
+
+---
+
+### 14. Notifications & Activity Feed
+
+```
+Add an in-app notification system.
+
+BACKEND:
+- New table: notifications (id, userId, type, message, read, createdAt, metadata)
+- Create notifications on: build complete, build failed, project shared/forked, quota warning
+- GET /api/notifications — returns unread + last 20 read
+- POST /api/notifications/read-all — marks all as read
+- SSE stream: /api/notifications/stream — push new notifications in real-time
+
+FRONTEND:
+- NotificationBell component in Toolbar: bell icon with unread count badge
+- NotificationPanel: dropdown list of notifications with timestamps
+- Toast integration: new notifications also show as toast (use existing toast() system)
+- Mark as read on click
+- Notification types with icons: ✅ Build complete | ❌ Build failed | 🔗 Project forked | ⚠️ Quota warning
+```
+
+---
+
+### 15. Landing Page Overhaul
+
+```
+Redesign LandingPage.tsx (currently has HeroDemo component) into a full marketing page.
+
+Sections to add:
+1. Hero: animated code editor demo (use existing HeroDemo, enhance with typewriter effect)
+2. Features grid: 6 cards — Run Code, Build APK, Share & Fork, AI Assistant, Git Sync, Deploy
+3. Language support: icon grid of supported languages with syntax highlighting previews
+4. Live demo: embedded read-only SharedProject view of a cool example project
+5. Social proof: "X projects created", "Y code runs today" (pull from /api/metrics)
+6. Pricing: Free vs Pro vs Team cards (connect to Billing page)
+7. Footer: links, GitHub, Twitter
+
+Design direction: dark theme, monospace font accents, terminal-aesthetic, 
+code rain or grid background, neon green/cyan accents. 
+Think: Vercel meets GitHub meets a hacker zine.
+Reference: vercel.com, railway.app, supabase.com landing pages.
+```
+
+---
+
+## 📋 QUICK WINS (small but impactful)
+
+```
+These are small improvements that take <2 hours each:
+
+1. AUTOSAVE INDICATOR — StatusBar: show "●  Unsaved" dot, turn to "✓ Saved" after save
+2. FILE RENAME — FileTree: double-click filename to rename inline (update project state)
+3. FILE DELETE — FileTree: right-click context menu with Delete option + confirm dialog  
+4. DUPLICATE FILE — FileTree context menu: Duplicate option
+5. DRAG TO REORDER TABS — TabBar: make tabs draggable to reorder
+6. WORD COUNT — StatusBar: show word count for Markdown files
+7. MINIMAP TOGGLE — SettingsPanel: toggle for editor minimap
+8. VIM MODE — SettingsPanel: toggle for Vim keybindings (CodeMirror vim extension)
+9. EMMET SUPPORT — Editor: add emmet extension for HTML/CSS expansion
+10. SHARE EXPIRY — ShareModal: option to set share link expiry (1 day / 1 week / forever)
+11. PROJECT SEARCH — ProjectsModal: search/filter projects by name
+12. RECENT FILES — CommandPalette: "Recent files" section at top before fuzzy results
+13. BREADCRUMBS — add file path breadcrumb above editor for nested folder projects
+14. FONT SIZE HOTKEYS — Ctrl+= / Ctrl+- to change editor font size (save to prefs)
+15. COPY OUTPUT — ConsoleOutput: "Copy output" button in top-right corner
+```
+
+---
+
+## 🏗️ ARCHITECTURE IMPROVEMENTS
+
+```
+Technical debt and infrastructure improvements:
+
+1. WEBSOCKET LAYER — Replace all SSE streaming (run, build) with a unified WebSocket 
+   manager. Single /ws connection, multiplexed channels by type. Cleaner reconnect logic.
+
+2. FILE STORAGE MIGRATION — Move project files out of PostgreSQL JSON blobs into 
+   object storage (S3/R2/MinIO). Store only metadata + file refs in DB. 
+   Enables: larger projects, binary files, CDN delivery.
+
+3. TYPED API CLIENT — Generate a typed API client from Express route schemas using 
+   zod-to-openapi + openapi-typescript. Replace all raw fetch() calls in hooks.
+
+4. ERROR BOUNDARY — Add React ErrorBoundary around Editor, PreviewPanel, MobilePreview.
+   Show graceful fallback instead of white screen on component crash.
+
+5. OPTIMISTIC UPDATES — useProjects: make save/rename/delete optimistic (update UI 
+   immediately, rollback on error). Currently likely has loading delays.
+
+6. REDIS CACHING — Cache GET /api/share/:id responses in Redis (TTL 60s). 
+   Share pages are public and hit DB on every view.
+
+7. BUILD QUEUE PRIORITY — Add priority levels to BullMQ build queue: 
+   Pro users get priority: 1, free users get priority: 10. 
+   Implement in buildJobProcessor.ts using job.opts.priority.
+
+8. STRUCTURED LOGGING — Replace console.log with the existing Pino logger (buildStreams) 
+   consistently across all route handlers and workers.
+
+9. HEALTH CHECK ENDPOINT — GET /health returns: DB status, Redis status, queue depths, 
+   Flutter/Android SDK availability. Use in deployment monitoring.
+
+10. RATE LIMIT HEADERS — Return X-RateLimit-Remaining, X-RateLimit-Reset headers 
+    from the rate limiter middleware. Frontend can show quota UI without extra API call.
+```
+
+---
+
+## 📝 PROMPT USAGE GUIDE
+
+**For a single feature**, paste the CONTEXT BLOCK + the specific feature section.
+
+**For a full session**, paste the CONTEXT BLOCK + one section at a time.
+
+**For quick wins**, paste the CONTEXT BLOCK + the entire Quick Wins list.
+
+**Example session opener:**
+```
+[paste CONTEXT BLOCK]
+
+Now implement Feature #2: Real Interactive Terminal. 
+Start with the backend node-pty WebSocket endpoint, then the xterm.js frontend component.
+Work incrementally — show me the backend first, then frontend.
+```
