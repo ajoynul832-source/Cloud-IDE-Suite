@@ -199,6 +199,8 @@ export async function* spawnStream(
 
 // ─── Compile-then-run helper (for C / C++) ────────────────────────────────────
 
+const TEMP_DIR_RE = /\/tmp\/ide_exec_[a-f0-9_]+\//g;
+
 async function* compileAndRun(
   compiler: string,
   compilerArgs: string[],
@@ -213,7 +215,9 @@ async function* compileAndRun(
     switch (ev.type) {
       case "stdout":
       case "stderr":
-        if (ev.chunk?.trim()) yield ev;   // show compiler warnings/errors
+        if (ev.chunk?.trim()) {
+          yield { ...ev, chunk: ev.chunk.replace(TEMP_DIR_RE, "") };
+        }
         break;
       case "done":
         compileExit = ev.exitCode ?? 0;
@@ -262,11 +266,28 @@ const typescriptHandler: LanguageHandler = {
   },
 };
 
+const PYTHON_STDIN_RE = /\binput\s*\(|\braw_input\s*\(|sys\.stdin\b/;
+const CPP_STDIN_RE    = /\bscanf\s*\(|\bgets\s*\(|\bgetchar\s*\(|\bcin\s*>>|\bgetline\s*\(\s*cin/;
+const C_STDIN_RE      = /\bscanf\s*\(|\bgets\s*\(|\bgetchar\s*\(|\bfgets\s*\([^,]+,\s*\d+,\s*stdin/;
+const PERL_STDIN_RE   = /<STDIN>|readline\s*\(\s*STDIN\s*\)/;
+
+const STDIN_MSG = (lang: string, tip: string) =>
+  `[CloudIDE] ⚠ This ${lang} program reads from stdin (interactive input).\n` +
+  `Interactive input is not yet supported in the sandbox.\n` +
+  `Tip: ${tip}\n`;
+
 const pythonHandler: LanguageHandler = {
   id: "python", name: "Python", extensions: ["py"],
   async *execute({ code, execId }) {
+    if (PYTHON_STDIN_RE.test(code)) {
+      yield { type: "stderr", chunk: STDIN_MSG("Python",
+        "Replace  name = input('Enter name: ')  with  name = 'Alice'  to test your logic.") };
+      yield { type: "done", exitCode: 1, duration: 0 };
+      return;
+    }
     yield* withTempDirStream(execId, async function* (dir) {
       const file        = path.join(dir, "main.py");
+      const PREPEND_LINES = 6;
       const limitedCode = `import resource as _r, sys as _sys
 try:
     _r.setrlimit(_r.RLIMIT_CPU, (10, 10))
@@ -275,7 +296,19 @@ except Exception:
 del _r
 ${code}`;
       await fsp.writeFile(file, limitedCode, "utf8");
-      yield* spawnStream("python3", ["-u", file], dir, sandboxEnv());
+      for await (const ev of spawnStream("python3", ["-u", file], dir, sandboxEnv())) {
+        if (ev.type === "stderr" && ev.chunk) {
+          yield {
+            ...ev,
+            chunk: ev.chunk.replace(
+              /File "[^"]*main\.py", line (\d+)/g,
+              (_, n) => `File "main.py", line ${Math.max(1, parseInt(n) - PREPEND_LINES)}`,
+            ),
+          };
+        } else {
+          yield ev;
+        }
+      }
     });
   },
 };
@@ -307,6 +340,12 @@ const bashHandler: LanguageHandler = {
 const perlHandler: LanguageHandler = {
   id: "perl", name: "Perl", extensions: ["pl", "pm"],
   async *execute({ code, execId }) {
+    if (PERL_STDIN_RE.test(code)) {
+      yield { type: "stderr", chunk: STDIN_MSG("Perl",
+        "Replace  my $x = <STDIN>  with  my $x = 'hello'  to test your logic.") };
+      yield { type: "done", exitCode: 1, duration: 0 };
+      return;
+    }
     yield* withTempDirStream(execId, async function* (dir) {
       const file = path.join(dir, "script.pl");
       await fsp.writeFile(file, code, "utf8");
@@ -318,6 +357,12 @@ const perlHandler: LanguageHandler = {
 const cHandler: LanguageHandler = {
   id: "c", name: "C", extensions: ["c"],
   async *execute({ code, execId }) {
+    if (C_STDIN_RE.test(code)) {
+      yield { type: "stderr", chunk: STDIN_MSG("C",
+        "Replace  scanf(\"%s\", &buf)  with a hardcoded variable to test your logic.") };
+      yield { type: "done", exitCode: 1, duration: 0 };
+      return;
+    }
     yield* withTempDirStream(execId, async function* (dir) {
       const src    = path.join(dir, "main.c");
       const binary = path.join(dir, "main");
@@ -334,6 +379,12 @@ const cHandler: LanguageHandler = {
 const cppHandler: LanguageHandler = {
   id: "cpp", name: "C++", extensions: ["cpp", "cxx", "cc"],
   async *execute({ code, execId }) {
+    if (CPP_STDIN_RE.test(code)) {
+      yield { type: "stderr", chunk: STDIN_MSG("C++",
+        "Replace  cin >> x  with  int x = 42;  to test your logic.") };
+      yield { type: "done", exitCode: 1, duration: 0 };
+      return;
+    }
     yield* withTempDirStream(execId, async function* (dir) {
       const src    = path.join(dir, "main.cpp");
       const binary = path.join(dir, "main");

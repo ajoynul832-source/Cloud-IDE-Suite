@@ -2,6 +2,7 @@ import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { EditorState, Extension } from "@codemirror/state";
 import { EditorView, lineNumbers, keymap, highlightActiveLine, highlightActiveLineGutter } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { search, searchKeymap } from "@codemirror/search";
 import { javascript } from "@codemirror/lang-javascript";
 import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
@@ -102,6 +103,8 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
         getLanguageExtension(filename),
         vscodeDark,
         autocompletion(),
+        search({ top: true }),
+        keymap.of(searchKeymap),
         EditorView.theme({
           "&": {
             height: "100%",

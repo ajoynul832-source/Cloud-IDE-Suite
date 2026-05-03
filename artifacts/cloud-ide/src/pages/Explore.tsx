@@ -180,12 +180,15 @@ export default function Explore() {
   const offsetRef   = useRef(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const fetchPage = useCallback(async (offset: number, replace = false) => {
+  const fetchPage = useCallback(async (offset: number, replace = false, q = "", lang = "") => {
     if (isLoading) return;
     setIsLoading(true);
     setError(null);
     try {
-      const res  = await fetch(`/api/explore?limit=${PAGE_SIZE}&offset=${offset}`);
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+      if (q)    params.set("q",    q);
+      if (lang) params.set("lang", lang);
+      const res  = await fetch(`/api/explore?${params}`);
       const data = await res.json() as ExploreResponse;
       if (!res.ok) throw new Error(data.error ?? "Failed to load projects");
       setItems((prev) => replace ? data.projects : [...prev, ...data.projects]);
@@ -196,12 +199,28 @@ export default function Explore() {
     } finally {
       setIsLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading]);
 
+  const isFirstRender = useRef(true);
+
+  // Initial load + debounced search/filter re-fetch (no delay on first render)
   useEffect(() => {
-    fetchPage(0, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      offsetRef.current = 0;
+      fetchPage(0, true, searchQuery, langFilter ?? "");
+      return;
+    }
+    const t = setTimeout(() => {
+      offsetRef.current = 0;
+      setItems([]);
+      setHasMore(true);
+      fetchPage(0, true, searchQuery, langFilter ?? "");
+    }, 400);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, langFilter]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;

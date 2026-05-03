@@ -225,8 +225,17 @@ export default function SharedProject() {
         sharedData.project.projectType,
         sharedData.project.files,
       );
-      if (saved) { recordEvent(shareId, "fork"); navigate("/ide"); }
-      else setForkError("Failed to fork project — are you signed in?");
+      if (saved) {
+        recordEvent(shareId, "fork");
+        sessionStorage.setItem("cloudide_pending_load", JSON.stringify({
+          id: saved.id ?? saved,
+          files: sharedData.project.files,
+          name: `Fork of ${sharedData.project.name}`,
+        }));
+        navigate("/ide");
+      } else {
+        setForkError("Failed to fork project — are you signed in?");
+      }
     } catch { setForkError("Failed to fork project"); }
     finally { setIsForking(false); }
   };

@@ -29,6 +29,7 @@ interface ToolbarProps {
   projectName?:      string;
   autosaveStatus?:   AutosaveStatus;
   runsRemaining?:    number | null;
+  showBuildButton?:  boolean;
 }
 
 export function Toolbar({
@@ -51,6 +52,7 @@ export function Toolbar({
   projectName,
   autosaveStatus = "idle",
   runsRemaining,
+  showBuildButton = false,
 }: ToolbarProps) {
   const { user, logout } = useAuth();
   const runDisabled = isRunning || !canRun || runsRemaining === 0;
@@ -177,24 +179,26 @@ export function Toolbar({
           )}
         </button>
 
-        {/* Build APK */}
-        <button
-          data-testid="button-build-apk"
-          onClick={onBuild}
-          disabled={isBuilding}
-          className={[
-            "flex items-center gap-1.5 px-3 h-7 rounded font-mono text-xs font-semibold transition-all border",
-            isBuilding
-              ? "border-white/15 text-white/30 cursor-not-allowed"
-              : "border-white/20 text-white/60 hover:border-white/40 hover:text-white",
-          ].join(" ")}
-        >
-          {isBuilding ? (
-            <><Loader2 size={11} className="animate-spin" />Building…</>
-          ) : (
-            <><Box size={11} />Build APK</>
-          )}
-        </button>
+        {/* Build APK — only for mobile projects */}
+        {showBuildButton && (
+          <button
+            data-testid="button-build-apk"
+            onClick={onBuild}
+            disabled={isBuilding}
+            className={[
+              "flex items-center gap-1.5 px-3 h-7 rounded font-mono text-xs font-semibold transition-all border",
+              isBuilding
+                ? "border-white/15 text-white/30 cursor-not-allowed"
+                : "border-white/20 text-white/60 hover:border-white/40 hover:text-white",
+            ].join(" ")}
+          >
+            {isBuilding ? (
+              <><Loader2 size={11} className="animate-spin" />Building…</>
+            ) : (
+              <><Box size={11} />Build APK</>
+            )}
+          </button>
+        )}
 
         {/* Download APK */}
         {buildStatus === "success" && jobId && (

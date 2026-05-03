@@ -158,6 +158,16 @@ export default function IDE() {
   const canShare        = !!currentProjectId;
   const previewMode     = isPreviewOnly(runTarget);
 
+  const isMobileProject =
+    Object.keys(files).some(f =>
+      /\.(dart|kt|java|swift)$/.test(f) ||
+      f.includes("pubspec.yaml") || f.includes("AndroidManifest.xml")
+    ) ||
+    Object.values(files).some(c =>
+      c.includes("react-native") || c.includes("expo") ||
+      c.includes("import Flutter") || c.includes("import kivy")
+    );
+
   // Auto-open first file
   useEffect(() => {
     if (openFiles.length > 0 || Object.keys(files).length === 0) return;
@@ -185,6 +195,26 @@ export default function IDE() {
         if (typeof d.runsRemaining === "number") setLocalRunsRemaining(d.runsRemaining);
       })
       .catch(() => {});
+  }, []);
+
+  // Load forked project stored by SharedProject before navigate("/ide")
+  useEffect(() => {
+    const raw = sessionStorage.getItem("cloudide_pending_load");
+    if (!raw) return;
+    sessionStorage.removeItem("cloudide_pending_load");
+    try {
+      const { id, files: pendingFiles, name } = JSON.parse(raw) as {
+        id: string; files: Record<string, string>; name: string;
+      };
+      loadTemplate(pendingFiles);
+      setCurrentProjectId(id ?? null);
+      setCurrentProjectName(name ?? "Forked Project");
+      lastSavedHash.current = JSON.stringify(pendingFiles);
+      setOpenFiles([]); setActiveFile(null); setCursorPos(null); setHtmlPreview(null);
+      const first = Object.keys(pendingFiles).sort()[0];
+      if (first) { setOpenFiles([first]); setActiveFile(first); }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Global "?" shortcut → keyboard shortcuts modal
@@ -373,7 +403,22 @@ export default function IDE() {
         projectName={currentProjectName}
         autosaveStatus={autosaveStatus}
         runsRemaining={localRunsRemaining}
+        showBuildButton={isMobileProject}
       />
+
+      {/* Guest warning banner */}
+      {!user && (
+        <div className="shrink-0 flex items-center gap-2 px-4 py-1.5 bg-amber-500/8 border-b border-amber-500/15 text-[11px] font-mono text-amber-300/70">
+          <span className="text-amber-400">⚠</span>
+          <span>Your work is only saved in this browser tab — sign in free to save permanently.</span>
+          <button
+            onClick={() => setShowSignIn(true)}
+            className="ml-auto shrink-0 underline text-amber-300/90 hover:text-amber-200 transition-colors"
+          >
+            Sign in →
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-hidden relative">
         <ResizablePanelGroup direction="horizontal" className="h-full">
