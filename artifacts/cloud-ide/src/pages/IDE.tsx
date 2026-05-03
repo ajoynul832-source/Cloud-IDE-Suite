@@ -11,6 +11,7 @@ import { ProjectsModal } from "@/components/ProjectsModal";
 import { ShareModal } from "@/components/ShareModal";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { KeyboardShortcutsModal } from "@/components/KeyboardShortcutsModal";
+import { CommandPalette } from "@/components/CommandPalette";
 import AuthPage from "@/pages/AuthPage";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useBuild } from "@/hooks/useBuild";
@@ -123,8 +124,9 @@ export default function IDE() {
   const [showProjects,  setShowProjects]  = useState(false);
   const [showShare,     setShowShare]     = useState(false);
   const [showSignIn,    setShowSignIn]    = useState(false);
-  const [showSettings,  setShowSettings]  = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showSettings,        setShowSettings]        = useState(false);
+  const [showShortcuts,       setShowShortcuts]       = useState(false);
+  const [showCommandPalette,  setShowCommandPalette]  = useState(false);
 
   const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
 
@@ -252,6 +254,14 @@ export default function IDE() {
       if (e.key === "," && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         setShowSettings((v) => !v);
+        return;
+      }
+
+      // Ctrl+Shift+P / Cmd+Shift+P → command palette
+      if (e.key === "p" && (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        setShowCommandPalette((v) => !v);
+        return;
       }
     };
     window.addEventListener("keydown", handler);
@@ -707,6 +717,32 @@ export default function IDE() {
       {showShortcuts && (
         <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
       )}
+
+      <CommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        files={files}
+        onSelectFile={(filename) => {
+          if (!openFiles.includes(filename)) setOpenFiles((prev) => [...prev, filename]);
+          setActiveFile(filename);
+        }}
+        onRun={handleRun}
+        onFormat={handleFormat}
+        onDownload={() => {
+          const json = JSON.stringify(files, null, 2);
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+          a.download = `${currentProjectName.replace(/\s+/g, "-").toLowerCase()}.cloudide.json`;
+          a.click();
+        }}
+        onShowSettings={() => setShowSettings(true)}
+        onShowShortcuts={() => setShowShortcuts(true)}
+        onNewProject={() => setShowTemplates(true)}
+        onOpenProjects={() => setShowProjects(true)}
+        onTabChange={setRightPanelTab}
+        onWordWrapToggle={toggleWordWrap}
+        onShare={canShare ? () => setShowShare(true) : undefined}
+      />
 
       <SettingsPanel
         isOpen={showSettings}

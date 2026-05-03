@@ -193,6 +193,7 @@ pnpm --filter @workspace/api-server run db:push
 | Shortcut | Action |
 |---|---|
 | `Ctrl+Enter` | Run / Preview current file |
+| `Ctrl+Shift+P` | **Command palette** (search all commands, files, templates) |
 | `Ctrl+Shift+F` | Format with Prettier |
 | `Ctrl+,` | Toggle settings panel |
 | `?` | Keyboard shortcuts reference |
@@ -202,7 +203,6 @@ pnpm --filter @workspace/api-server run db:push
 | `Ctrl+D` | Select next occurrence |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / Redo |
 | `Ctrl+F` | Find in file |
-| `Alt+Z` | Toggle word wrap |
 | `Ctrl+G` | Go to line |
 
 ---
@@ -334,7 +334,7 @@ Mobile templates run live in the browser — no Expo API dependency for the web 
 9. `AppRegistry.runApplication()` mounts `window.App` into `<div id="root">`
 10. The HTML page is served from a `blob://` URL in an iframe
 
-The **Android / iOS tabs** still use Expo Snack for real-device QR codes (via `useSnackSync` → `POST /api/snack`).
+The Android/iOS Expo Go prompt has been removed — the preview is **Web-only** (React Native Web in-browser). No download prompts, no Expo Go app required.
 
 ---
 

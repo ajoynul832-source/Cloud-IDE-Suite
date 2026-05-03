@@ -37,6 +37,7 @@ const SECTIONS: Section[] = [
     title: "IDE",
     items: [
       { keys: ["?"],                                               label: "Open keyboard shortcuts" },
+      { keys: ["Ctrl", "Shift", "P"],   mac: ["⌘", "⇧", "P"],   label: "Command palette" },
       { keys: ["Ctrl", ","],             mac: ["⌘", ","],         label: "Open settings" },
       { keys: ["Alt", "Z"],                                        label: "Toggle word wrap" },
     ],

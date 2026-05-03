@@ -29,13 +29,13 @@ console.log("Sum:    ", numbers.reduce((a, b) => a + b, 0));
 // Async / await
 async function fetchData(id) {
   await new Promise(r => setTimeout(r, 100)); // simulate async work
-  return { id, name: \`Item \${id}\`, value: Math.random().toFixed(4) };
+  return { id, name: \`Item \x24{id}\`, value: Math.random().toFixed(4) };
 }
 
 async function main() {
   const items = await Promise.all([1, 2, 3].map(fetchData));
   items.forEach(({ id, name, value }) => {
-    console.log(\`[\${id}] \${name} → \${value}\`);
+    console.log(\`[\x24{id}] \x24{name} → \x24{value}\`);
   });
 }
 
@@ -612,18 +612,18 @@ echo
 # Arrays
 echo "=== Arrays ==="
 FRUITS=("apple" "banana" "cherry" "mango" "kiwi")
-echo "Fruits: \${FRUITS[*]}"
-echo "Count:  \${#FRUITS[@]}"
-echo "Sorted: $(printf '%s\\n' "\${FRUITS[@]}" | sort | tr '\\n' ' ')"
+echo "Fruits: \x24{FRUITS[*]}"
+echo "Count:  \x24{#FRUITS[@]}"
+echo "Sorted: $(printf '%s\\n' "\x24{FRUITS[@]}" | sort | tr '\\n' ' ')"
 echo
 
 # String operations
 echo "=== Strings ==="
 TEXT="Hello, World from Bash!"
 echo "Original:   $TEXT"
-echo "Uppercase:  \${TEXT^^}"
-echo "Length:     \${#TEXT}"
-echo "Replace:    \${TEXT/World/CloudIDE}"
+echo "Uppercase:  \x24{TEXT^^}"
+echo "Length:     \x24{#TEXT}"
+echo "Replace:    \x24{TEXT/World/CloudIDE}"
 echo
 
 # Functions
@@ -642,9 +642,9 @@ echo
 echo "=== Word Frequency ==="
 SENTENCE="the quick brown fox jumps over the lazy dog the fox"
 declare -A FREQ
-for W in $SENTENCE; do FREQ[$W]=$(( \${FREQ[$W]:-0} + 1 )); done
-for W in "\${!FREQ[@]}"; do
-    printf "  %-8s %d\\n" "$W" "\${FREQ[$W]}"
+for W in $SENTENCE; do FREQ[$W]=$(( \x24{FREQ[$W]:-0} + 1 )); done
+for W in "\x24{!FREQ[@]}"; do
+    printf "  %-8s %d\\n" "$W" "\x24{FREQ[$W]}"
 done | sort -k2 -rn
 echo
 echo "✓ Done!"
@@ -1342,7 +1342,7 @@ async function mockFetch(url, options = {}) {
     return { ok: true, status: 200, json: async () => ({ data: enriched }) };
   }
 
-  return { ok: false, status: 404, json: async () => ({ error: \`Route not found: \${method} \${url}\` }) };
+  return { ok: false, status: 404, json: async () => ({ error: \`Route not found: \x24{method} \x24{url}\` }) };
 }
 
 // ── API client wrapper ────────────────────────────────────────────────────────
@@ -1350,10 +1350,10 @@ async function apiCall(url, options = {}) {
   try {
     const res  = await mockFetch(url, options);
     const data = await res.json();
-    if (!res.ok) throw new Error(\`\${res.status}: \${data.error}\`);
+    if (!res.ok) throw new Error(\`\x24{res.status}: \x24{data.error}\`);
     return data;
   } catch (err) {
-    throw new Error(\`API Error — \${err.message}\`);
+    throw new Error(\`API Error — \x24{err.message}\`);
   }
 }
 
@@ -1361,32 +1361,32 @@ async function apiCall(url, options = {}) {
 async function main() {
   console.log("=== GET /api/users ===");
   const { data: users, total } = await apiCall("/api/users");
-  console.log(\`  Found \${total} users\`);
-  users.filter(u => u.active).forEach(u => console.log(\`  [\${u.id}] \${u.name} (\${u.role})\`));
+  console.log(\`  Found \x24{total} users\`);
+  users.filter(u => u.active).forEach(u => console.log(\`  [\x24{u.id}] \x24{u.name} (\x24{u.role})\`));
 
   console.log("\\n=== GET /api/users/2 ===");
   const { data: bob } = await apiCall("/api/users/2");
-  console.log(\`  Name: \${bob.name}  Email: \${bob.email}\`);
+  console.log(\`  Name: \x24{bob.name}  Email: \x24{bob.email}\`);
 
   console.log("\\n=== GET /api/users/99 (404) ===");
   try { await apiCall("/api/users/99"); }
-  catch (e) { console.log(\`  Error: \${e.message}\`); }
+  catch (e) { console.log(\`  Error: \x24{e.message}\`); }
 
   console.log("\\n=== POST /api/users ===");
   const { data: newUser } = await apiCall("/api/users", {
     method: "POST",
     body: JSON.stringify({ name: "Eve Torres", email: "eve@example.com" }),
   });
-  console.log(\`  Created: [\${newUser.id}] \${newUser.name}\`);
+  console.log(\`  Created: [\x24{newUser.id}] \x24{newUser.name}\`);
 
   console.log("\\n=== POST /api/users (400 — missing fields) ===");
   try { await apiCall("/api/users", { method: "POST", body: JSON.stringify({ name: "Incomplete" }) }); }
-  catch (e) { console.log(\`  Error: \${e.message}\`); }
+  catch (e) { console.log(\`  Error: \x24{e.message}\`); }
 
   console.log("\\n=== GET /api/posts ===");
   const { data: posts } = await apiCall("/api/posts");
   posts.sort((a, b) => b.likes - a.likes).forEach(p =>
-    console.log(\`  [\${p.likes} ♥] \${p.title} — by \${p.author}\`)
+    console.log(\`  [\x24{p.likes} ♥] \x24{p.title} — by \x24{p.author}\`)
   );
 
   console.log("\\n=== Parallel requests ===");
@@ -1394,7 +1394,7 @@ async function main() {
     apiCall("/api/users/1"),
     apiCall("/api/users/4"),
   ]);
-  console.log(\`  Parallel result: \${r1.data.name} & \${r2.data.name}\`);
+  console.log(\`  Parallel result: \x24{r1.data.name} & \x24{r2.data.name}\`);
 }
 
 main().catch(console.error);
@@ -1415,18 +1415,18 @@ main().catch(console.error);
 function test(label, pattern, text, expected) {
   const result = pattern.test(text);
   const mark   = result === expected ? "✓" : "✗";
-  console.log(\`\${mark} \${label}: \${result}\`);
+  console.log(\`\x24{mark} \x24{label}: \x24{result}\`);
 }
 
 function matchAll(label, pattern, text) {
   const matches = [...text.matchAll(pattern)];
-  console.log(\`\\n--- \${label} ---\`);
+  console.log(\`\\n--- \x24{label} ---\`);
   if (!matches.length) { console.log("  (no matches)"); return; }
   matches.forEach((m, i) => {
     const groups = m.groups
-      ? Object.entries(m.groups).map(([k, v]) => \`\${k}=\${JSON.stringify(v)}\`).join(", ")
-      : m.slice(1).map((g, j) => \`group\${j + 1}=\${JSON.stringify(g)}\`).join(", ");
-    console.log(\`  [\${i}] match=\${JSON.stringify(m[0])}  index=\${m.index}\${groups ? "  " + groups : ""}\`);
+      ? Object.entries(m.groups).map(([k, v]) => \`\x24{k}=\x24{JSON.stringify(v)}\`).join(", ")
+      : m.slice(1).map((g, j) => \`group\x24{j + 1}=\x24{JSON.stringify(g)}\`).join(", ");
+    console.log(\`  [\x24{i}] match=\x24{JSON.stringify(m[0])}  index=\x24{m.index}\x24{groups ? "  " + groups : ""}\`);
   });
 }
 
@@ -1459,18 +1459,18 @@ matchAll("URL parts", URL_RE, urls);
 console.log("\\n=== String Replace ===");
 const camel   = "getUserProfileData";
 const snake   = camel.replace(/([A-Z])/g, "_$1").toLowerCase();
-console.log(\`  camelCase → snake_case: "\${camel}" → "\${snake}"\`);
+console.log(\`  camelCase → snake_case: "\x24{camel}" → "\x24{snake}"\`);
 
 const template = "Hello, {{name}}! You have {{count}} messages.";
 const result   = template.replace(/{{(\\w+)}}/g, (_, key) =>
-  ({ name: "Alice", count: 7 })[key] ?? \`{{MISSING:\${key}}}\`
+  ({ name: "Alice", count: 7 })[key] ?? \`{{MISSING:\x24{key}}}\`
 );
-console.log(\`  Template: "\${result}"\`);
+console.log(\`  Template: "\x24{result}"\`);
 
 // ── 5. Extract all hashtags ───────────────────────────────────────────────────
 const tweet    = "Loving #JavaScript and #TypeScript! Check out #CloudIDE 🚀 #coding";
 const hashtags = tweet.match(/#\\w+/g) ?? [];
-console.log(\`\\n=== Hashtags ===\\n  \${hashtags.join(", ")}\`);
+console.log(\`\\n=== Hashtags ===\\n  \x24{hashtags.join(", ")}\`);
 
 // ── 6. Password strength ──────────────────────────────────────────────────────
 function passwordStrength(pw) {
@@ -1489,8 +1489,8 @@ function passwordStrength(pw) {
 console.log("\\n=== Password Strength ===");
 ["abc", "password", "Pass1234", "P@ssw0rd!"].forEach(pw => {
   const { score, label, missing } = passwordStrength(pw);
-  const missing_str = missing.length ? \`  missing: \${missing.join(", ")}\` : "";
-  console.log(\`  "\${pw.padEnd(12)}" → \${label} (\${score}/5)\${missing_str}\`);
+  const missing_str = missing.length ? \`  missing: \x24{missing.join(", ")}\` : "";
+  console.log(\`  "\x24{pw.padEnd(12)}" → \x24{label} (\x24{score}/5)\x24{missing_str}\`);
 });
 `,
     },
@@ -1594,7 +1594,7 @@ function isBalanced(s) {
 
 console.log("\\n=== Stack (Balanced Brackets) ===");
 ["{[()]}", "{[(])}", "((()))", "((())", "[]{}()"].forEach(s =>
-  console.log(\`  "\${s}" → \${isBalanced(s) ? "✓ balanced" : "✗ unbalanced"}\`)
+  console.log('  "' + s + '" \u2192 ' + (isBalanced(s) ? '\u2713 balanced' : '\u2717 unbalanced'))
 );
 `,
     },
@@ -2847,7 +2847,7 @@ class MockRouter {
 
   _match(pattern, path) {
     const re = pattern.replace(/:([\\w]+)/g, "([^/]+)");
-    return new RegExp(\`^\${re}$\`).test(path);
+    return new RegExp(\`^\x24{re}$\`).test(path);
   }
   _params(pattern, path) {
     const keys  = [...pattern.matchAll(/:([\\w]+)/g)].map(m => m[1]);
@@ -2904,7 +2904,7 @@ app.delete("/users/:id", async (req, res) => {
 async function log(method, path, body = null) {
   const res = await app.request(method, path, body);
   const icon = res.status < 300 ? "✓" : res.status < 400 ? "→" : "✗";
-  console.log(\`\${icon} \${method} \${path} → \${res.status}\`);
+  console.log(\`\x24{icon} \x24{method} \x24{path} → \x24{res.status}\`);
   console.log("  ", JSON.stringify(res.body, null, 2).split("\\n").join("\\n   "));
   console.log();
 }
@@ -2954,7 +2954,7 @@ const MOCK_DB = {
 async function fetchJson(url) {
   await new Promise(r => setTimeout(r, 10)); // simulate latency
   const data = MOCK_DB[url] ?? MOCK_DB[url.split("?")[0]];
-  if (!data) throw new Error(\`404: \${url} not found\`);
+  if (!data) throw new Error(\`404: \x24{url} not found\`);
   return { ok: true, json: async () => JSON.parse(JSON.stringify(data)) };
 }
 
@@ -2962,10 +2962,10 @@ async function fetchJson(url) {
 console.log("=== Pattern 1: Basic Fetch ===");
 try {
   const res  = await fetchJson("https://api.example.com/users");
-  if (!res.ok) throw new Error(\`HTTP error \${res.status}\`);
+  if (!res.ok) throw new Error(\`HTTP error \x24{res.status}\`);
   const data = await res.json();
-  console.log(\`Fetched \${data.length} users\`);
-  data.slice(0, 3).forEach(u => console.log(\`  [\${u.id}] \${u.name} (score: \${u.score})\`));
+  console.log(\`Fetched \x24{data.length} users\`);
+  data.slice(0, 3).forEach(u => console.log(\`  [\x24{u.id}] \x24{u.name} (score: \x24{u.score})\`));
 } catch (err) {
   console.error("Fetch failed:", err.message);
 }
@@ -2977,7 +2977,7 @@ const [usersRes, postsRes] = await Promise.all([
   fetchJson("https://api.example.com/posts"),
 ]);
 const [users, posts] = await Promise.all([usersRes.json(), postsRes.json()]);
-console.log(\`Loaded \${users.length} users and \${posts.length} posts in parallel\`);
+console.log(\`Loaded \x24{users.length} users and \x24{posts.length} posts in parallel\`);
 
 // ── Pattern 3: Join + transform ─────────────────────────────────────
 console.log("\\n=== Pattern 3: Join + Transform ===");
@@ -2989,7 +2989,7 @@ const enriched = posts
 console.log("Top posts by views:");
 enriched.forEach(p => {
   const bar = "█".repeat(Math.round(p.views / 400));
-  console.log(\`  \${bar.padEnd(15)} \${p.views.toLocaleString()} · "\${p.title}" by \${p.author}\`);
+  console.log(\`  \x24{bar.padEnd(15)} \x24{p.views.toLocaleString()} · "\x24{p.title}" by \x24{p.author}\`);
 });
 
 // ── Pattern 4: Aggregate stats ──────────────────────────────────────
@@ -3001,9 +3001,9 @@ const stats = users.reduce((acc, u) => {
   return acc;
 }, { totalScore: 0, max: -Infinity, min: Infinity });
 
-console.log(\`Average score: \${(stats.totalScore / users.length).toFixed(1)}\`);
-console.log(\`Highest:       \${stats.max} (\${users.find(u => u.score === stats.max)?.name})\`);
-console.log(\`Lowest:        \${stats.min} (\${users.find(u => u.score === stats.min)?.name})\`);
+console.log(\`Average score: \x24{(stats.totalScore / users.length).toFixed(1)}\`);
+console.log(\`Highest:       \x24{stats.max} (\x24{users.find(u => u.score === stats.max)?.name})\`);
+console.log(\`Lowest:        \x24{stats.min} (\x24{users.find(u => u.score === stats.min)?.name})\`);
 
 // ── Pattern 5: Error boundary ───────────────────────────────────────
 console.log("\\n=== Pattern 5: Error Handling ===");
@@ -3013,8 +3013,8 @@ const results = await Promise.allSettled([
   fetchJson("https://api.example.com/posts"),
 ]);
 results.forEach((r, i) => {
-  if (r.status === "fulfilled") console.log(\`  [✓] Request \${i+1} succeeded\`);
-  else                          console.log(\`  [✗] Request \${i+1} failed: \${r.reason.message}\`);
+  if (r.status === "fulfilled") console.log(\`  [✓] Request \x24{i+1} succeeded\`);
+  else                          console.log(\`  [✗] Request \x24{i+1} failed: \x24{r.reason.message}\`);
 });
 `,
     },
@@ -3397,7 +3397,7 @@ find_library(log-lib log)
 
 target_link_libraries(
     nativeapp
-    \${log-lib}
+    \x24{log-lib}
 )
 `,
       "app/src/main/java/com/example/app/MainActivity.kt": `package com.example.app
@@ -3512,17 +3512,17 @@ const N = 40;
 console.time("iterative");
 const r1 = fibIterative(N);
 console.timeEnd("iterative");
-console.log(\`iterative → fib(\${N}) = \${r1}\`);
+console.log(\`iterative → fib(\x24{N}) = \x24{r1}\`);
 
 console.time("memoized");
 const r2 = fibMemo(N);
 console.timeEnd("memoized");
-console.log(\`memoized  → fib(\${N}) = \${r2}\`);
+console.log(\`memoized  → fib(\x24{N}) = \x24{r2}\`);
 
 // ── Fun fact: Golden Ratio ────────────────────────────────
 console.log("\\n=== Golden Ratio Approximation ===");
 const ratio = fibIterative(50) / fibIterative(49);
-console.log(\`fib(50) / fib(49) ≈ \${ratio.toFixed(15)}\`);
+console.log(\`fib(50) / fib(49) ≈ \x24{ratio.toFixed(15)}\`);
 console.log(\`Golden ratio  φ  ≈ 1.618033988749895\`);
 `,
     },
@@ -4279,6 +4279,1159 @@ async function demo6() {
 `,
     },
   },
+
+// ── Canvas Particle System ─────────────────────────────────────────────────────
+{
+  id:          "html-canvas-game",
+  name:        "Canvas Particle System",
+  description: "Interactive HTML5 Canvas particle physics — click to spawn bursts, mouse to attract.",
+  icon:        "✨",
+  language:    "HTML",
+  runnable:    true,
+  files: {
+    "index.html": `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Particle System</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; cursor: crosshair; }
+  canvas { display: block; }
+  #info {
+    position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+    font: 12px/1.6 monospace; color: rgba(255,255,255,0.35);
+    text-align: center; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">Click to spawn · Move mouse to attract</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W = canvas.width  = window.innerWidth;
+let H = canvas.height = window.innerHeight;
+window.addEventListener('resize', () => { W = canvas.width = innerWidth; H = canvas.height = innerHeight; });
+
+const mouse = { x: W / 2, y: H / 2 };
+const particles = [];
+
+const COLORS = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff6bff','#ff9f43','#48dbfb'];
+
+class Particle {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 6 + 1;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+    this.r  = Math.random() * 4 + 1;
+    this.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+    this.life = 1;
+    this.decay = Math.random() * 0.012 + 0.006;
+  }
+  update() {
+    // Attract toward mouse
+    const dx = mouse.x - this.x;
+    const dy = mouse.y - this.y;
+    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    const force = Math.min(80 / (dist * dist), 0.4);
+    this.vx += dx / dist * force;
+    this.vy += dy / dist * force;
+    // Gravity
+    this.vy += 0.08;
+    // Friction
+    this.vx *= 0.99;
+    this.vy *= 0.99;
+    this.x += this.vx;
+    this.y += this.vy;
+    this.life -= this.decay;
+  }
+  draw() {
+    ctx.globalAlpha = this.life;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+  }
+}
+
+function spawn(x, y, n = 60) {
+  for (let i = 0; i < n; i++) particles.push(new Particle(x, y));
+}
+
+canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+canvas.addEventListener('click',     e => spawn(e.clientX, e.clientY));
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  mouse.x = t.clientX; mouse.y = t.clientY;
+  spawn(t.clientX, t.clientY, 20);
+}, { passive: false });
+
+// Ambient particles
+setInterval(() => spawn(Math.random() * W, Math.random() * H, 15), 1200);
+
+function loop() {
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 1;
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update();
+    particles[i].draw();
+    if (particles[i].life <= 0) particles.splice(i, 1);
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
+`,
+  },
+},
+
+// ── CSS Grid Showcase ──────────────────────────────────────────────────────────
+{
+  id:          "html-css-grid",
+  name:        "CSS Grid Layout",
+  description: "Complete CSS Grid showcase — named areas, auto-fill, minmax, and responsive breakpoints.",
+  icon:        "▦",
+  language:    "HTML",
+  runnable:    true,
+  files: {
+    "index.html": `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CSS Grid Showcase</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.25rem; color: #7dd3fc; }
+  p.sub { font-size: 0.8rem; color: #64748b; margin-bottom: 2rem; }
+  h2 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin: 2rem 0 0.75rem; }
+  .box {
+    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+    padding: 1rem; display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-align: center;
+    min-height: 64px;
+  }
+  .box.accent { background: #0f4c7e; border-color: #3b82f6; color: #93c5fd; }
+  .box.green  { background: #14532d; border-color: #22c55e; color: #86efac; }
+
+  /* ── 1. Named template areas ── */
+  .layout-named {
+    display: grid;
+    grid-template-areas:
+      "header  header  header"
+      "sidebar main    main"
+      "sidebar aside   aside"
+      "footer  footer  footer";
+    grid-template-columns: 200px 1fr 1fr;
+    grid-template-rows: auto 1fr 1fr auto;
+    gap: 8px; min-height: 240px;
+  }
+  .layout-named .header  { grid-area: header;  }
+  .layout-named .sidebar { grid-area: sidebar; }
+  .layout-named .main    { grid-area: main;    }
+  .layout-named .aside   { grid-area: aside;   }
+  .layout-named .footer  { grid-area: footer;  }
+
+  /* ── 2. auto-fill + minmax responsive cards ── */
+  .layout-auto {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+  }
+
+  /* ── 3. Spanning columns & rows ── */
+  .layout-span {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 80px;
+    gap: 8px;
+  }
+  .span-2c { grid-column: span 2; }
+  .span-2r { grid-row:    span 2; }
+  .span-2c2r { grid-column: span 2; grid-row: span 2; }
+</style>
+</head>
+<body>
+<h1>CSS Grid Showcase</h1>
+<p class="sub">Three real-world layout patterns in 40 lines of CSS.</p>
+
+<h2>1 · Named Template Areas</h2>
+<div class="layout-named">
+  <div class="box accent header" >Header</div>
+  <div class="box green  sidebar">Sidebar</div>
+  <div class="box        main"   >Main Content</div>
+  <div class="box        aside"  >Aside</div>
+  <div class="box        footer" >Footer</div>
+</div>
+
+<h2>2 · Auto-fill + minmax (responsive cards)</h2>
+<div class="layout-auto">
+  <div class="box">Card 1</div>
+  <div class="box">Card 2</div>
+  <div class="box">Card 3</div>
+  <div class="box">Card 4</div>
+  <div class="box">Card 5</div>
+  <div class="box">Card 6</div>
+  <div class="box">Card 7</div>
+  <div class="box">Card 8</div>
+  <div class="box">Card 9</div>
+  <div class="box">Card 10</div>
+</div>
+
+<h2>3 · Column &amp; Row Spanning</h2>
+<div class="layout-span">
+  <div class="box accent span-2c2r">2×2</div>
+  <div class="box green  span-2c"  >2 cols</div>
+  <div class="box"                 >1×1</div>
+  <div class="box"                 >1×1</div>
+  <div class="box green  span-2r"  >2 rows</div>
+  <div class="box"                 >1×1</div>
+  <div class="box accent span-2c"  >2 cols</div>
+</div>
+</body>
+</html>
+`,
+  },
+},
+
+// ── CSS Flexbox Showcase ───────────────────────────────────────────────────────
+{
+  id:          "html-css-flexbox",
+  name:        "CSS Flexbox Showcase",
+  description: "Visual guide to every key Flexbox property — direction, wrap, justify, align, gap.",
+  icon:        "⬌",
+  language:    "HTML",
+  runnable:    true,
+  files: {
+    "index.html": `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flexbox Showcase</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }
+  h1   { font-size: 1.4rem; color: #a78bfa; margin-bottom: 0.2rem; }
+  p.sub{ font-size: 0.8rem; color: #64748b; margin-bottom: 2rem; }
+  h2   { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em;
+         color: #94a3b8; margin: 2rem 0 0.75rem; }
+  code { font-size: 0.72rem; background: #1e293b; color: #7dd3fc;
+         padding: 1px 6px; border-radius: 4px; }
+  .flex-demo { background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+               padding: 12px; gap: 6px; min-height: 80px; }
+  .item { background: #4f46e5; border-radius: 4px; padding: 8px 14px;
+          font-size: 0.72rem; font-weight: 700; color: #e0e7ff; white-space: nowrap; }
+  .item.gold { background: #d97706; color: #fef3c7; }
+  .item.teal { background: #0f766e; color: #ccfbf1; }
+</style>
+</head>
+<body>
+<h1>CSS Flexbox Showcase</h1>
+<p class="sub">Every key property, live in the browser.</p>
+
+<h2>flex-direction: row (default)</h2>
+<div class="flex-demo" style="display:flex; flex-direction:row;">
+  <div class="item">A</div><div class="item">B</div><div class="item">C</div>
+</div>
+
+<h2>flex-direction: column</h2>
+<div class="flex-demo" style="display:flex; flex-direction:column; min-height:160px;">
+  <div class="item">A</div><div class="item">B</div><div class="item">C</div>
+</div>
+
+<h2>justify-content: space-between</h2>
+<div class="flex-demo" style="display:flex; justify-content:space-between;">
+  <div class="item">Left</div><div class="item">Center</div><div class="item">Right</div>
+</div>
+
+<h2>justify-content: center + align-items: center</h2>
+<div class="flex-demo" style="display:flex; justify-content:center; align-items:center; min-height:100px;">
+  <div class="item gold">Perfectly Centered</div>
+</div>
+
+<h2>flex-wrap: wrap + gap</h2>
+<div class="flex-demo" style="display:flex; flex-wrap:wrap; gap:8px;">
+  <div class="item">Item 1</div>
+  <div class="item gold">Item 2</div>
+  <div class="item teal">Item 3</div>
+  <div class="item">Item 4</div>
+  <div class="item gold">Item 5</div>
+  <div class="item teal">Item 6</div>
+  <div class="item">Item 7</div>
+  <div class="item gold">Item 8</div>
+  <div class="item teal">Item 9</div>
+  <div class="item">Item 10</div>
+  <div class="item gold">Item 11</div>
+  <div class="item teal">Item 12</div>
+</div>
+
+<h2>flex-grow — proportional sizing</h2>
+<div class="flex-demo" style="display:flex; gap:6px;">
+  <div class="item" style="flex:1">grow 1</div>
+  <div class="item teal" style="flex:2">grow 2</div>
+  <div class="item gold" style="flex:3">grow 3</div>
+</div>
+
+<h2>align-self — per-item alignment</h2>
+<div class="flex-demo" style="display:flex; align-items:flex-start; min-height:120px; gap:6px;">
+  <div class="item" style="align-self:flex-start">start</div>
+  <div class="item teal" style="align-self:center">center</div>
+  <div class="item gold" style="align-self:flex-end">end</div>
+  <div class="item" style="align-self:stretch; height:auto">stretch</div>
+</div>
+</body>
+</html>
+`,
+  },
+},
+
+// ── Python Sorting Algorithms ──────────────────────────────────────────────────
+{
+  id:          "py-sorting",
+  name:        "Python Sorting Algorithms",
+  description: "Bubble, selection, insertion, merge, and quicksort — with timing comparison on 1000-element arrays.",
+  icon:        "🔢",
+  language:    "Python",
+  runnable:    true,
+  files: {
+    "sorting.py": `import random
+import time
+
+def bubble_sort(arr):
+    a = arr[:]
+    n = len(a)
+    for i in range(n):
+        for j in range(n - i - 1):
+            if a[j] > a[j+1]:
+                a[j], a[j+1] = a[j+1], a[j]
+    return a
+
+def selection_sort(arr):
+    a = arr[:]
+    n = len(a)
+    for i in range(n):
+        min_idx = i
+        for j in range(i+1, n):
+            if a[j] < a[min_idx]:
+                min_idx = j
+        a[i], a[min_idx] = a[min_idx], a[i]
+    return a
+
+def insertion_sort(arr):
+    a = arr[:]
+    for i in range(1, len(a)):
+        key = a[i]
+        j = i - 1
+        while j >= 0 and a[j] > key:
+            a[j+1] = a[j]
+            j -= 1
+        a[j+1] = key
+    return a
+
+def merge_sort(arr):
+    if len(arr) <= 1:
+        return arr[:]
+    mid = len(arr) // 2
+    left  = merge_sort(arr[:mid])
+    right = merge_sort(arr[mid:])
+    result = []
+    i = j = 0
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            result.append(left[i]); i += 1
+        else:
+            result.append(right[j]); j += 1
+    return result + left[i:] + right[j:]
+
+def quick_sort(arr):
+    if len(arr) <= 1:
+        return arr[:]
+    pivot = arr[len(arr) // 2]
+    left  = [x for x in arr if x < pivot]
+    mid   = [x for x in arr if x == pivot]
+    right = [x for x in arr if x > pivot]
+    return quick_sort(left) + mid + quick_sort(right)
+
+# ── Timing test ───────────────────────────────────────────────────────────────
+N = 1000
+data = [random.randint(0, 10000) for _ in range(N)]
+
+algorithms = [
+    ("Bubble Sort",    bubble_sort),
+    ("Selection Sort", selection_sort),
+    ("Insertion Sort", insertion_sort),
+    ("Merge Sort",     merge_sort),
+    ("Quick Sort",     quick_sort),
+    ("Python sorted()",sorted),
+]
+
+print(f"Sorting {N} random integers\\n")
+print(f"{'Algorithm':<20} {'Time (ms)':>10}  Correct?")
+print("-" * 40)
+
+reference = sorted(data)
+for name, fn in algorithms:
+    start = time.perf_counter()
+    result = fn(data)
+    elapsed = (time.perf_counter() - start) * 1000
+    ok = "✓" if list(result) == reference else "✗"
+    print(f"{name:<20} {elapsed:>8.3f}ms  {ok}")
+`,
+  },
+},
+
+// ── Python OOP ────────────────────────────────────────────────────────────────
+{
+  id:          "py-oop",
+  name:        "Python OOP & Dataclasses",
+  description: "Classes, inheritance, dataclasses, __dunder__ methods, and property decorators.",
+  icon:        "🐍",
+  language:    "Python",
+  runnable:    true,
+  files: {
+    "oop.py": `from dataclasses import dataclass, field
+from typing import List
+import math
+
+# ── 1. Dataclass with defaults & __post_init__ ────────────────────────────────
+@dataclass
+class Vector2D:
+    x: float = 0.0
+    y: float = 0.0
+
+    def __post_init__(self):
+        if not (isinstance(self.x, (int,float)) and isinstance(self.y, (int,float))):
+            raise TypeError("x and y must be numeric")
+
+    def __add__(self, other: "Vector2D") -> "Vector2D":
+        return Vector2D(self.x + other.x, self.y + other.y)
+
+    def __mul__(self, scalar: float) -> "Vector2D":
+        return Vector2D(self.x * scalar, self.y * scalar)
+
+    def __abs__(self) -> float:
+        return math.hypot(self.x, self.y)
+
+    def __repr__(self) -> str:
+        return f"Vector2D({self.x:.2f}, {self.y:.2f})"
+
+    @property
+    def unit(self) -> "Vector2D":
+        mag = abs(self)
+        if mag == 0:
+            return Vector2D(0, 0)
+        return Vector2D(self.x / mag, self.y / mag)
+
+    def dot(self, other: "Vector2D") -> float:
+        return self.x * other.x + self.y * other.y
+
+# ── 2. Inheritance & polymorphism ─────────────────────────────────────────────
+class Shape:
+    def area(self) -> float:
+        raise NotImplementedError
+
+    def perimeter(self) -> float:
+        raise NotImplementedError
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(area={self.area():.2f}, perimeter={self.perimeter():.2f})"
+
+class Circle(Shape):
+    def __init__(self, radius: float):
+        self.radius = radius
+    def area(self):      return math.pi * self.radius ** 2
+    def perimeter(self): return 2 * math.pi * self.radius
+
+class Rectangle(Shape):
+    def __init__(self, w: float, h: float):
+        self.w, self.h = w, h
+    def area(self):      return self.w * self.h
+    def perimeter(self): return 2 * (self.w + self.h)
+
+class Triangle(Shape):
+    def __init__(self, a: float, b: float, c: float):
+        assert a + b > c and b + c > a and a + c > b, "Invalid triangle"
+        self.a, self.b, self.c = a, b, c
+    def perimeter(self): return self.a + self.b + self.c
+    def area(self):
+        s = self.perimeter() / 2
+        return math.sqrt(s * (s-self.a) * (s-self.b) * (s-self.c))
+
+# ── 3. Dataclass with list field ──────────────────────────────────────────────
+@dataclass
+class Inventory:
+    items: List[str] = field(default_factory=list)
+
+    def add(self, item: str):
+        self.items.append(item)
+        return self
+
+    def remove(self, item: str):
+        self.items.remove(item)
+        return self
+
+    def __len__(self):
+        return len(self.items)
+
+    def __contains__(self, item):
+        return item in self.items
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+print("=== Vector2D ===")
+v1 = Vector2D(3, 4)
+v2 = Vector2D(1, -2)
+print(f"v1 = {v1},  |v1| = {abs(v1)}")
+print(f"v1 + v2 = {v1 + v2}")
+print(f"v1 * 2  = {v1 * 2}")
+print(f"unit(v1)= {v1.unit}")
+print(f"dot     = {v1.dot(v2)}")
+
+print("\\n=== Shapes ===")
+shapes: List[Shape] = [Circle(5), Rectangle(4, 6), Triangle(3, 4, 5)]
+for s in shapes:
+    print(s)
+
+print("\\n=== Inventory ===")
+inv = Inventory()
+inv.add("sword").add("shield").add("potion")
+print(f"Items: {inv.items}  (count: {len(inv)})")
+print(f"Has sword? {'sword' in inv}")
+inv.remove("potion")
+print(f"After remove: {inv.items}")
+`,
+  },
+},
+
+// ── TypeScript Generics ────────────────────────────────────────────────────────
+{
+  id:          "ts-generics",
+  name:        "TypeScript Generics Deep Dive",
+  description: "Generic functions, constraints, conditional types, mapped types, and utility types.",
+  icon:        "🔷",
+  language:    "TypeScript",
+  runnable:    true,
+  files: {
+    "generics.ts": `// ── 1. Generic functions & constraints ───────────────────────────────────────
+function identity<T>(value: T): T {
+  return value;
+}
+
+function first<T>(arr: T[]): T | undefined {
+  return arr[0];
+}
+
+function merge<A, B>(a: A, b: B): A & B {
+  return { ...a, ...b } as A & B;
+}
+
+function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
+  return obj[key];
+}
+
+// ── 2. Generic class ──────────────────────────────────────────────────────────
+class Stack<T> {
+  private items: T[] = [];
+
+  push(item: T): void { this.items.push(item); }
+  pop(): T | undefined { return this.items.pop(); }
+  peek(): T | undefined { return this.items[this.items.length - 1]; }
+  get size(): number { return this.items.length; }
+  isEmpty(): boolean { return this.items.length === 0; }
+  toArray(): T[] { return [...this.items]; }
+}
+
+// ── 3. Conditional types ──────────────────────────────────────────────────────
+type IsArray<T> = T extends any[] ? true : false;
+type Unwrap<T>  = T extends Array<infer U> ? U : T;
+type NonNullable2<T> = T extends null | undefined ? never : T;
+
+// ── 4. Mapped types ───────────────────────────────────────────────────────────
+type Optional<T>   = { [K in keyof T]?: T[K] };
+type Readonly2<T>  = { readonly [K in keyof T]: T[K] };
+type Stringify<T>  = { [K in keyof T]: string };
+type Nullable<T>   = { [K in keyof T]: T[K] | null };
+
+// ── 5. Utility type examples ──────────────────────────────────────────────────
+interface User {
+  id:       number;
+  name:     string;
+  email:    string;
+  password: string;
+  role:     "admin" | "user" | "guest";
+}
+
+type PublicUser   = Omit<User, "password">;
+type CreateUser   = Omit<User, "id">;
+type UpdateUser   = Partial<Omit<User, "id">>;
+type AdminUser    = User & { permissions: string[] };
+type UserRole     = User["role"];
+type UserKeys     = keyof User;
+
+// ── 6. Generic Result type (like Rust Result<T,E>) ───────────────────────────
+type Ok<T>  = { ok: true;  value: T };
+type Err<E> = { ok: false; error: E };
+type Result<T, E = string> = Ok<T> | Err<E>;
+
+function divide(a: number, b: number): Result<number> {
+  if (b === 0) return { ok: false, error: "Division by zero" };
+  return { ok: true, value: a / b };
+}
+
+function unwrap<T>(result: Result<T>): T {
+  if (!result.ok) throw new Error(result.error);
+  return result.value;
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+console.log("=== Generic Functions ===");
+console.log(identity("hello"));
+console.log(identity(42));
+console.log(first([10, 20, 30]));
+console.log(merge({ name: "Alice" }, { age: 30 }));
+
+const user = { name: "Bob", role: "admin" as const, id: 1, email: "bob@example.com", password: "x" };
+console.log(getProperty(user, "role"));
+
+console.log("\\n=== Stack<T> ===");
+const stack = new Stack<number>();
+[1,2,3,4,5].forEach(n => stack.push(n));
+console.log("Stack:", stack.toArray());
+console.log("Pop:", stack.pop());
+console.log("Peek:", stack.peek());
+console.log("Size:", stack.size);
+
+console.log("\\n=== Conditional Types ===");
+type A = IsArray<string[]>;  // true
+type B = IsArray<string>;    // false
+type C = Unwrap<number[]>;   // number
+console.log("IsArray, Unwrap — checked at compile time");
+
+console.log("\\n=== Result<T,E> ===");
+const r1 = divide(10, 2);
+const r2 = divide(10, 0);
+console.log(r1.ok ? \`10/2 = \x24{r1.value}\` : \`Error: \x24{r1.error}\`);
+console.log(r2.ok ? \`10/0 = \x24{r2.value}\` : \`Error: \x24{r2.error}\`);
+try { unwrap(r2); } catch(e) { console.log("unwrap threw:", (e as Error).message); }
+`,
+  },
+},
+
+// ── JS DOM Manipulation ────────────────────────────────────────────────────────
+{
+  id:          "html-dom-events",
+  name:        "JS DOM Manipulation",
+  description: "Interactive DOM demo — live counter, color picker, dynamic list, drag & drop, event delegation.",
+  icon:        "🖱️",
+  language:    "HTML",
+  runnable:    true,
+  files: {
+    "index.html": `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DOM Manipulation</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui,sans-serif; background:#0f172a; color:#e2e8f0; padding:2rem; max-width:600px; margin:auto; }
+  h1 { color:#7dd3fc; margin-bottom:0.25rem; font-size:1.4rem; }
+  p.sub { color:#64748b; font-size:0.8rem; margin-bottom:2rem; }
+  section { background:#1e293b; border:1px solid #334155; border-radius:10px; padding:1.25rem; margin-bottom:1.25rem; }
+  h2 { font-size:0.85rem; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; margin-bottom:1rem; }
+  button { background:#3b82f6; color:#fff; border:none; border-radius:6px; padding:6px 16px; cursor:pointer; font-size:0.85rem; transition:background 0.15s; }
+  button:hover { background:#2563eb; }
+  button.red   { background:#ef4444; }
+  button.red:hover { background:#dc2626; }
+  input[type=text]  { background:#0f172a; border:1px solid #475569; border-radius:6px; padding:6px 10px; color:#e2e8f0; font-size:0.85rem; outline:none; }
+  input[type=text]:focus { border-color:#3b82f6; }
+  .counter { font-size:3rem; font-weight:700; color:#7dd3fc; text-align:center; margin:0.5rem 0; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  ul#list { list-style:none; margin-top:0.75rem; display:flex; flex-direction:column; gap:6px; }
+  ul#list li { display:flex; justify-content:space-between; align-items:center;
+               background:#0f172a; border:1px solid #334155; border-radius:6px;
+               padding:6px 12px; font-size:0.85rem; cursor:grab; }
+  ul#list li.dragging { opacity:0.4; }
+  .del-btn { background:none; border:none; color:#ef4444; cursor:pointer; font-size:1rem; padding:0 4px; }
+  #color-box { width:100%; height:80px; border-radius:8px; margin-top:0.75rem; transition:background 0.2s; }
+  #color-label { text-align:center; font-family:monospace; color:#94a3b8; font-size:0.85rem; margin-top:6px; }
+</style>
+</head>
+<body>
+<h1>DOM Manipulation</h1>
+<p class="sub">Counter · Color picker · Dynamic list with drag & drop</p>
+
+<section>
+  <h2>Counter with keyboard support</h2>
+  <div id="count" class="counter">0</div>
+  <div class="row" style="justify-content:center;gap:12px;">
+    <button id="dec">− Decrement</button>
+    <button id="reset" class="red">Reset</button>
+    <button id="inc">+ Increment</button>
+  </div>
+  <p style="text-align:center;font-size:0.75rem;color:#64748b;margin-top:0.75rem;">Use ← → arrow keys too</p>
+</section>
+
+<section>
+  <h2>Live color picker</h2>
+  <input type="color" id="picker" value="#3b82f6" style="width:60px;height:36px;border:none;background:none;cursor:pointer;">
+  <input type="text"  id="hex"    value="#3b82f6" placeholder="#rrggbb" style="width:100px;font-family:monospace;">
+  <div id="color-box" style="background:#3b82f6;"></div>
+  <div id="color-label">#3b82f6</div>
+</section>
+
+<section>
+  <h2>Dynamic list (drag to reorder)</h2>
+  <div class="row" style="margin-bottom:0.75rem;">
+    <input type="text" id="item-input" placeholder="New item…">
+    <button id="add-btn">Add</button>
+  </div>
+  <ul id="list"></ul>
+</section>
+
+<script>
+// ── Counter ──────────────────────────────────────────────────────────────────
+let count = 0;
+const display = document.getElementById('count');
+const update = () => { display.textContent = count; display.style.color = count < 0 ? '#f87171' : count > 0 ? '#4ade80' : '#7dd3fc'; };
+document.getElementById('inc').onclick   = () => { count++;  update(); };
+document.getElementById('dec').onclick   = () => { count--;  update(); };
+document.getElementById('reset').onclick = () => { count = 0; update(); };
+window.addEventListener('keydown', e => {
+  if (document.activeElement.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight') { count++; update(); }
+  if (e.key === 'ArrowLeft')  { count--; update(); }
+  if (e.key === 'Escape')     { count = 0; update(); }
+});
+
+// ── Color picker ─────────────────────────────────────────────────────────────
+const picker = document.getElementById('picker');
+const hex    = document.getElementById('hex');
+const box    = document.getElementById('color-box');
+const label  = document.getElementById('color-label');
+function applyColor(c) { box.style.background = c; label.textContent = c; }
+picker.addEventListener('input', () => { hex.value = picker.value; applyColor(picker.value); });
+hex.addEventListener('input', () => {
+  if (/^#[0-9a-f]{6}$/i.test(hex.value)) { picker.value = hex.value; applyColor(hex.value); }
+});
+
+// ── Dynamic list with drag & drop ────────────────────────────────────────────
+const ul = document.getElementById('list');
+['Buy groceries','Read docs','Build something cool'].forEach(addItem);
+document.getElementById('add-btn').onclick = () => { const v = document.getElementById('item-input').value.trim(); if(v){addItem(v);document.getElementById('item-input').value='';} };
+document.getElementById('item-input').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('add-btn').click(); });
+
+let dragged = null;
+function addItem(text) {
+  const li = document.createElement('li');
+  li.textContent = text;
+  li.draggable = true;
+  const btn = document.createElement('button');
+  btn.className = 'del-btn'; btn.textContent = '✕';
+  btn.onclick = () => li.remove();
+  li.appendChild(btn);
+  li.addEventListener('dragstart', () => { dragged = li; setTimeout(() => li.classList.add('dragging'), 0); });
+  li.addEventListener('dragend',   () => { li.classList.remove('dragging'); dragged = null; });
+  li.addEventListener('dragover',  e => { e.preventDefault(); const next = li.nextSibling; if (dragged !== li) ul.insertBefore(dragged, next === dragged ? li : next); });
+  ul.appendChild(li);
+}
+</script>
+</body>
+</html>
+`,
+  },
+},
+
+// ── Python Fibonacci & Memoization ────────────────────────────────────────────
+{
+  id:          "py-fibonacci",
+  name:        "Python Fibonacci & Memoization",
+  description: "Five implementations — naive, memoized, dynamic programming, matrix exponentiation, Binet's formula.",
+  icon:        "🔁",
+  language:    "Python",
+  runnable:    true,
+  files: {
+    "fibonacci.py": `import time
+from functools import lru_cache
+from decimal import Decimal, getcontext
+
+# ── 1. Naive recursive (exponential time) ────────────────────────────────────
+def fib_naive(n):
+    if n <= 1: return n
+    return fib_naive(n-1) + fib_naive(n-2)
+
+# ── 2. Memoized with @lru_cache (O(n) time, O(n) space) ─────────────────────
+@lru_cache(maxsize=None)
+def fib_memo(n):
+    if n <= 1: return n
+    return fib_memo(n-1) + fib_memo(n-2)
+
+# ── 3. Bottom-up dynamic programming (O(n) time, O(1) space) ─────────────────
+def fib_dp(n):
+    if n <= 1: return n
+    a, b = 0, 1
+    for _ in range(2, n+1):
+        a, b = b, a + b
+    return b
+
+# ── 4. Matrix exponentiation (O(log n)) ──────────────────────────────────────
+def mat_mul(A, B):
+    return [
+        [A[0][0]*B[0][0] + A[0][1]*B[1][0], A[0][0]*B[0][1] + A[0][1]*B[1][1]],
+        [A[1][0]*B[0][0] + A[1][1]*B[1][0], A[1][0]*B[0][1] + A[1][1]*B[1][1]],
+    ]
+
+def mat_pow(M, n):
+    if n == 1: return M
+    if n % 2 == 0:
+        half = mat_pow(M, n // 2)
+        return mat_mul(half, half)
+    return mat_mul(M, mat_pow(M, n-1))
+
+def fib_matrix(n):
+    if n <= 1: return n
+    M = [[1,1],[1,0]]
+    return mat_pow(M, n)[0][1]
+
+# ── 5. Binet's formula (closed form, approximate for large n) ─────────────────
+def fib_binet(n):
+    getcontext().prec = 50
+    sqrt5 = Decimal(5).sqrt()
+    phi   = (1 + sqrt5) / 2
+    return int((phi**n / sqrt5).to_integral_value())
+
+# ── Correctness & timing ──────────────────────────────────────────────────────
+print("=== First 15 Fibonacci numbers ===")
+print([fib_dp(i) for i in range(15)])
+
+print("\\n=== Correctness check (n=50) ===")
+reference = fib_dp(50)
+for name, fn in [("naive(skipped)","skip"), ("memo", fib_memo), ("dp", fib_dp), ("matrix", fib_matrix), ("binet", fib_binet)]:
+    if fn == "skip":
+        print(f"  {name:<20} (too slow for n=50)")
+        continue
+    result = fn(50)
+    print(f"  {name:<20} = {result}  {'✓' if result == reference else '✗'}")
+
+print("\\n=== Performance (n=35, 100 iterations) ===")
+ITERS = 100
+for name, fn in [("naive", fib_naive), ("memo", fib_memo), ("dp", fib_dp), ("matrix", fib_matrix)]:
+    start = time.perf_counter()
+    for _ in range(ITERS): fn(35)
+    ms = (time.perf_counter() - start) * 1000
+    print(f"  {name:<10} {ms:8.2f}ms total  ({ms/ITERS:.3f}ms each)")
+
+print("\\n=== Large number (fib(1000), first 40 digits) ===")
+big = fib_dp(1000)
+print(f"  fib(1000) = {str(big)[:40]}… ({len(str(big))} digits)")
+`,
+  },
+},
+
+// ── JavaScript Date & Time Utilities ──────────────────────────────────────────
+{
+  id:          "js-date-utils",
+  name:        "JS Date & Time Utilities",
+  description: "Comprehensive date manipulation — formatting, relative time, time zones, duration, calendar math.",
+  icon:        "📅",
+  language:    "JavaScript",
+  runnable:    true,
+  files: {
+    "dates.js": `// ── Date formatting ──────────────────────────────────────────────────────────
+function fmt(date, fmt = "YYYY-MM-DD") {
+  const d = new Date(date);
+  const pad = (n, w=2) => String(n).padStart(w, "0");
+  return fmt
+    .replace("YYYY", d.getFullYear())
+    .replace("MM",   pad(d.getMonth() + 1))
+    .replace("DD",   pad(d.getDate()))
+    .replace("HH",   pad(d.getHours()))
+    .replace("mm",   pad(d.getMinutes()))
+    .replace("ss",   pad(d.getSeconds()));
+}
+
+// ── Relative time (like "3 days ago") ────────────────────────────────────────
+function relative(date) {
+  const diff = Date.now() - new Date(date).getTime();
+  const abs  = Math.abs(diff);
+  const past = diff > 0;
+  const units = [
+    [60_000,      "minute"],
+    [3_600_000,   "hour"],
+    [86_400_000,  "day"],
+    [604_800_000, "week"],
+    [2_592_000_000, "month"],
+    [31_536_000_000,"year"],
+  ];
+  for (let i = units.length - 1; i >= 0; i--) {
+    const [ms, label] = units[i];
+    const prev = i > 0 ? units[i-1][0] : 1000;
+    if (abs >= ms) {
+      const n = Math.round(abs / ms);
+      return past ? \`\x24{n} \x24{label}\x24{n !== 1 ? "s" : ""} ago\` : \`in \x24{n} \x24{label}\x24{n !== 1 ? "s" : ""}\`;
+    }
+    if (i === 0 && abs >= prev) {
+      const n = Math.round(abs / prev);
+      return past ? \`\x24{n} second\x24{n !== 1 ? "s" : ""} ago\` : \`in \x24{n} second\x24{n !== 1 ? "s" : ""}\`;
+    }
+  }
+  return "just now";
+}
+
+// ── Add / subtract ────────────────────────────────────────────────────────────
+function add(date, { years=0, months=0, days=0, hours=0, minutes=0 } = {}) {
+  const d = new Date(date);
+  d.setFullYear(d.getFullYear() + years);
+  d.setMonth(d.getMonth() + months);
+  d.setDate(d.getDate() + days);
+  d.setHours(d.getHours() + hours);
+  d.setMinutes(d.getMinutes() + minutes);
+  return d;
+}
+
+// ── Start/end of period ───────────────────────────────────────────────────────
+function startOf(date, unit) {
+  const d = new Date(date);
+  if (unit === "day")   { d.setHours(0,0,0,0); return d; }
+  if (unit === "month") { d.setDate(1); d.setHours(0,0,0,0); return d; }
+  if (unit === "year")  { d.setMonth(0,1); d.setHours(0,0,0,0); return d; }
+  if (unit === "week")  { const day = d.getDay(); d.setDate(d.getDate()-day); d.setHours(0,0,0,0); return d; }
+  return d;
+}
+
+// ── Duration formatting ───────────────────────────────────────────────────────
+function humanDuration(ms) {
+  const s  = Math.floor(ms / 1000);
+  const m  = Math.floor(s  / 60);
+  const h  = Math.floor(m  / 60);
+  const d  = Math.floor(h  / 24);
+  if (d > 0) return \`\x24{d}d \x24{h%24}h \x24{m%60}m\`;
+  if (h > 0) return \`\x24{h}h \x24{m%60}m \x24{s%60}s\`;
+  if (m > 0) return \`\x24{m}m \x24{s%60}s\`;
+  return \`\x24{s}s\`;
+}
+
+// ── Days between dates ────────────────────────────────────────────────────────
+function daysBetween(a, b) {
+  return Math.round((new Date(b) - new Date(a)) / 86_400_000);
+}
+
+// ── Is leap year ──────────────────────────────────────────────────────────────
+function isLeapYear(year) {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+// ── Day of year ───────────────────────────────────────────────────────────────
+function dayOfYear(date) {
+  return Math.ceil((new Date(date) - new Date(new Date(date).getFullYear(), 0, 0)) / 86_400_000);
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+const now = new Date();
+
+console.log("=== Formatting ===");
+console.log(fmt(now, "YYYY-MM-DD"));
+console.log(fmt(now, "DD/MM/YYYY HH:mm:ss"));
+
+console.log("\\n=== Relative Time ===");
+console.log(relative(Date.now() - 1000 * 60 * 3));        // 3 minutes ago
+console.log(relative(Date.now() - 1000 * 60 * 60 * 26));  // ~1 day ago
+console.log(relative(Date.now() + 1000 * 60 * 60 * 48));  // in 2 days
+console.log(relative(Date.now() - 1000 * 60 * 60 * 24 * 400)); // ~1 year ago
+
+console.log("\\n=== Add/Subtract ===");
+console.log(fmt(add(now, { days: 30  }), "YYYY-MM-DD"), "(+30 days)");
+console.log(fmt(add(now, { months: 3 }), "YYYY-MM-DD"), "(+3 months)");
+console.log(fmt(add(now, { years: -1 }), "YYYY-MM-DD"), "(-1 year)");
+
+console.log("\\n=== Period Boundaries ===");
+console.log("Start of today: ", fmt(startOf(now, "day"),   "YYYY-MM-DD HH:mm:ss"));
+console.log("Start of week:  ", fmt(startOf(now, "week"),  "YYYY-MM-DD"));
+console.log("Start of month: ", fmt(startOf(now, "month"), "YYYY-MM-DD"));
+console.log("Start of year:  ", fmt(startOf(now, "year"),  "YYYY-MM-DD"));
+
+console.log("\\n=== Miscellaneous ===");
+console.log("Days in this year:", daysBetween(\`\x24{now.getFullYear()}-01-01\`, \`\x24{now.getFullYear()}-12-31\`) + 1);
+console.log("Day of year:", dayOfYear(now));
+console.log("Leap year 2024:", isLeapYear(2024));
+console.log("Leap year 2025:", isLeapYear(2025));
+console.log("Duration 3h 25m 42s:", humanDuration((3*3600 + 25*60 + 42) * 1000));
+`,
+  },
+},
+
+// ── HTML Form Validation ──────────────────────────────────────────────────────
+{
+  id:          "html-form-validation",
+  name:        "HTML Form with Validation",
+  description: "Real-world signup form with client-side validation, error states, password strength meter, and success toast.",
+  icon:        "📋",
+  language:    "HTML",
+  runnable:    true,
+  files: {
+    "index.html": `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Form Validation</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui,sans-serif; background:#0f172a; color:#e2e8f0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:1.5rem; }
+  .card { background:#1e293b; border:1px solid #334155; border-radius:16px; padding:2rem; width:100%; max-width:420px; }
+  h1 { font-size:1.4rem; margin-bottom:0.25rem; }
+  p.sub { color:#64748b; font-size:0.85rem; margin-bottom:1.75rem; }
+  .field { margin-bottom:1.1rem; }
+  label { display:block; font-size:0.78rem; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.4rem; }
+  input {
+    width:100%; background:#0f172a; border:1.5px solid #334155; border-radius:8px;
+    padding:10px 12px; color:#e2e8f0; font-size:0.9rem; outline:none; transition:border-color 0.15s;
+  }
+  input:focus { border-color:#3b82f6; }
+  input.valid   { border-color:#22c55e; }
+  input.invalid { border-color:#ef4444; }
+  .err { font-size:0.75rem; color:#f87171; margin-top:4px; min-height:18px; }
+  .strength-bar { height:4px; border-radius:2px; margin-top:6px; transition:all 0.3s; background:#334155; }
+  .strength-bar-fill { height:100%; border-radius:2px; transition:all 0.3s; }
+  .strength-label { font-size:0.72rem; color:#64748b; margin-top:4px; }
+  .checkbox-row { display:flex; align-items:flex-start; gap:10px; margin-bottom:1.25rem; font-size:0.85rem; color:#94a3b8; }
+  .checkbox-row input[type=checkbox] { margin-top:3px; accent-color:#3b82f6; width:16px; height:16px; flex-shrink:0; }
+  button[type=submit] {
+    width:100%; padding:11px; background:#3b82f6; color:#fff; font-weight:700; font-size:0.95rem;
+    border:none; border-radius:8px; cursor:pointer; transition:background 0.15s;
+  }
+  button[type=submit]:hover   { background:#2563eb; }
+  button[type=submit]:disabled{ background:#334155; color:#64748b; cursor:not-allowed; }
+  .toast {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px);
+    background:#22c55e; color:#fff; font-weight:600; padding:12px 24px; border-radius:10px;
+    font-size:0.9rem; transition:transform 0.35s; white-space:nowrap; pointer-events:none;
+  }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Create Account</h1>
+  <p class="sub">All fields are validated in real time.</p>
+  <form id="form" novalidate>
+    <div class="field">
+      <label>Full Name</label>
+      <input type="text" id="name" placeholder="Jane Doe" autocomplete="name">
+      <div class="err" id="name-err"></div>
+    </div>
+    <div class="field">
+      <label>Email Address</label>
+      <input type="email" id="email" placeholder="jane@example.com" autocomplete="email">
+      <div class="err" id="email-err"></div>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="Min. 8 characters" autocomplete="new-password">
+      <div class="strength-bar"><div class="strength-bar-fill" id="strength-fill"></div></div>
+      <div class="strength-label" id="strength-label"></div>
+      <div class="err" id="password-err"></div>
+    </div>
+    <div class="field">
+      <label>Confirm Password</label>
+      <input type="password" id="confirm" placeholder="Repeat password" autocomplete="new-password">
+      <div class="err" id="confirm-err"></div>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="terms">
+      <label for="terms" style="text-transform:none;letter-spacing:normal;margin:0;">
+        I agree to the <a href="#" style="color:#7dd3fc">Terms of Service</a> and <a href="#" style="color:#7dd3fc">Privacy Policy</a>
+      </label>
+    </div>
+    <button type="submit" id="submit-btn" disabled>Create Account</button>
+  </form>
+</div>
+<div class="toast" id="toast">✓ Account created successfully!</div>
+<script>
+const $ = id => document.getElementById(id);
+const setValid   = (id) => { $(\`\x24{id}\`).classList.add('valid');   $(\`\x24{id}\`).classList.remove('invalid'); $(\`\x24{id}-err\`).textContent = ''; };
+const setInvalid = (id, msg) => { $(\`\x24{id}\`).classList.add('invalid'); $(\`\x24{id}\`).classList.remove('valid'); $(\`\x24{id}-err\`).textContent = msg; };
+const clearState = (id) => { $(\`\x24{id}\`).classList.remove('valid','invalid'); $(\`\x24{id}-err\`).textContent = ''; };
+
+function validateName() {
+  const v = $('name').value.trim();
+  if (!v)           { setInvalid('name', 'Name is required.'); return false; }
+  if (v.length < 2) { setInvalid('name', 'Name must be at least 2 characters.'); return false; }
+  setValid('name'); return true;
+}
+function validateEmail() {
+  const v = $('email').value.trim();
+  if (!v)                        { setInvalid('email', 'Email is required.'); return false; }
+  if (!/^[^@]+@[^@]+\.[^@]+$/.test(v)) { setInvalid('email', 'Enter a valid email address.'); return false; }
+  setValid('email'); return true;
+}
+function passwordStrength(pw) {
+  let score = 0;
+  if (pw.length >= 8)  score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  return score;
+}
+function validatePassword() {
+  const v = $('password').value;
+  const score = passwordStrength(v);
+  const fill = $('strength-fill');
+  const label = $('strength-label');
+  const pct = Math.min(score / 5 * 100, 100);
+  fill.style.width = v ? pct + '%' : '0';
+  fill.style.background = score <= 2 ? '#ef4444' : score <= 3 ? '#f59e0b' : '#22c55e';
+  label.textContent = v ? (['','Weak','Fair','Good','Strong','Very strong'][score] + ' password') : '';
+  if (!v)          { setInvalid('password', 'Password is required.'); return false; }
+  if (v.length < 8){ setInvalid('password', 'Password must be at least 8 characters.'); return false; }
+  setValid('password'); return true;
+}
+function validateConfirm() {
+  const v = $('confirm').value;
+  if (!v)                        { setInvalid('confirm', 'Please confirm your password.'); return false; }
+  if (v !== $('password').value) { setInvalid('confirm', 'Passwords do not match.'); return false; }
+  setValid('confirm'); return true;
+}
+function checkForm() {
+  const ok = !document.querySelector('.invalid') &&
+    ['name','email','password','confirm'].every(id => $(\`\x24{id}\`).classList.contains('valid')) &&
+    $('terms').checked;
+  $('submit-btn').disabled = !ok;
+}
+
+$('name').addEventListener('input',    () => { validateName();     checkForm(); });
+$('email').addEventListener('input',   () => { validateEmail();    checkForm(); });
+$('password').addEventListener('input',() => { validatePassword(); validateConfirm(); checkForm(); });
+$('confirm').addEventListener('input', () => { validateConfirm();  checkForm(); });
+$('terms').addEventListener('change',  () => checkForm());
+
+$('form').addEventListener('submit', e => {
+  e.preventDefault();
+  const toast = $('toast');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+  $('form').reset();
+  ['name','email','password','confirm'].forEach(id => clearState(id));
+  $('strength-fill').style.width = '0'; $('strength-label').textContent = '';
+  $('submit-btn').disabled = true;
+});
+</script>
+</body>
+</html>
+`,
+  },
+},
 ];
 
 export function getTemplateById(id: string): ProjectTemplate | undefined {

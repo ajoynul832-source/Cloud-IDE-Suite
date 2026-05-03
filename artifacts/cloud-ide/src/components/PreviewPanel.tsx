@@ -41,7 +41,7 @@ export function PreviewPanel({
   stream, htmlPreview, runsRemaining, livePreview,
   stdinInput, onStdinChange,
   isRNProject, snackData, embedUrl, isSyncing, syncError,
-  snackPlatform = "android", onPlatform, onSyncNow,
+  snackPlatform = "web", onPlatform, onSyncNow,
   files,
 }: PreviewPanelProps) {
   const defaultStream: StreamState = { chunks: [], result: null };
@@ -176,28 +176,60 @@ function WebPreviewContent({ htmlPreview }: { htmlPreview?: string | null }) {
   }
 
   return (
-    <div className="w-full h-full flex items-center justify-center text-white/30 font-mono text-xs p-8 text-center">
-      <div className="space-y-3 max-w-xs">
-        <p className="text-base text-white/50">
+    <div className="w-full h-full flex items-center justify-center text-white/30 font-mono text-xs p-6 text-center overflow-y-auto">
+      <div className="space-y-4 max-w-xs w-full">
+        <p className="text-sm text-white/50">
           Open a file and click{" "}
           <span className="text-[#4ade80] font-bold">Run ▶</span>
+          <span className="text-white/30 text-xs ml-1">(or Ctrl+Enter)</span>
         </p>
-        <div className="space-y-1 text-left text-white/25">
+
+        <div className="text-left space-y-0.5">
+          <p className="text-[9px] uppercase tracking-widest text-white/20 mb-1.5">Executed on server</p>
           {[
-            ["🟡", "JS / TS",       "→ Console output"],
-            ["🐍", "Python",        "→ Console output"],
-            ["🌐", "HTML",          "→ Live preview here"],
-            ["🎨", "CSS",           "→ Live preview here"],
-            ["📄", "Markdown",      "→ Rendered preview here"],
-            ["📋", "JSON",          "→ Formatted viewer here"],
-            ["🖼",  "SVG",           "→ Rendered preview here"],
-            ["⚡", "Bash / Perl",   "→ Console output"],
-            ["⚙",  "C / C++",       "→ Compile → Console"],
+            ["🟡", "JS / TS",    "→ Console output"],
+            ["🐍", "Python",     "→ Console output"],
+            ["⚡", "Bash/Perl",  "→ Console output"],
+            ["⚙",  "C / C++",    "→ Compile → Run"],
           ].map(([icon, lang, note]) => (
-            <div key={lang} className="flex items-center gap-2">
-              <span>{icon}</span>
-              <span className="text-white/40 w-24">{lang}</span>
-              <span>{note}</span>
+            <div key={lang} className="flex items-center gap-2 text-white/25">
+              <span className="w-5 text-center">{icon}</span>
+              <span className="w-20">{lang}</span>
+              <span className="text-white/20">{note}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="text-left space-y-0.5">
+          <p className="text-[9px] uppercase tracking-widest text-white/20 mb-1.5">Instant in-browser preview</p>
+          {[
+            ["🌐", "HTML",       "→ Live iframe"],
+            ["🎨", "CSS",        "→ Styled demo"],
+            ["📄", "Markdown",   "→ Rendered HTML"],
+            ["📋", "JSON",       "→ Tree viewer"],
+            ["🖼",  "SVG",        "→ Rendered image"],
+          ].map(([icon, lang, note]) => (
+            <div key={lang} className="flex items-center gap-2 text-white/25">
+              <span className="w-5 text-center">{icon}</span>
+              <span className="w-20">{lang}</span>
+              <span className="text-white/20">{note}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="text-left space-y-0.5">
+          <p className="text-[9px] uppercase tracking-widest text-white/20 mb-1.5">CDN templates (use New Project)</p>
+          {[
+            ["⚛️",  "React CDN",  "→ Live preview"],
+            ["💚", "Vue 3 CDN",  "→ Live preview"],
+            ["🔷", "Three.js",   "→ WebGL 3D"],
+            ["🎨", "p5.js",      "→ Canvas art"],
+            ["📊", "Chart.js",   "→ Dashboard"],
+          ].map(([icon, lang, note]) => (
+            <div key={lang} className="flex items-center gap-2 text-white/20">
+              <span className="w-5 text-center">{icon}</span>
+              <span className="w-20">{lang}</span>
+              <span className="text-white/15">{note}</span>
             </div>
           ))}
         </div>
