@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { motion } from "framer-motion";
 import { Terminal as TerminalIcon, X, RotateCcw, AlertCircle } from "lucide-react";
 
 interface TerminalTabProps {
@@ -157,7 +158,9 @@ export function TerminalTab({ isActive }: TerminalTabProps) {
   const clear = () => { setLines(WELCOME_LINES); setInput(""); };
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       className="h-full flex flex-col bg-[#0d1117] font-mono text-[11px]"
       onClick={() => inputRef.current?.focus()}
     >
@@ -235,6 +238,6 @@ export function TerminalTab({ isActive }: TerminalTabProps) {
           <span className="text-[10px] text-red-300/75 font-mono">WebSocket unavailable — using HTTP fallback for bash execution</span>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

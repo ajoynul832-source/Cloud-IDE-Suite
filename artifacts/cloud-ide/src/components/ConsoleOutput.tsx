@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { StreamState } from "@/hooks/useRun";
 import { Trash2, Clock, Copy, Check, Terminal, ChevronDown, ChevronRight } from "lucide-react";
 

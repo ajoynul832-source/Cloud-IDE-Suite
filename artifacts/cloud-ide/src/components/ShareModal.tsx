@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { X, Copy, Check, ExternalLink, Loader2, Share2, Eye } from "lucide-react";
 import { Button } from "./ui/button";
 
@@ -89,13 +90,20 @@ export function ShareModal({ projectId, projectName, onClose }: ShareModalProps)
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       onClick={onClose}
+      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center backdrop-blur-sm"
     >
-      <div
-        className="bg-card border border-border rounded-lg shadow-2xl w-[460px] flex flex-col"
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ type: "spring", damping: 20, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
+        className="bg-gradient-to-b from-[#1c2128] to-[#161b22] border border-white/12 rounded-xl shadow-[0_20px_80px_rgba(0,0,0,0.6)] w-[460px] flex flex-col"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -199,7 +207,7 @@ export function ShareModal({ projectId, projectName, onClose }: ShareModalProps)
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

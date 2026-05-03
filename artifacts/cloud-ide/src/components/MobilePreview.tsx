@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { RefreshCw, ExternalLink, Globe, Loader2, Smartphone, ChevronDown, ChevronUp } from "lucide-react";
 import type { SnackPlatform, SnackSyncData } from "@/hooks/useSnackSync";
 import { generateReactNativeWebPreview } from "@/lib/preview-generators";
@@ -69,7 +70,11 @@ export function MobilePreview({
   const hasFiles = files && Object.keys(files).length > 0;
 
   return (
-    <div className="h-full flex flex-col bg-[#0d1117]">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="h-full flex flex-col bg-[#0d1117]"
+    >
 
       {/* Top bar */}
       <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-white/8 bg-[#161b22]">
@@ -200,7 +205,7 @@ export function MobilePreview({
           {showFrame ? "Full" : "Frame"}
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -225,6 +230,6 @@ function WebEmptyState() {
         <p>✓ Animated, Dimensions</p>
         <p>✓ Image, TextInput</p>
       </div>
-    </div>
+    </motion.div>
   );
 }

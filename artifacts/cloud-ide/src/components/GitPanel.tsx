@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { GitBranch, Download, Upload, RefreshCw, X, AlertCircle, Check, Loader2, GitCommit, ExternalLink } from "lucide-react";
 
 interface GitStatus {
@@ -70,7 +71,11 @@ export function GitPanel({ projectId, files, onClose }: GitPanelProps) {
   }, [commitMsg, repoUrl, pat, projectId, files, apiCall]);
 
   return (
-    <div className="flex flex-col h-full bg-[#0d1117] text-white/70 text-xs font-mono">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex flex-col h-full bg-[#0d1117] text-white/70 text-xs font-mono"
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/8 bg-[#161b22] shrink-0">
         <div className="flex items-center gap-2">
@@ -255,6 +260,6 @@ export function GitPanel({ projectId, files, onClose }: GitPanelProps) {
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

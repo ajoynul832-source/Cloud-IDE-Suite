@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, Wand2, Archive, Settings, HelpCircle, FolderOpen,
   Database, X, Search, FileCode, Zap, Terminal, Globe,
@@ -155,7 +156,6 @@ export function CommandPalette({
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, filtered, selected, onClose]);
 
-  // Scroll selected item into view
   useEffect(() => {
     const el = listRef.current?.children[selected] as HTMLElement | undefined;
     el?.scrollIntoView({ block: "nearest" });
@@ -172,14 +172,28 @@ export function CommandPalette({
   let globalIdx = 0;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[14vh] bg-black/60 backdrop-blur-sm"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       onClick={(e) => { if (e.target === e.currentTarget) { onClose(); setQuery(""); } }}
+      className="fixed inset-0 z-[100] flex items-start justify-center pt-[14vh] bg-black/60 backdrop-blur-sm"
     >
-      <div className="w-full max-w-[560px] bg-[#161b22] border border-white/12 rounded-xl shadow-2xl overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+        transition={{ type: "spring", damping: 20, stiffness: 300 }}
+        className="w-full max-w-[560px] bg-gradient-to-b from-[#1c2128] to-[#161b22] border border-white/12 rounded-xl shadow-[0_20px_80px_rgba(0,0,0,0.6)] overflow-hidden"
+      >
 
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/8">
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="flex items-center gap-3 px-4 py-3 border-b border-white/8 bg-gradient-to-r from-white/5 to-transparent"
+        >
           <Search size={14} className="text-white/30 shrink-0" />
           <input
             ref={inputRef}
@@ -190,33 +204,44 @@ export function CommandPalette({
             className="flex-1 bg-transparent font-mono text-sm text-white placeholder:text-white/25 outline-none"
           />
           {query && (
-            <button onClick={() => setQuery("")} className="text-white/30 hover:text-white/60 transition-colors">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setQuery("")}
+              className="text-white/30 hover:text-white/60 transition-colors"
+            >
               <X size={13} />
-            </button>
+            </motion.button>
           )}
           <kbd className="text-[10px] font-mono text-white/25 bg-white/6 border border-white/10 px-1.5 py-0.5 rounded">
             Esc
           </kbd>
-        </div>
+        </motion.div>
 
         {/* Results */}
         <div ref={listRef} className="max-h-[400px] overflow-y-auto py-1.5">
 
           {query.trim() ? (
             filtered.length === 0 ? (
-              <div className="px-4 py-6 text-center text-xs font-mono text-white/30">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="px-4 py-6 text-center text-xs font-mono text-white/30"
+              >
                 No results for "{query}"
-              </div>
+              </motion.div>
             ) : (
-              filtered.map((cmd, i) => (
-                <CommandRow
-                  key={cmd.id}
-                  cmd={cmd}
-                  isSelected={i === selected}
-                  onMouseEnter={() => setSelected(i)}
-                  onClick={cmd.run}
-                />
-              ))
+              <AnimatePresence mode="popLayout">
+                {filtered.map((cmd, i) => (
+                  <CommandRow
+                    key={cmd.id}
+                    cmd={cmd}
+                    isSelected={i === selected}
+                    onMouseEnter={() => setSelected(i)}
+                    onClick={cmd.run}
+                  />
+                ))}
+              </AnimatePresence>
             )
           ) : (
             sections!.map((section) => {
@@ -224,34 +249,41 @@ export function CommandPalette({
               const sectionStart = globalIdx;
               globalIdx += section.items.length;
               return (
-                <div key={section.label}>
+                <motion.div key={section.label} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                   <div className="px-4 py-1 text-[9px] font-mono uppercase tracking-widest text-white/25 mt-1">
                     {section.label}
                   </div>
-                  {section.items.map((cmd, i) => (
-                    <CommandRow
-                      key={cmd.id}
-                      cmd={cmd}
-                      isSelected={sectionStart + i === selected}
-                      onMouseEnter={() => setSelected(sectionStart + i)}
-                      onClick={cmd.run}
-                    />
-                  ))}
-                </div>
+                  <AnimatePresence mode="popLayout">
+                    {section.items.map((cmd, i) => (
+                      <CommandRow
+                        key={cmd.id}
+                        cmd={cmd}
+                        isSelected={sectionStart + i === selected}
+                        onMouseEnter={() => setSelected(sectionStart + i)}
+                        onClick={cmd.run}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
               );
             })
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2 border-t border-white/8 flex items-center gap-4 text-[10px] font-mono text-white/25">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="px-4 py-2 border-t border-white/8 flex items-center gap-4 text-[10px] font-mono text-white/25 bg-white/[0.02]"
+        >
           <span className="flex items-center gap-1"><kbd className="bg-white/8 px-1 rounded">↑↓</kbd> navigate</span>
           <span className="flex items-center gap-1"><kbd className="bg-white/8 px-1 rounded">↵</kbd> select</span>
           <span className="flex items-center gap-1"><kbd className="bg-white/8 px-1 rounded">Esc</kbd> close</span>
           <span className="ml-auto opacity-60">Ctrl+Shift+P</span>
-        </div>
-      </div>
-    </div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -264,12 +296,17 @@ function CommandRow({
   onClick: () => void;
 }) {
   return (
-    <button
+    <motion.button
+      layout
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -10 }}
+      whileHover={{ x: 4 }}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       className={[
         "w-full flex items-center gap-3 px-4 py-2 text-left transition-colors",
-        isSelected ? "bg-white/8 text-white" : "text-white/60 hover:bg-white/5",
+        isSelected ? "bg-[#4ade80]/12 text-white shadow-[inset_0_0_12px_rgba(74,222,128,0.1)]" : "text-white/60 hover:bg-white/5",
       ].join(" ")}
     >
       <span className="shrink-0 w-5 flex items-center justify-center">
@@ -289,6 +326,6 @@ function CommandRow({
       {cmd.category === "template" && (
         <span className="shrink-0 text-[9px] font-mono text-[#4ade80]/40">template</span>
       )}
-    </button>
+    </motion.button>
   );
 }

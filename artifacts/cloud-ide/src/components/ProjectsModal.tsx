@@ -1,560 +1,235 @@
-import { useEffect, useState, useCallback } from "react";
-import {
-  FolderOpen, Save, Trash2, X, Loader2, Plus,
-  Copy, Pencil, Check, History, RotateCcw, Search,
-} from "lucide-react";
-import { Button } from "./ui/button";
-import { useProjects, ProjectSummary, VersionSummary } from "@/hooks/useProjects";
+import { useState, useMemo, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, X, ChevronDown, ChevronRight, File } from "lucide-react";
 
-type Tab = "load" | "save" | "versions";
-
-interface ProjectsModalProps {
-  currentFiles:       Record<string, string>;
-  currentProjectType: string;
-  currentProjectId:   string | null;
-  onLoad:    (files: Record<string, string>, name: string, id: string) => void;
-  onSaved:   (id: string, name: string) => void;
-  onClose:   () => void;
+interface SearchResult {
+  filename: string;
+  matches: { line: number; col: number; text: string; matchStart: number; matchEnd: number }[];
 }
 
-export function ProjectsModal({
-  currentFiles,
-  currentProjectType,
-  currentProjectId,
-  onLoad,
-  onSaved,
-  onClose,
-}: ProjectsModalProps) {
-  const {
-    projects, isLoading, error,
-    listProjects, saveProject, loadProject, deleteProject,
-    renameProject, duplicateProject,
-    listVersions, createVersion, restoreVersion,
-  } = useProjects();
+interface SearchPanelProps {
+  files: Record<string, string>;
+  onSelectFile: (filename: string, line?: number) => void;
+  onClose: () => void;
+}
 
-  const [saveName,    setSaveName]    = useState("");
-  const [saving,      setSaving]      = useState(false);
-  const [saveError,   setSaveError]   = useState<string | null>(null);
-  const [loadingId,   setLoadingId]   = useState<string | null>(null);
-  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
-  const [tab,         setTab]         = useState<Tab>("load");
-  const [search,      setSearch]      = useState("");
+export function SearchPanel({ files, onSelectFile, onClose }: SearchPanelProps) {
+  const [query, setQuery]           = useState("");
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [useRegex, setUseRegex]     = useState(false);
+  const [collapsed, setCollapsed]   = useState<Set<string>>(new Set());
 
-  // Delete confirmation
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [deletingId,      setDeletingId]      = useState<string | null>(null);
+  const results = useMemo<SearchResult[]>(() => {
+    if (!query.trim()) return [];
+    const matches: SearchResult[] = [];
 
-  // Inline rename
-  const [renamingId,    setRenamingId]    = useState<string | null>(null);
-  const [renameValue,   setRenameValue]   = useState("");
-  const [renameSaving,  setRenameSaving]  = useState(false);
-
-  // Versions tab
-  const [versions,        setVersions]        = useState<VersionSummary[]>([]);
-  const [versionsLoading, setVersionsLoading] = useState(false);
-  const [restoringId,     setRestoringId]     = useState<string | null>(null);
-  const [creatingVersion, setCreatingVersion] = useState(false);
-
-  useEffect(() => { listProjects(); }, [listProjects]);
-
-  // Load versions when switching to that tab
-  useEffect(() => {
-    if (tab === "versions" && currentProjectId) {
-      setVersionsLoading(true);
-      listVersions(currentProjectId).then((v) => {
-        setVersions(v);
-        setVersionsLoading(false);
-      });
+    let pattern: RegExp | null = null;
+    try {
+      pattern = useRegex
+        ? new RegExp(query, caseSensitive ? "g" : "gi")
+        : new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), caseSensitive ? "g" : "gi");
+    } catch {
+      return [];
     }
-  }, [tab, currentProjectId, listVersions]);
 
-  // ─── Handlers ─────────────────────────────────────────────────────────────────
-
-  async function handleSave() {
-    const name = saveName.trim();
-    if (!name && !currentProjectId) { setSaveError("Name is required"); return; }
-    setSaving(true);
-    setSaveError(null);
-    const effectiveName = name || (projects.find((p) => p.id === currentProjectId)?.name ?? "Untitled");
-    const saved = await saveProject(effectiveName, currentProjectType, currentFiles, currentProjectId ?? undefined);
-    setSaving(false);
-    if (saved) { onSaved(saved.id, saved.name); onClose(); }
-    else setSaveError("Failed to save project");
-  }
-
-  async function handleLoad(id: string) {
-    setLoadingId(id);
-    const project = await loadProject(id);
-    setLoadingId(null);
-    if (project?.files) { onLoad(project.files, project.name, project.id); onClose(); }
-  }
-
-  async function handleDeleteConfirmed() {
-    if (!confirmDeleteId) return;
-    setDeletingId(confirmDeleteId);
-    setConfirmDeleteId(null);
-    await deleteProject(confirmDeleteId);
-    setDeletingId(null);
-  }
-
-  async function handleDuplicate(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    setDuplicatingId(id);
-    await duplicateProject(id);
-    setDuplicatingId(null);
-  }
-
-  function startRename(project: ProjectSummary, e: React.MouseEvent) {
-    e.stopPropagation();
-    setRenamingId(project.id);
-    setRenameValue(project.name);
-  }
-
-  async function commitRename(id: string) {
-    const name = renameValue.trim();
-    if (!name) { setRenamingId(null); return; }
-    setRenameSaving(true);
-    await renameProject(id, name);
-    setRenameSaving(false);
-    setRenamingId(null);
-  }
-
-  async function handleCreateVersion() {
-    if (!currentProjectId) return;
-    setCreatingVersion(true);
-    const v = await createVersion(currentProjectId, "Manual snapshot");
-    setCreatingVersion(false);
-    if (v) setVersions((prev) => [v, ...prev]);
-  }
-
-  async function handleRestoreVersion(versionId: string) {
-    if (!currentProjectId) return;
-    setRestoringId(versionId);
-    const restored = await restoreVersion(currentProjectId, versionId);
-    setRestoringId(null);
-    if (restored?.files) {
-      onLoad(restored.files, restored.name, restored.id);
-      onClose();
-    }
-  }
-
-  // ─── Filtering ────────────────────────────────────────────────────────────────
-
-  const filteredProjects = projects.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const typeLabel: Record<string, string> = {
-    javascript: "JS", typescript: "TS", python: "Py", flutter: "Flutter",
-    "react-native": "RN", android: "Android", ios: "iOS", html: "HTML",
-  };
-
-  const availableTabs: Tab[] = currentProjectId
-    ? ["load", "save", "versions"]
-    : ["load", "save"];
-
-  return (
-    <>
-      {/* Delete confirmation overlay */}
-      {confirmDeleteId && (
-        <div
-          className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center"
-          onClick={() => setConfirmDeleteId(null)}
-        >
-          <div
-            className="bg-card border border-border rounded-lg shadow-2xl w-80 p-5 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="font-mono text-sm text-foreground font-semibold">Delete project?</p>
-            <p className="font-mono text-xs text-muted-foreground">
-              This will permanently delete the project and its share links. This cannot be undone.
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 font-mono text-xs"
-                onClick={() => setConfirmDeleteId(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                className="flex-1 font-mono text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={handleDeleteConfirmed}
-              >
-                <Trash2 size={11} className="mr-1" />
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center" onClick={onClose}>
-        <div
-          className="bg-card border border-border rounded-lg shadow-2xl w-[500px] max-h-[82vh] flex flex-col"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <span className="font-mono text-sm font-semibold text-foreground">Projects</span>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-              <X size={16} />
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex border-b border-border">
-            {availableTabs.map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={[
-                  "px-4 py-2 text-xs font-mono uppercase tracking-wider flex items-center gap-1.5",
-                  tab === t
-                    ? "text-primary border-b-2 border-primary"
-                    : "text-muted-foreground hover:text-foreground",
-                ].join(" ")}
-              >
-                {t === "load" && <FolderOpen size={11} />}
-                {t === "save" && <Save size={11} />}
-                {t === "versions" && <History size={11} />}
-                {t === "load" ? "My Projects" : t === "save" ? "Save" : "History"}
-              </button>
-            ))}
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto">
-
-            {/* ── My Projects ─────────────────────────────────────────────── */}
-            {tab === "load" && (
-              <div className="flex flex-col h-full">
-                {/* Search bar */}
-                <div className="px-3 pt-3 pb-2">
-                  <div className="flex items-center gap-2 bg-background border border-border rounded px-2.5 py-1.5">
-                    <Search size={12} className="text-muted-foreground shrink-0" />
-                    <input
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Filter projects…"
-                      className="flex-1 bg-transparent font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-2 pb-2">
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                      <Loader2 size={14} className="animate-spin" />
-                      <span className="font-mono text-xs">Loading projects…</span>
-                    </div>
-                  ) : error ? (
-                    <div className="p-4 text-destructive font-mono text-xs">{error}</div>
-                  ) : filteredProjects.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground font-mono text-xs gap-2">
-                      <FolderOpen size={28} className="opacity-30" />
-                      {search ? (
-                        <p>No projects match "{search}"</p>
-                      ) : (
-                        <>
-                          <p>No saved projects yet</p>
-                          <button
-                            onClick={() => setTab("save")}
-                            className="flex items-center gap-1 text-primary hover:underline mt-1"
-                          >
-                            <Plus size={11} />Save current project
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    filteredProjects.map((project) => (
-                      <ProjectRow
-                        key={project.id}
-                        project={project}
-                        typeLabel={typeLabel}
-                        isLoading={loadingId === project.id}
-                        isDeleting={deletingId === project.id}
-                        isDuplicating={duplicatingId === project.id}
-                        isCurrent={project.id === currentProjectId}
-                        isRenaming={renamingId === project.id}
-                        renameValue={renameValue}
-                        renameSaving={renameSaving}
-                        onLoad={() => handleLoad(project.id)}
-                        onDelete={(e) => { e.stopPropagation(); setConfirmDeleteId(project.id); }}
-                        onDuplicate={(e) => handleDuplicate(project.id, e)}
-                        onStartRename={(e) => startRename(project, e)}
-                        onRenameChange={setRenameValue}
-                        onRenameCommit={() => commitRename(project.id)}
-                        onRenameCancel={() => setRenamingId(null)}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ── Save ────────────────────────────────────────────────────── */}
-            {tab === "save" && (
-              <div className="p-4 space-y-4">
-                <div>
-                  <label className="block text-xs font-mono text-muted-foreground mb-1.5">
-                    Project Name
-                  </label>
-                  <input
-                    type="text"
-                    value={saveName}
-                    onChange={(e) => setSaveName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
-                    placeholder={
-                      currentProjectId
-                        ? projects.find((p) => p.id === currentProjectId)?.name ?? "Current project"
-                        : "My Awesome App"
-                    }
-                    className="w-full bg-background border border-border rounded px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-                    autoFocus
-                  />
-                </div>
-
-                <div className="text-xs font-mono text-muted-foreground">
-                  <span className="text-foreground">{Object.keys(currentFiles).length}</span> files ·{" "}
-                  <span className="text-foreground capitalize">{currentProjectType}</span> project
-                  {currentProjectId && (
-                    <span className="ml-2 text-primary">(updating existing)</span>
-                  )}
-                </div>
-
-                {saveError && (
-                  <p className="text-xs font-mono text-destructive">{saveError}</p>
-                )}
-
-                <Button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="w-full font-mono text-xs h-8 bg-primary text-primary-foreground"
-                >
-                  {saving ? (
-                    <><Loader2 size={12} className="mr-1.5 animate-spin" />Saving…</>
-                  ) : (
-                    <><Save size={12} className="mr-1.5" />{currentProjectId ? "Update Project" : "Save Project"}</>
-                  )}
-                </Button>
-              </div>
-            )}
-
-            {/* ── Version History ──────────────────────────────────────────── */}
-            {tab === "versions" && currentProjectId && (
-              <div className="flex flex-col h-full">
-                <div className="px-3 pt-3 pb-2 flex items-center justify-between">
-                  <p className="font-mono text-xs text-muted-foreground">
-                    Up to 10 snapshots are kept. Restoring auto-saves current state first.
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={creatingVersion}
-                    onClick={handleCreateVersion}
-                    className="font-mono text-[10px] h-6 px-2 shrink-0 ml-2"
-                  >
-                    {creatingVersion
-                      ? <Loader2 size={10} className="animate-spin" />
-                      : <><History size={10} className="mr-1" />Snapshot</>
-                    }
-                  </Button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-2 pb-2">
-                  {versionsLoading ? (
-                    <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                      <Loader2 size={14} className="animate-spin" />
-                      <span className="font-mono text-xs">Loading history…</span>
-                    </div>
-                  ) : versions.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground font-mono text-xs gap-2">
-                      <History size={28} className="opacity-30" />
-                      <p>No snapshots yet</p>
-                      <p className="text-[10px] text-muted-foreground/60">
-                        Snapshots are created on explicit save or manually.
-                      </p>
-                    </div>
-                  ) : (
-                    versions.map((v) => (
-                      <VersionRow
-                        key={v.id}
-                        version={v}
-                        isRestoring={restoringId === v.id}
-                        onRestore={() => handleRestoreVersion(v.id)}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ─── Project Row ──────────────────────────────────────────────────────────────
-
-function ProjectRow({
-  project, typeLabel,
-  isLoading, isDeleting, isDuplicating, isCurrent,
-  isRenaming, renameValue, renameSaving,
-  onLoad, onDelete, onDuplicate, onStartRename,
-  onRenameChange, onRenameCommit, onRenameCancel,
-}: {
-  project:       ProjectSummary;
-  typeLabel:     Record<string, string>;
-  isLoading:     boolean;
-  isDeleting:    boolean;
-  isDuplicating: boolean;
-  isCurrent:     boolean;
-  isRenaming:    boolean;
-  renameValue:   string;
-  renameSaving:  boolean;
-  onLoad:        () => void;
-  onDelete:      (e: React.MouseEvent) => void;
-  onDuplicate:   (e: React.MouseEvent) => void;
-  onStartRename: (e: React.MouseEvent) => void;
-  onRenameChange: (v: string) => void;
-  onRenameCommit: () => void;
-  onRenameCancel: () => void;
-}) {
-  const label = typeLabel[project.projectType] ?? project.projectType;
-  const date  = new Date(project.updatedAt).toLocaleDateString(undefined, {
-    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-  });
-
-  return (
-    <button
-      onClick={isRenaming ? undefined : onLoad}
-      disabled={isLoading || isDeleting}
-      className={[
-        "w-full flex items-center gap-3 px-3 py-2.5 rounded hover:bg-muted/40 transition-colors text-left group",
-        isCurrent ? "bg-primary/5 border border-primary/20" : "",
-      ].join(" ")}
-    >
-      <div className="shrink-0 w-8 h-8 rounded bg-primary/10 flex items-center justify-center font-mono text-[10px] text-primary font-bold">
-        {label.slice(0, 2)}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        {isRenaming ? (
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <input
-              autoFocus
-              value={renameValue}
-              onChange={(e) => onRenameChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onRenameCommit();
-                if (e.key === "Escape") onRenameCancel();
-              }}
-              className="flex-1 bg-background border border-primary rounded px-2 py-0.5 font-mono text-xs text-foreground focus:outline-none"
-            />
-            <button
-              onClick={onRenameCommit}
-              disabled={renameSaving}
-              className="text-primary hover:text-primary/80 p-0.5"
-            >
-              {renameSaving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-            </button>
-            <button onClick={onRenameCancel} className="text-muted-foreground hover:text-foreground p-0.5">
-              <X size={11} />
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm text-foreground truncate">{project.name}</span>
-            {isCurrent && (
-              <span className="text-[9px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded-full shrink-0">
-                current
-              </span>
-            )}
-          </div>
-        )}
-        <span className="font-mono text-[10px] text-muted-foreground">{date}</span>
-      </div>
-
-      {!isRenaming && (
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
-          {/* Rename */}
-          <button
-            onClick={onStartRename}
-            title="Rename"
-            className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors"
-          >
-            <Pencil size={12} />
-          </button>
-
-          {/* Duplicate */}
-          <button
-            onClick={onDuplicate}
-            disabled={isDuplicating}
-            title="Duplicate"
-            className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors"
-          >
-            {isDuplicating ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
-          </button>
-
-          {/* Delete */}
-          <button
-            onClick={onDelete}
-            disabled={isDeleting}
-            title="Delete"
-            className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
-          >
-            {isDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-          </button>
-        </div>
-      )}
-
-      {isLoading && (
-        <Loader2 size={13} className="shrink-0 animate-spin text-primary ml-1" />
-      )}
-    </button>
-  );
-}
-
-// ─── Version Row ──────────────────────────────────────────────────────────────
-
-function VersionRow({
-  version, isRestoring, onRestore,
-}: {
-  version:     VersionSummary;
-  isRestoring: boolean;
-  onRestore:   () => void;
-}) {
-  const date = new Date(version.createdAt).toLocaleString(undefined, {
-    month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
-
-  return (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded hover:bg-muted/30 transition-colors group">
-      <History size={14} className="shrink-0 text-muted-foreground" />
-      <div className="flex-1 min-w-0">
-        <p className="font-mono text-xs text-foreground truncate">
-          {version.label || "Snapshot"}
-        </p>
-        <p className="font-mono text-[10px] text-muted-foreground">{date}</p>
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={isRestoring}
-        onClick={onRestore}
-        className="font-mono text-[10px] h-6 px-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        {isRestoring
-          ? <Loader2 size={10} className="animate-spin" />
-          : <><RotateCcw size={10} className="mr-1" />Restore</>
+    for (const [filename, content] of Object.entries(files)) {
+      const lines = content.split("\n");
+      const fileMatches: SearchResult["matches"] = [];
+      lines.forEach((lineText, idx) => {
+        pattern!.lastIndex = 0;
+        let m: RegExpExecArray | null;
+        while ((m = pattern!.exec(lineText)) !== null) {
+          fileMatches.push({
+            line: idx + 1,
+            col: m.index + 1,
+            text: lineText.trim(),
+            matchStart: m.index,
+            matchEnd: m.index + m[0].length,
+          });
+          if (!pattern!.global) break;
         }
-      </Button>
+      });
+      if (fileMatches.length > 0) {
+        matches.push({ filename, matches: fileMatches });
+      }
+    }
+    return matches;
+  }, [query, files, caseSensitive, useRegex]);
+
+  const totalMatches = results.reduce((s, r) => s + r.matches.length, 0);
+
+  const toggleCollapse = useCallback((filename: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(filename)) next.delete(filename);
+      else next.add(filename);
+      return next;
+    });
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full bg-[#0d1117] text-white/70 text-xs font-mono">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -5 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between px-3 py-2 border-b border-white/8 bg-[#161b22] shrink-0"
+      >
+        <span className="text-[11px] font-semibold text-white/50 uppercase tracking-widest">Search</span>
+        <motion.button
+          onClick={onClose}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          className="p-0.5 rounded hover:bg-white/10 text-white/30 hover:text-white/70 transition-colors"
+        >
+          <X size={12} />
+        </motion.button>
+      </motion.div>
+
+      {/* Input */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.05 }}
+        className="px-2 py-2 shrink-0 space-y-1.5 border-b border-white/8 bg-gradient-to-b from-white/[0.02] to-transparent"
+      >
+        <div className="relative">
+          <Search size={11} className="absolute left-2 top-2.5 text-white/25 pointer-events-none" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search…"
+            className="w-full pl-7 pr-2 py-1.5 rounded bg-white/5 border border-white/10 text-white/80 placeholder:text-white/20 outline-none focus:border-[#4ade80]/40 focus:bg-white/[0.08] transition-all text-[11px]"
+          />
+        </div>
+        <div className="flex gap-1.5 px-0.5">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setCaseSensitive(!caseSensitive)}
+            className={`px-2 py-1 rounded text-[9px] transition-all border ${
+              caseSensitive
+                ? "border-[#4ade80]/50 text-[#4ade80] bg-[#4ade80]/10"
+                : "border-white/10 text-white/30 hover:border-white/25"
+            }`}
+            title="Case sensitive"
+          >
+            Aa
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setUseRegex(!useRegex)}
+            className={`px-2 py-1 rounded text-[9px] transition-all border ${
+              useRegex
+                ? "border-[#4ade80]/50 text-[#4ade80] bg-[#4ade80]/10"
+                : "border-white/10 text-white/30 hover:border-white/25"
+            }`}
+            title="Regex"
+          >
+            .*
+          </motion.button>
+          {query && (
+            <span className="ml-auto text-[9px] text-white/25 py-1">
+              {totalMatches} result{totalMatches !== 1 ? "s" : ""} in {results.length} file{results.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Results */}
+      <div className="flex-1 overflow-y-auto">
+        <AnimatePresence mode="wait">
+          {!query.trim() && (
+            <motion.div
+              key="empty-search"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="px-3 py-8 text-center text-white/20 text-[11px]"
+            >
+              Type to search across all files
+            </motion.div>
+          )}
+          {query.trim() && results.length === 0 && (
+            <motion.div
+              key="no-results"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="px-3 py-8 text-center text-white/20 text-[11px]"
+            >
+              No results for "{query}"
+            </motion.div>
+          )}
+          {results.length > 0 && (
+            <motion.div
+              key="results"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-0"
+            >
+              {results.map(({ filename, matches }, fileIdx) => {
+                const isCollapsed = collapsed.has(filename);
+                const shortName = filename.split("/").pop() ?? filename;
+                return (
+                  <motion.div
+                    key={filename}
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: fileIdx * 0.03 }}
+                    className="border-b border-white/5"
+                  >
+                    <motion.button
+                      onClick={() => toggleCollapse(filename)}
+                      whileHover={{ x: 4 }}
+                      className="w-full flex items-center gap-1.5 px-2 py-1 hover:bg-white/5 text-left transition-colors"
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight size={10} className="text-white/30 shrink-0" />
+                      ) : (
+                        <ChevronDown size={10} className="text-white/30 shrink-0" />
+                      )}
+                      <File size={10} className="text-white/30 shrink-0" />
+                      <span className="text-[11px] text-white/70 truncate flex-1">{shortName}</span>
+                      <span className="text-[9px] text-white/25 shrink-0">{matches.length}</span>
+                    </motion.button>
+                    <AnimatePresence>
+                      {!isCollapsed && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ type: "spring", damping: 20, stiffness: 300 }}
+                        >
+                          {matches.map((m, i) => (
+                            <motion.button
+                              key={i}
+                              initial={{ opacity: 0, x: -5 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: i * 0.02 }}
+                              onClick={() => onSelectFile(filename, m.line)}
+                              whileHover={{ x: 2 }}
+                              className="w-full flex items-start gap-2 px-4 py-1 hover:bg-[#4ade80]/5 text-left group transition-colors"
+                            >
+                              <span className="text-white/20 shrink-0 w-6 text-right text-[10px]">{m.line}</span>
+                              <span className="text-white/50 truncate group-hover:text-white/70 flex-1 text-[10px]">
+                                {m.text.length > 60 ? m.text.slice(0, 60) + "…" : m.text}
+                              </span>
+                            </motion.button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

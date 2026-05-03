@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, Eye, EyeOff, Save, X, KeyRound, AlertCircle } from "lucide-react";
 
 export interface EnvVar {
@@ -94,7 +95,11 @@ export function EnvPanel({ projectId, onClose, onEnvChange, initialVars }: EnvPa
   }, [vars, projectId, onEnvChange]);
 
   return (
-    <div className="flex flex-col h-full bg-[#0d1117] text-white/70 text-xs font-mono">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex flex-col h-full bg-[#0d1117] text-white/70 text-xs font-mono"
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/8 bg-[#161b22] shrink-0">
         <div className="flex items-center gap-2">
@@ -192,6 +197,6 @@ export function EnvPanel({ projectId, onClose, onEnvChange, initialVars }: EnvPa
           {saving ? "Saving…" : saved ? "Saved!" : "Save Variables"}
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }

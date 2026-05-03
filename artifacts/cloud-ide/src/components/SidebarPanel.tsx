@@ -1,4 +1,5 @@
 import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Search, KeyRound, GitBranch, Package, Sparkles } from "lucide-react";
 import { SearchPanel } from "./SearchPanel";
 import { EnvPanel, EnvVar } from "./EnvPanel";
@@ -44,24 +45,34 @@ export function SidebarPanel({
       {/* Icon rail */}
       <div className="w-10 flex flex-col items-center py-2 gap-1 bg-[#161b22] border-r border-white/8 shrink-0">
         {TABS.map(({ id, icon, label, shortcut }) => (
-          <button
+          <motion.button
             key={id!}
             onClick={() => onTabChange(activeTab === id ? null : id)}
             title={shortcut ? `${label} (${shortcut})` : label}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
               activeTab === id
-                ? "bg-[#4ade80]/15 text-[#4ade80]"
+                ? "bg-[#4ade80]/15 text-[#4ade80] shadow-[0_0_12px_rgba(74,222,128,0.15)]"
                 : "text-white/25 hover:text-white/60 hover:bg-white/5"
             }`}
           >
             {icon}
-          </button>
+          </motion.button>
         ))}
       </div>
 
       {/* Slide-out panel */}
-      {activeTab && (
-        <div className="w-72 overflow-hidden border-r border-white/8 bg-[#0d1117] flex flex-col shrink-0">
+      <AnimatePresence mode="wait">
+        {activeTab && (
+          <motion.div
+            key="sidebar"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ type: "spring", damping: 20, stiffness: 300 }}
+            className="w-72 overflow-hidden border-r border-white/8 bg-[#0d1117] flex flex-col shrink-0"
+          >
           {activeTab === "ai" && (
             <AIChat
               onClose={() => onTabChange(null)}
@@ -97,8 +108,9 @@ export function SidebarPanel({
               onClose={() => onTabChange(null)}
             />
           )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Send, Bot, X, Loader2, Copy, Check, Sparkles, WrapText } from "lucide-react";
 
 interface Message {
@@ -55,7 +56,12 @@ function MessageBubble({ msg, onInsert }: { msg: Message; onInsert?: (c: string)
   const parts = msg.content.split(/(```[\s\S]*?```)/g);
 
   return (
-    <div className={`flex gap-2 ${isUser ? "flex-row-reverse" : "flex-row"} mb-3`}>
+    <motion.div
+      initial={{ opacity: 0, y: 10, x: isUser ? 20 : -20 }}
+      animate={{ opacity: 1, y: 0, x: 0 }}
+      transition={{ type: "spring", damping: 20, stiffness: 300 }}
+      className={`flex gap-2 ${isUser ? "flex-row-reverse" : "flex-row"} mb-3`}
+    >
       <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${isUser ? "bg-white/10" : "bg-[#4ade80]/20"}`}>
         {isUser
           ? <span className="text-[8px] text-white/50">U</span>
@@ -73,7 +79,7 @@ function MessageBubble({ msg, onInsert }: { msg: Message; onInsert?: (c: string)
           return <span key={i} style={{ whiteSpace: "pre-wrap" }}>{part}</span>;
         })}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -164,7 +170,11 @@ export function AIChat({ onClose, currentFile, currentCode, currentContent, onIn
   ];
 
   return (
-    <div className="flex flex-col h-full bg-[#0d1117] text-white/70 text-xs font-mono">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex flex-col h-full bg-[#0d1117] text-white/70 text-xs font-mono"
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/8 bg-[#161b22] shrink-0">
         <div className="flex items-center gap-2">
@@ -236,6 +246,6 @@ export function AIChat({ onClose, currentFile, currentCode, currentContent, onIn
         </div>
         <p className="text-[9px] text-white/15 mt-1 text-center">Shift+Enter for new line · Enter to send</p>
       </div>
-    </div>
+    </motion.div>
   );
 }

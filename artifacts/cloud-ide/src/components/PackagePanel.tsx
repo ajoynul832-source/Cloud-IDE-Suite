@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Package, Search, Plus, Trash2, X, Loader2, ExternalLink, AlertCircle, Check } from "lucide-react";
 
 interface PackageInfo {
@@ -76,7 +77,11 @@ export function PackagePanel({ projectId, onClose }: PackagePanelProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0d1117] text-white/70 text-xs font-mono">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex flex-col h-full bg-[#0d1117] text-white/70 text-xs font-mono"
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/8 bg-[#161b22] shrink-0">
         <div className="flex items-center gap-2">
@@ -205,6 +210,6 @@ export function PackagePanel({ projectId, onClose }: PackagePanelProps) {
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
