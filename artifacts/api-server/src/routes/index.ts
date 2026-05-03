@@ -11,6 +11,7 @@ import authRouter         from "./auth";
 import shareRouter        from "./share";
 import metricsRouter      from "./metrics";
 import docsRouter         from "./docs";
+import snackRouter        from "./snack";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(shareRouter);
 router.use(buildRouter);
 router.use(metricsRouter);
 router.use(docsRouter);
+router.use(snackRouter);
 
 export default router;

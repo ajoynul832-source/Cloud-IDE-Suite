@@ -17,6 +17,7 @@ import { useBuild } from "@/hooks/useBuild";
 import { useRun } from "@/hooks/useRun";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSnackSync } from "@/hooks/useSnackSync";
 import { ProjectTemplate } from "@/lib/templates";
 import {
   generateCSSPreview,
@@ -105,10 +106,14 @@ const MOBILE_IMPORT_PATTERNS = [
 
 export default function IDE() {
   const { files, saveFile, createFile, renameFile, deleteFile, loadTemplate, resetToDefaults } = useFileSystem();
-  const { isBuilding, startBuild, status, logs, jobId, projectType, previewData } = useBuild();
+  const { isBuilding, startBuild, status, logs, jobId, projectType } = useBuild();
   const { isRunning, stream, runsRemaining, runCode, showClientError } = useRun();
   const { saveProject, createVersion } = useProjects();
   const { user } = useAuth();
+  const {
+    isRNProject, snackData, embedUrl: snackEmbedUrl, isSyncing,
+    syncError, platform: snackPlatform, setPlatform: setSnackPlatform, syncNow,
+  } = useSnackSync(files);
 
   const [openFiles,     setOpenFiles]     = useState<string[]>([]);
   const [activeFile,    setActiveFile]    = useState<string | null>(null);
@@ -280,7 +285,7 @@ export default function IDE() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files]);
 
-  // ── Auto-switch to Preview tab when opening a preview-type file ────────────
+  // ── Auto-switch to Preview tab for preview-type files or RN projects ───────
   useEffect(() => {
     if (!activeFile) return;
     const ext = activeFile.split(".").pop()?.toLowerCase() ?? "";
@@ -288,6 +293,11 @@ export default function IDE() {
       setRightPanelTab("preview");
     }
   }, [activeFile]);
+
+  // Switch to preview tab automatically when RN project is detected
+  useEffect(() => {
+    if (isRNProject) setRightPanelTab("preview");
+  }, [isRNProject]);
 
   // ── Live preview: debounced auto-update for HTML/CSS/MD/JSON/SVG ──────────
   useEffect(() => {
@@ -369,15 +379,9 @@ export default function IDE() {
       return;
     }
 
-    // ── Mobile guard ──────────────────────────────────────────────────────
+    // ── Mobile guard — redirect to live preview tab ───────────────────────
     if (MOBILE_IMPORT_PATTERNS.some((p) => p.test(content))) {
-      setRightPanelTab("console");
-      showClientError(
-        "This file imports a mobile framework (react-native / expo / kivy) that\n" +
-        "cannot run in the browser sandbox.\n\n" +
-        "→ Use Build APK to compile it, or click New to start a\n" +
-        "  JavaScript / Python / HTML project that runs instantly."
-      );
+      setRightPanelTab("preview");
       return;
     }
 
@@ -623,9 +627,7 @@ export default function IDE() {
               activeTab={rightPanelTab}
               onTabChange={setRightPanelTab}
               stream={stream}
-              snackPreview={previewData}
               htmlPreview={htmlPreview}
-              projectType={projectType}
               runsRemaining={localRunsRemaining}
               livePreview={
                 !!htmlPreview &&
@@ -636,6 +638,14 @@ export default function IDE() {
               }
               stdinInput={stdinInput}
               onStdinChange={setStdinInput}
+              isRNProject={isRNProject}
+              snackData={snackData}
+              embedUrl={snackEmbedUrl}
+              isSyncing={isSyncing}
+              syncError={syncError}
+              snackPlatform={snackPlatform}
+              onPlatform={setSnackPlatform}
+              onSyncNow={syncNow}
             />
           </ResizablePanel>
         </ResizablePanelGroup>

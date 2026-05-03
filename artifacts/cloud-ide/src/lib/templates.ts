@@ -1703,6 +1703,130 @@ Run \`flutter pub get\` then \`flutter run\`.
   },
 
   {
+    id: "expo-starter",
+    name: "Expo / React Native",
+    description: "Live phone preview in the IDE — edits sync to simulator automatically",
+    icon: "📱",
+    language: "JavaScript",
+    files: {
+      "App.js": `import React, { useState } from 'react';
+import {
+  View, Text, TouchableOpacity, StyleSheet,
+  SafeAreaView, StatusBar, ScrollView,
+} from 'react-native';
+
+export default function App() {
+  const [count, setCount] = useState(0);
+  const [color, setColor] = useState('#4ade80');
+
+  const COLORS = ['#4ade80', '#60a5fa', '#f472b6', '#fb923c', '#a78bfa'];
+  const nextColor = () => {
+    const i = (COLORS.indexOf(color) + 1) % COLORS.length;
+    setColor(COLORS[i]);
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor="#0d1117" />
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.logo}>☁ CloudIDE</Text>
+          <Text style={styles.subtitle}>React Native live preview</Text>
+        </View>
+
+        {/* Counter card */}
+        <View style={[styles.card, { borderColor: color + '40' }]}>
+          <Text style={[styles.count, { color }]}>{count}</Text>
+          <Text style={styles.label}>tap counter</Text>
+
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={[styles.btn, { backgroundColor: color }]}
+              onPress={() => setCount(c => c + 1)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.btnText}>+ Add</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btn, styles.btnSecondary]}
+              onPress={() => setCount(0)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.btnText, { color: '#fff' }]}>Reset</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Color picker card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Accent color</Text>
+          <View style={styles.colorRow}>
+            {COLORS.map(c => (
+              <TouchableOpacity
+                key={c}
+                onPress={() => setColor(c)}
+                style={[
+                  styles.swatch,
+                  { backgroundColor: c },
+                  color === c && styles.swatchActive,
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+
+        {/* Info */}
+        <View style={styles.info}>
+          <Text style={styles.infoText}>
+            ✏  Edit this file — preview updates automatically
+          </Text>
+          <Text style={styles.infoText}>
+            📱  Scan QR code to run on your real device
+          </Text>
+          <Text style={styles.infoText}>
+            🌐  Switch to Web / iOS tabs above the phone
+          </Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe:         { flex: 1, backgroundColor: '#0d1117' },
+  scroll:       { padding: 20 },
+  header:       { alignItems: 'center', marginBottom: 28 },
+  logo:         { fontSize: 22, fontWeight: '800', color: '#ffffff', letterSpacing: 1 },
+  subtitle:     { fontSize: 12, color: '#4ade80', marginTop: 4, opacity: 0.7 },
+  card: {
+    backgroundColor: '#161b22',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ffffff15',
+  },
+  count:        { fontSize: 72, fontWeight: '900', textAlign: 'center', lineHeight: 80 },
+  label:        { fontSize: 12, color: '#ffffff40', textAlign: 'center', marginBottom: 20, textTransform: 'uppercase', letterSpacing: 2 },
+  row:          { flexDirection: 'row', gap: 10 },
+  btn: {
+    flex: 1, paddingVertical: 14, borderRadius: 10, alignItems: 'center',
+  },
+  btnSecondary: { backgroundColor: '#21262d' },
+  btnText:      { fontWeight: '700', fontSize: 15, color: '#000' },
+  cardTitle:    { fontSize: 13, color: '#ffffff60', marginBottom: 12, fontWeight: '600' },
+  colorRow:     { flexDirection: 'row', gap: 12, justifyContent: 'center' },
+  swatch:       { width: 32, height: 32, borderRadius: 16 },
+  swatchActive: { transform: [{ scale: 1.25 }], shadowColor: '#000', shadowRadius: 6, shadowOpacity: 0.4, elevation: 6 },
+  info:         { gap: 8, marginTop: 4 },
+  infoText:     { fontSize: 11, color: '#ffffff30', fontFamily: 'monospace' },
+});
+`,
+    },
+  },
+
+  {
     id: "react-native-ts",
     name: "React Native (TypeScript)",
     description: "Cross-platform mobile with React — iOS & Android",
@@ -2684,6 +2808,427 @@ cargo tauri build
 cargo tauri android init
 cargo tauri android dev
 \`\`\`
+`,
+    },
+  },
+
+  // ── Extra runnable: API mock + fetch demo ─────────────────────────────────
+  {
+    id: "js-api-mock",
+    name: "JS API Mock",
+    description: "REST API mock server pattern — routes, middleware, JSON responses",
+    icon: "🔌",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "api-mock.js": `// REST API Mock — simulates a backend without any server
+// Run ▶ to see request/response pairs logged to console
+
+// ── Tiny in-process router ──────────────────────────────────────────
+class MockRouter {
+  constructor() { this.routes = []; }
+
+  get(path, handler)    { this.routes.push({ method: "GET",    path, handler }); }
+  post(path, handler)   { this.routes.push({ method: "POST",   path, handler }); }
+  put(path, handler)    { this.routes.push({ method: "PUT",    path, handler }); }
+  delete(path, handler) { this.routes.push({ method: "DELETE", path, handler }); }
+
+  async request(method, path, body = null) {
+    const route = this.routes.find(
+      r => r.method === method && this._match(r.path, path)
+    );
+    const params = route ? this._params(route.path, path) : {};
+    const req  = { method, path, params, body };
+    const res  = { status: 200, body: null };
+    if (!route) { res.status = 404; res.body = { error: "Not Found" }; }
+    else await route.handler(req, res);
+    return res;
+  }
+
+  _match(pattern, path) {
+    const re = pattern.replace(/:([\\w]+)/g, "([^/]+)");
+    return new RegExp(\`^\${re}$\`).test(path);
+  }
+  _params(pattern, path) {
+    const keys  = [...pattern.matchAll(/:([\\w]+)/g)].map(m => m[1]);
+    const vals  = path.match(pattern.replace(/:([\\w]+)/g, "([^/]+)"))?.slice(1) ?? [];
+    return Object.fromEntries(keys.map((k, i) => [k, vals[i]]));
+  }
+}
+
+// ── In-memory data store ────────────────────────────────────────────
+let users = [
+  { id: 1, name: "Alice",   email: "alice@example.com",   role: "admin" },
+  { id: 2, name: "Bob",     email: "bob@example.com",     role: "user"  },
+  { id: 3, name: "Charlie", email: "charlie@example.com", role: "user"  },
+];
+let nextId = 4;
+
+// ── Register routes ─────────────────────────────────────────────────
+const app = new MockRouter();
+
+app.get("/users", async (req, res) => {
+  res.body = { users, total: users.length };
+});
+
+app.get("/users/:id", async (req, res) => {
+  const user = users.find(u => u.id === Number(req.params.id));
+  if (!user) { res.status = 404; res.body = { error: "User not found" }; return; }
+  res.body = { user };
+});
+
+app.post("/users", async (req, res) => {
+  const { name, email, role = "user" } = req.body;
+  if (!name || !email) { res.status = 400; res.body = { error: "name and email required" }; return; }
+  const user = { id: nextId++, name, email, role };
+  users.push(user);
+  res.status = 201;
+  res.body = { user, message: "User created" };
+});
+
+app.put("/users/:id", async (req, res) => {
+  const idx = users.findIndex(u => u.id === Number(req.params.id));
+  if (idx === -1) { res.status = 404; res.body = { error: "User not found" }; return; }
+  users[idx] = { ...users[idx], ...req.body };
+  res.body = { user: users[idx], message: "User updated" };
+});
+
+app.delete("/users/:id", async (req, res) => {
+  const before = users.length;
+  users = users.filter(u => u.id !== Number(req.params.id));
+  if (users.length === before) { res.status = 404; res.body = { error: "User not found" }; return; }
+  res.body = { message: "User deleted" };
+});
+
+// ── Run test requests ───────────────────────────────────────────────
+async function log(method, path, body = null) {
+  const res = await app.request(method, path, body);
+  const icon = res.status < 300 ? "✓" : res.status < 400 ? "→" : "✗";
+  console.log(\`\${icon} \${method} \${path} → \${res.status}\`);
+  console.log("  ", JSON.stringify(res.body, null, 2).split("\\n").join("\\n   "));
+  console.log();
+}
+
+console.log("=== REST API Mock ===\\n");
+await log("GET",    "/users");
+await log("GET",    "/users/1");
+await log("POST",   "/users", { name: "Diana", email: "diana@example.com" });
+await log("GET",    "/users/4");
+await log("PUT",    "/users/2", { name: "Bobby", role: "admin" });
+await log("DELETE", "/users/3");
+await log("GET",    "/users");
+await log("GET",    "/users/99");  // 404
+`,
+    },
+  },
+
+  {
+    id: "js-fetch-mock",
+    name: "Fetch & JSON",
+    description: "HTTP fetch patterns, async/await, error handling, and data transformation",
+    icon: "🌐",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "fetch-demo.js": `// Fetch & JSON Patterns — async HTTP, error handling, data transforms
+// Uses built-in mock data (no real network calls needed)
+
+// ── Mock fetch (works like real fetch, no network needed) ───────────
+const MOCK_DB = {
+  "https://api.example.com/users": [
+    { id: 1, name: "Alice",   email: "alice@example.com",   score: 92 },
+    { id: 2, name: "Bob",     email: "bob@example.com",     score: 78 },
+    { id: 3, name: "Charlie", email: "charlie@example.com", score: 95 },
+    { id: 4, name: "Diana",   email: "diana@example.com",   score: 88 },
+    { id: 5, name: "Eve",     email: "eve@example.com",     score: 70 },
+  ],
+  "https://api.example.com/posts": [
+    { id: 1, userId: 1, title: "Getting started with JS",     views: 4200 },
+    { id: 2, userId: 1, title: "Async/await patterns",        views: 3100 },
+    { id: 3, userId: 2, title: "REST API design",             views: 2800 },
+    { id: 4, userId: 3, title: "TypeScript generics",         views: 5600 },
+    { id: 5, userId: 3, title: "Performance optimization",    views: 1900 },
+  ],
+};
+
+async function fetchJson(url) {
+  await new Promise(r => setTimeout(r, 10)); // simulate latency
+  const data = MOCK_DB[url] ?? MOCK_DB[url.split("?")[0]];
+  if (!data) throw new Error(\`404: \${url} not found\`);
+  return { ok: true, json: async () => JSON.parse(JSON.stringify(data)) };
+}
+
+// ── Pattern 1: Basic fetch + error handling ─────────────────────────
+console.log("=== Pattern 1: Basic Fetch ===");
+try {
+  const res  = await fetchJson("https://api.example.com/users");
+  if (!res.ok) throw new Error(\`HTTP error \${res.status}\`);
+  const data = await res.json();
+  console.log(\`Fetched \${data.length} users\`);
+  data.slice(0, 3).forEach(u => console.log(\`  [\${u.id}] \${u.name} (score: \${u.score})\`));
+} catch (err) {
+  console.error("Fetch failed:", err.message);
+}
+
+// ── Pattern 2: Parallel fetch with Promise.all ─────────────────────
+console.log("\\n=== Pattern 2: Parallel Fetch ===");
+const [usersRes, postsRes] = await Promise.all([
+  fetchJson("https://api.example.com/users"),
+  fetchJson("https://api.example.com/posts"),
+]);
+const [users, posts] = await Promise.all([usersRes.json(), postsRes.json()]);
+console.log(\`Loaded \${users.length} users and \${posts.length} posts in parallel\`);
+
+// ── Pattern 3: Join + transform ─────────────────────────────────────
+console.log("\\n=== Pattern 3: Join + Transform ===");
+const userMap = Object.fromEntries(users.map(u => [u.id, u]));
+const enriched = posts
+  .map(p => ({ ...p, author: userMap[p.userId]?.name ?? "Unknown" }))
+  .sort((a, b) => b.views - a.views);
+
+console.log("Top posts by views:");
+enriched.forEach(p => {
+  const bar = "█".repeat(Math.round(p.views / 400));
+  console.log(\`  \${bar.padEnd(15)} \${p.views.toLocaleString()} · "\${p.title}" by \${p.author}\`);
+});
+
+// ── Pattern 4: Aggregate stats ──────────────────────────────────────
+console.log("\\n=== Pattern 4: Aggregation ===");
+const stats = users.reduce((acc, u) => {
+  acc.totalScore += u.score;
+  acc.max = Math.max(acc.max, u.score);
+  acc.min = Math.min(acc.min, u.score);
+  return acc;
+}, { totalScore: 0, max: -Infinity, min: Infinity });
+
+console.log(\`Average score: \${(stats.totalScore / users.length).toFixed(1)}\`);
+console.log(\`Highest:       \${stats.max} (\${users.find(u => u.score === stats.max)?.name})\`);
+console.log(\`Lowest:        \${stats.min} (\${users.find(u => u.score === stats.min)?.name})\`);
+
+// ── Pattern 5: Error boundary ───────────────────────────────────────
+console.log("\\n=== Pattern 5: Error Handling ===");
+const results = await Promise.allSettled([
+  fetchJson("https://api.example.com/users"),
+  fetchJson("https://api.example.com/missing"),  // will fail
+  fetchJson("https://api.example.com/posts"),
+]);
+results.forEach((r, i) => {
+  if (r.status === "fulfilled") console.log(\`  [✓] Request \${i+1} succeeded\`);
+  else                          console.log(\`  [✗] Request \${i+1} failed: \${r.reason.message}\`);
+});
+`,
+    },
+  },
+
+  {
+    id: "go-starter",
+    name: "Go",
+    description: "Go language — goroutines, channels, structs, interfaces, and stdlib",
+    icon: "🐹",
+    language: "Go",
+    runnable: true,
+    files: {
+      "main.go": `// Go Starter — click Run ▶ or press Ctrl+Enter
+package main
+
+import (
+        "fmt"
+        "math"
+        "sort"
+        "strings"
+        "sync"
+)
+
+// ── Interfaces & structs ─────────────────────────────────────────────
+type Shape interface {
+        Area()     float64
+        Perimeter() float64
+        Name()     string
+}
+
+type Circle struct{ R float64 }
+type Rect   struct{ W, H float64 }
+
+func (c Circle) Area()      float64 { return math.Pi * c.R * c.R }
+func (c Circle) Perimeter() float64 { return 2 * math.Pi * c.R }
+func (c Circle) Name()      string  { return fmt.Sprintf("Circle(r=%.1f)", c.R) }
+
+func (r Rect) Area()      float64 { return r.W * r.H }
+func (r Rect) Perimeter() float64 { return 2 * (r.W + r.H) }
+func (r Rect) Name()      string  { return fmt.Sprintf("Rect(%.1f×%.1f)", r.W, r.H) }
+
+func printShape(s Shape) {
+        fmt.Printf("  %-22s  area=%-8.2f  perim=%.2f\\n", s.Name(), s.Area(), s.Perimeter())
+}
+
+// ── Goroutines + channels ────────────────────────────────────────────
+func fibonacci(n int, ch chan<- int) {
+        a, b := 0, 1
+        for i := 0; i < n; i++ {
+                ch <- a
+                a, b = b, a+b
+        }
+        close(ch)
+}
+
+// ── Generics (Go 1.18+) ──────────────────────────────────────────────
+func Map[T, U any](slice []T, fn func(T) U) []U {
+        out := make([]U, len(slice))
+        for i, v := range slice { out[i] = fn(v) }
+        return out
+}
+
+func Filter[T any](slice []T, fn func(T) bool) []T {
+        var out []T
+        for _, v := range slice { if fn(v) { out = append(out, v) } }
+        return out
+}
+
+func main() {
+        // Shapes
+        fmt.Println("=== Shapes ===")
+        shapes := []Shape{Circle{5}, Rect{4, 6}, Circle{3}, Rect{10, 2}}
+        for _, s := range shapes { printShape(s) }
+
+        // Goroutines
+        fmt.Println("\\n=== Fibonacci (goroutine) ===")
+        ch := make(chan int, 12)
+        go fibonacci(12, ch)
+        var fibs []string
+        for n := range ch { fibs = append(fibs, fmt.Sprintf("%d", n)) }
+        fmt.Println(" ", strings.Join(fibs, ", "))
+
+        // WaitGroup
+        fmt.Println("\\n=== Concurrent workers ===")
+        var wg sync.WaitGroup
+        var mu sync.Mutex
+        results := make([]string, 0, 5)
+        for i := 1; i <= 5; i++ {
+                wg.Add(1)
+                go func(id int) {
+                        defer wg.Done()
+                        mu.Lock()
+                        results = append(results, fmt.Sprintf("worker-%d done", id))
+                        mu.Unlock()
+                }(i)
+        }
+        wg.Wait()
+        sort.Strings(results)
+        for _, r := range results { fmt.Println(" ", r) }
+
+        // Generics
+        fmt.Println("\\n=== Generics ===")
+        nums  := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+        even  := Filter(nums, func(n int) bool { return n%2 == 0 })
+        sq    := Map(even, func(n int) int { return n * n })
+        fmt.Println("  Evens:   ", even)
+        fmt.Println("  Squared:", sq)
+}
+`,
+    },
+  },
+
+  {
+    id: "rust-starter",
+    name: "Rust",
+    description: "Rust — ownership, structs, iterators, pattern matching, and error handling",
+    icon: "🦀",
+    language: "Rust",
+    runnable: true,
+    files: {
+      "main.rs": `// Rust Starter — click Run ▶ or press Ctrl+Enter
+use std::collections::HashMap;
+
+// ── Structs & traits ────────────────────────────────────────────────
+#[derive(Debug, Clone)]
+struct Student {
+    name:  String,
+    score: f64,
+}
+
+impl Student {
+    fn new(name: &str, score: f64) -> Self {
+        Student { name: name.to_string(), score }
+    }
+    fn grade(&self) -> &str {
+        match self.score as u32 {
+            90..=100 => "A",
+            80..=89  => "B",
+            70..=79  => "C",
+            60..=69  => "D",
+            _        => "F",
+        }
+    }
+}
+
+impl std::fmt::Display for Student {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:<10} {:.1}  ({})", self.name, self.score, self.grade())
+    }
+}
+
+// ── Error handling with Result ───────────────────────────────────────
+fn parse_score(s: &str) -> Result<f64, String> {
+    s.trim()
+     .parse::<f64>()
+     .map_err(|e| format!("Invalid score '{}': {}", s, e))
+}
+
+fn main() {
+    // Structs & pattern matching
+    println!("=== Student Leaderboard ===");
+    let mut students = vec![
+        Student::new("Alice",   92.5),
+        Student::new("Bob",     78.0),
+        Student::new("Charlie", 95.3),
+        Student::new("Diana",   88.1),
+        Student::new("Eve",     71.4),
+    ];
+    students.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    for (i, s) in students.iter().enumerate() {
+        println!("  {}. {}", i + 1, s);
+    }
+
+    // Iterators & closures
+    println!("\\n=== Iterator chains ===");
+    let total: f64  = students.iter().map(|s| s.score).sum();
+    let avg          = total / students.len() as f64;
+    let above_avg: Vec<_> = students.iter()
+        .filter(|s| s.score > avg)
+        .map(|s| s.name.as_str())
+        .collect();
+    println!("  Average:     {:.2}", avg);
+    println!("  Above avg:   {:?}", above_avg);
+
+    // HashMap
+    println!("\\n=== Grade distribution ===");
+    let mut grades: HashMap<&str, u32> = HashMap::new();
+    for s in &students {
+        *grades.entry(s.grade()).or_insert(0) += 1;
+    }
+    let mut sorted_grades: Vec<_> = grades.iter().collect();
+    sorted_grades.sort_by_key(|(k, _)| *k);
+    for (grade, count) in &sorted_grades {
+        let bar = "█".repeat(**count as usize * 4);
+        println!("  {}  {}  ({})", grade, bar, count);
+    }
+
+    // Result & error handling
+    println!("\\n=== Error handling ===");
+    for input in &["87.5", "not_a_number", "100", "-5"] {
+        match parse_score(input) {
+            Ok(s)  => println!("  ✓  '{}' → {:.1}", input, s),
+            Err(e) => println!("  ✗  {}", e),
+        }
+    }
+
+    // Ownership example
+    println!("\\n=== Ownership & borrowing ===");
+    let names: Vec<String> = students.iter().map(|s| s.name.clone()).collect();
+    let upper: Vec<String> = names.iter().map(|n| n.to_uppercase()).collect();
+    println!("  Original: {:?}", names);
+    println!("  Upper:    {:?}", upper);
+}
 `,
     },
   },

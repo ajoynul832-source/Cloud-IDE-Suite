@@ -16,6 +16,8 @@ const QUICK_START_IDS = [
   "html-canvas",
 ];
 
+const LIVE_PREVIEW_IDS = ["expo-starter"];
+
 export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -26,7 +28,12 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
   const moreRunnable = PROJECT_TEMPLATES.filter(
     (t) => t.runnable && !QUICK_START_IDS.includes(t.id)
   );
-  const mobile = PROJECT_TEMPLATES.filter((t) => !t.runnable);
+  const livePreview = LIVE_PREVIEW_IDS
+    .map(id => PROJECT_TEMPLATES.find(t => t.id === id))
+    .filter((t): t is ProjectTemplate => !!t);
+  const mobile = PROJECT_TEMPLATES.filter(
+    (t) => !t.runnable && !LIVE_PREVIEW_IDS.includes(t.id)
+  );
 
   const renderCard = (template: ProjectTemplate, compact = false) => (
     <button
@@ -136,7 +143,55 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
             </div>
           )}
 
-          {/* Section 3: Mobile / Build Required */}
+          {/* Section 3: Mobile Live Preview */}
+          {livePreview.length > 0 && (
+            <div className="px-6 pt-4 pb-2">
+              <div className="flex items-center gap-2 mb-3">
+                <Smartphone size={13} className="text-[#4ade80]" />
+                <h3 className="font-mono text-xs font-semibold uppercase tracking-widest text-[#4ade80]/80">
+                  Mobile Live Preview
+                </h3>
+                <span className="text-[10px] font-mono text-[#4ade80]/40">
+                  — phone simulator in the IDE, auto-syncs as you type
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {livePreview.map(t => (
+                  <button
+                    key={t.id}
+                    data-testid={`template-${t.id}`}
+                    onMouseEnter={() => setHovered(t.id)}
+                    onMouseLeave={() => setHovered(null)}
+                    onClick={() => onSelect(t)}
+                    className={[
+                      "text-left rounded-lg border-2 transition-all duration-150 cursor-pointer p-4",
+                      hovered === t.id
+                        ? "border-[#4ade80] bg-[#4ade80]/10"
+                        : "border-[#4ade80]/30 bg-[#4ade80]/5 hover:border-[#4ade80]/60",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl leading-none mt-0.5">{t.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="font-mono font-bold text-foreground text-sm">{t.name}</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-[#4ade80]/10 text-[#4ade80] border-[#4ade80]/25">
+                            {t.language}
+                          </span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-blue-400/10 text-blue-400 border-blue-400/25">
+                            📱 Live Preview
+                          </span>
+                        </div>
+                        <p className="text-muted-foreground text-xs leading-relaxed">{t.description}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Section 4: Mobile / Build Required */}
           <div className="px-6 pt-4 pb-5">
             <div className="flex items-center gap-2 mb-3">
               <Smartphone size={13} className="text-amber-400/80" />
