@@ -98,6 +98,7 @@ export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRe
         data-testid={`item-file-${path}`}
         whileHover={{ x: 4 }}
         onClick={() => onSelect(path)}
+        onDoubleClick={() => { setEditingPath(path); setEditValue(path); }}
         className={[
           "group flex items-center pr-2 py-[3px] cursor-pointer text-xs font-mono truncate transition-all",
           indent ? "pl-7" : "pl-5",
@@ -105,8 +106,6 @@ export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRe
             ? "bg-sidebar-accent text-primary"
             : "text-sidebar-foreground hover:bg-sidebar-accent/40 hover:text-white",
         ].join(" ")}
-        onClick={() => onSelect(path)}
-        onDoubleClick={() => { setEditingPath(path); setEditValue(path); }}
       >
         <span className="mr-1.5 shrink-0">{getIcon(path)}</span>
 
