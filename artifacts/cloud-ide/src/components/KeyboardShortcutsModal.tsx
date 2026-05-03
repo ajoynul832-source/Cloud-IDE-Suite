@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { X, Command } from "lucide-react";
 
 interface Shortcut {
@@ -46,7 +47,7 @@ const SECTIONS: Section[] = [
 
 function Kbd({ children }: { children: string }) {
   return (
-    <kbd className="px-1.5 py-0.5 rounded bg-white/10 border border-white/15 font-mono text-[10px] text-white/70 leading-none">
+    <kbd className="px-2 py-1 rounded bg-[#4ade80]/12 border border-[#4ade80]/25 font-mono text-[10px] text-[#4ade80]/70 leading-none">
       {children}
     </kbd>
   );
@@ -60,68 +61,89 @@ export function KeyboardShortcutsModal({ onClose }: KeyboardShortcutsModalProps)
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPod|iPad/.test(navigator.platform);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md"
     >
-      <div
-        className="relative w-full max-w-md bg-[#161b22] border border-white/10 rounded-lg shadow-2xl overflow-hidden"
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ type: "spring", damping: 20, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-2xl bg-gradient-to-b from-[#1c2128] to-[#161b22] border border-white/12 rounded-xl shadow-[0_20px_80px_rgba(0,0,0,0.6)] overflow-hidden max-h-[85vh] overflow-y-auto"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
-          <div className="flex items-center gap-2.5">
-            <Command size={15} className="text-[#4ade80]" />
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex items-center justify-between px-6 py-4 border-b border-white/8 bg-gradient-to-r from-white/5 to-transparent sticky top-0 z-10"
+        >
+          <div className="flex items-center gap-3">
+            <Command size={16} className="text-[#4ade80]" />
             <span className="font-mono text-sm font-bold text-white tracking-widest uppercase">
               Keyboard Shortcuts
             </span>
           </div>
-          <button
+          <motion.button
             onClick={onClose}
-            className="text-white/30 hover:text-white transition-colors p-1"
+            whileHover={{ rotate: 90, scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            className="text-white/40 hover:text-white/80 transition-colors"
           >
-            <X size={15} />
-          </button>
-        </div>
+            <X size={18} />
+          </motion.button>
+        </motion.div>
 
         {/* Sections */}
-        <div className="p-5 space-y-5 max-h-[65vh] overflow-y-auto">
-          {SECTIONS.map(({ title, items }) => (
-            <div key={title}>
-              <h3 className="text-[10px] font-mono font-semibold uppercase tracking-widest text-white/30 mb-3 pb-1 border-b border-white/5">
-                {title}
+        <div className="p-6 space-y-7">
+          {SECTIONS.map((section, i) => (
+            <motion.div
+              key={section.title}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + i * 0.05 }}
+            >
+              <h3 className="text-xs font-mono font-bold text-white/60 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
+                {section.title}
               </h3>
-              <div className="space-y-2.5">
-                {items.map(({ keys, mac, label }) => {
-                  const displayKeys = isMac && mac ? mac : keys;
-                  return (
-                    <div key={label} className="flex items-center justify-between gap-4">
-                      <span className="font-mono text-[11px] text-white/60 flex-1">{label}</span>
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        {displayKeys.map((k, i) => (
-                          <span key={i} className="flex items-center gap-0.5">
-                            <Kbd>{k}</Kbd>
-                            {i < displayKeys.length - 1 && (
-                              <span className="text-white/20 text-[9px] mx-0.5">+</span>
-                            )}
-                          </span>
-                        ))}
-                      </div>
+              <div className="space-y-2">
+                {section.items.map((shortcut, j) => (
+                  <motion.div
+                    key={j}
+                    initial={{ opacity: 0, x: -5 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.15 + i * 0.05 + j * 0.02 }}
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg hover:bg-white/[0.03] transition-colors"
+                  >
+                    <span className="font-mono text-sm text-white/50">{shortcut.label}</span>
+                    <div className="flex gap-1.5">
+                      {(isMac && shortcut.mac ? shortcut.mac : shortcut.keys).map((key, idx) => (
+                        <Kbd key={idx}>{key}</Kbd>
+                      ))}
                     </div>
-                  );
-                })}
+                  </motion.div>
+                ))}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-white/8 flex items-center gap-2">
-          <span className="text-[10px] font-mono text-white/25">
-            Press <Kbd>?</Kbd> anywhere to open this panel
-          </span>
-        </div>
-      </div>
-    </div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="px-6 py-3 border-t border-white/8 bg-white/[0.02] text-center text-[10px] font-mono text-white/25"
+        >
+          Press <kbd className="px-1 py-0.5 rounded bg-white/10 text-white/50 text-[9px] border border-white/15">Esc</kbd> to close
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }

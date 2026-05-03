@@ -274,6 +274,13 @@ export default function IDE() {
       const tag = (e.target as HTMLElement).tagName;
       const inInput = tag === "INPUT" || tag === "TEXTAREA";
 
+      // Ctrl+Enter / Cmd+Enter → run
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        handleRun();
+        return;
+      }
+
       // "?" → keyboard shortcuts modal
       if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey && !inInput) {
         e.preventDefault();

@@ -352,8 +352,9 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
                   {mobile.map(t => renderCard(t))}
                 </div>
               </div>
-            </>
+            </motion.div>
           )}
+          </AnimatePresence>
         </div>
 
         {/* Footer */}

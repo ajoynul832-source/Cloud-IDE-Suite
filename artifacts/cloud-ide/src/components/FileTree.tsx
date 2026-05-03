@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { motion } from "framer-motion";
 import {
   FileCode, FileJson, FileText, File, FileType, X,
   Braces, Terminal, Globe, Cpu, ChevronRight, ChevronDown, FilePlus,
@@ -92,11 +93,13 @@ export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRe
     const filename = path.split("/").pop() || path;
 
     return (
-      <div
+      <motion.div
         key={path}
         data-testid={`item-file-${path}`}
+        whileHover={{ x: 4 }}
+        onClick={() => onSelect(path)}
         className={[
-          "group flex items-center pr-2 py-[3px] cursor-pointer text-xs font-mono truncate",
+          "group flex items-center pr-2 py-[3px] cursor-pointer text-xs font-mono truncate transition-all",
           indent ? "pl-7" : "pl-5",
           isActive
             ? "bg-sidebar-accent text-primary"
@@ -139,7 +142,7 @@ export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRe
         >
           <X size={12} />
         </button>
-      </div>
+      </motion.div>
     );
   };
 
