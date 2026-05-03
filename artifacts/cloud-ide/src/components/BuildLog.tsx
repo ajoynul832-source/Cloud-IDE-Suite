@@ -28,141 +28,13 @@ function isSdkMissingError(text: string): boolean {
   return SDK_MISSING_PATTERNS.some((p) => lower.includes(p.toLowerCase()));
 }
 
-// ─── Build capabilities overview (shown before any build) ─────────────────────
+// ─── Empty build log state ────────────────────────────────────────────────────
 
-function BuildCapabilities() {
-  const capabilities = [
-    {
-      icon: "💙",
-      name: "Flutter",
-      badge: "APK",
-      badgeColor: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-      desc: "Native Android APK from Dart code",
-      requirement: "Flutter SDK on PATH",
-      works: false,
-    },
-    {
-      icon: "🤖",
-      name: "Android (Kotlin/Java)",
-      badge: "APK",
-      badgeColor: "text-green-400 bg-green-400/10 border-green-400/20",
-      desc: "Native Android APK via Gradle",
-      requirement: "Android SDK + Java 17",
-      works: false,
-    },
-    {
-      icon: "🌐",
-      name: "HTML / JS / TS",
-      badge: "APK",
-      badgeColor: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
-      desc: "Wrap web app in native shell via Capacitor",
-      requirement: "Capacitor CLI + Android SDK",
-      works: false,
-    },
-    {
-      icon: "⚛️",
-      name: "React Native",
-      badge: "PREVIEW",
-      badgeColor: "text-[#4ade80] bg-[#4ade80]/10 border-[#4ade80]/20",
-      desc: "Live phone preview via Expo Snack",
-      requirement: "Works now — no SDK needed",
-      works: true,
-    },
-  ];
-
+function EmptyBuildLog() {
   return (
-    <div className="h-full bg-[#0d1117] font-mono text-xs p-4 overflow-y-auto">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-2 mb-4"
-      >
-        <Terminal size={13} className="text-white/30" />
-        <span className="text-white/50 text-[11px]">Build Log</span>
-        <span className="text-white/20 text-[10px]">— no build started yet</span>
-      </motion.div>
-
-      {/* React Native works now */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="mb-4 p-3 rounded-lg bg-gradient-to-br from-[#4ade80]/12 to-[#4ade80]/4 border border-[#4ade80]/25 backdrop-blur-sm shadow-[0_8px_32px_rgba(74,222,128,0.1)]"
-      >
-        <div className="flex items-center gap-2 mb-1">
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <Smartphone size={12} className="text-[#4ade80]" />
-          </motion.div>
-          <span className="text-[#4ade80] text-[11px] font-semibold">React Native → Works right now</span>
-        </div>
-        <p className="text-[#4ade80]/50 text-[10px] leading-relaxed">
-          Choose a React Native template and click <strong className="text-[#4ade80]/70">Preview</strong> — instant
-          phone simulator via Expo Snack. No SDK install, no build queue.
-        </p>
-      </motion.div>
-
-      {/* All build types */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="space-y-2 mb-4">
-        <p className="text-[9px] uppercase tracking-widest text-white/25 mb-2">All supported build targets</p>
-        {capabilities.map((cap, i) => (
-          <motion.div
-            key={cap.name}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.08 }}
-            className={[
-              "flex items-start gap-3 p-2.5 rounded-lg border transition-all hover:scale-[1.02]",
-              cap.works
-                ? "border-[#4ade80]/25 bg-gradient-to-br from-[#4ade80]/10 to-[#4ade80]/3 backdrop-blur-sm shadow-[0_4px_16px_rgba(74,222,128,0.08)]"
-                : "border-white/8 bg-white/[0.02] hover:border-white/15",
-            ].join(" ")}>
-            <span className="text-sm shrink-0 mt-0.5">{cap.icon}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-white/60 text-[11px] font-medium">{cap.name}</span>
-                <span className={`text-[9px] px-1.5 py-0.5 rounded border font-mono ${cap.badgeColor}`}>
-                  {cap.badge}
-                </span>
-                {cap.works && (
-                  <span className="text-[9px] text-[#4ade80]/60 flex items-center gap-1">
-                    <CheckCircle size={8} /> Available
-                  </span>
-                )}
-              </div>
-              <p className="text-white/30 text-[10px] mt-0.5">{cap.desc}</p>
-              <p className="text-white/20 text-[9px] mt-0.5 italic">{cap.requirement}</p>
-            </div>
-          </motion.div>
-        ))}
-      </motion.div>
-
-      {/* Self-host call to action */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="p-3 rounded-lg bg-gradient-to-br from-amber-500/12 to-amber-500/4 border border-amber-500/25 backdrop-blur-sm shadow-[0_8px_32px_rgba(217,119,6,0.08)]">
-        <div className="flex items-center gap-2 mb-1.5">
-          <Globe size={11} className="text-amber-400" />
-          <span className="text-amber-400 text-[11px] font-semibold">Want Flutter/Android/Capacitor builds?</span>
-        </div>
-        <p className="text-amber-300/50 text-[10px] leading-relaxed mb-2">
-          Self-host CloudIDE using <code className="text-amber-300/70">Dockerfile.sdk</code> — it pre-installs all
-          SDKs and enables APK builds for every language.
-        </p>
-        <div className="bg-[#1c2128] rounded p-2 text-[10px] space-y-0.5">
-          <p className="text-white/30"># Clone + self-host with all SDKs</p>
-          <p className="text-[#4ade80]/70">docker compose up -d   # uses Dockerfile.sdk</p>
-          <p className="text-white/20 mt-1">See DEPLOY.md for full instructions</p>
-        </div>
-      </motion.div>
+    <div className="h-full bg-[#0d1117] font-mono text-xs p-4 flex flex-col items-center justify-center text-white/30">
+      <Terminal size={20} className="mb-2 text-white/20" />
+      <p className="text-[11px]">Build log is ready</p>
     </div>
   );
 }
@@ -274,9 +146,9 @@ export function BuildLog({ logs, status, error, projectType }: BuildLogProps) {
       ? isSdkMissingError(logs)
       : false;
 
-  // No build started yet → show capabilities overview
+  // No build started yet → show empty state
   if (!logs && !error) {
-    return <BuildCapabilities />;
+    return <EmptyBuildLog />;
   }
 
   // SDK missing → show self-hosting instructions
