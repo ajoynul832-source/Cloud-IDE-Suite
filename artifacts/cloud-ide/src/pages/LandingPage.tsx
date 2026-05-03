@@ -75,6 +75,29 @@ int main() {
     output: ["Sorted: 1 2 3 4 5 6 7 8 9", "First >= 7: 7", "exit code 0  ·  compiled in 1.2s"],
   },
   {
+    id: "react", label: "React", icon: "⚛️", color: "#38bdf8",
+    file: "index.html",
+    code: `<!-- React 18 via CDN — live preview, no build step -->
+<script src="unpkg.com/react@18/umd/react.development.js"></script>
+<script src="unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+  const { useState } = React;
+  function App() {
+    const [n, setN] = useState(0);
+    return (
+      <div>
+        <h1 style={{color:"#4ade80"}}>Count: {n}</h1>
+        <button onClick={() => setN(c => c+1)}>Click me</button>
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById("root"))
+    .render(<App />);
+</script>`,
+    output: ["→ Renders live in the preview panel", "→ React hooks work (useState, useEffect…)", "→ JSX transformed by Babel CDN"],
+  },
+  {
     id: "html", label: "HTML", icon: "🌐", color: "#fb923c",
     file: "index.html",
     code: `<!-- HTML — live preview in the right panel -->
@@ -173,16 +196,18 @@ function HeroDemo() {
 // ── Comparison data ────────────────────────────────────────────────────────────
 
 const COMPARE_ROWS = [
-  { label: "Python execution",       cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
-  { label: "C / C++ compilation",    cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
-  { label: "Bash / Perl scripting",  cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
-  { label: "CSS live preview",       cloudide: true,  codepen: true,  jsfiddle: true,  stackblitz: false },
-  { label: "Markdown rendering",     cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
-  { label: "SVG live preview",       cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
-  { label: "APK / Mobile builder",   cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
-  { label: "Fork & share projects",  cloudide: true,  codepen: true,  jsfiddle: true,  stackblitz: false },
-  { label: "Version history",        cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
-  { label: "Free tier",              cloudide: true,  codepen: true,  jsfiddle: true,  stackblitz: true  },
+  { label: "Python execution",           cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
+  { label: "C / C++ compilation",        cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
+  { label: "Bash / Perl scripting",      cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
+  { label: "React / Vue CDN preview",    cloudide: true,  codepen: true,  jsfiddle: false, stackblitz: true  },
+  { label: "Three.js / p5.js preview",   cloudide: true,  codepen: true,  jsfiddle: false, stackblitz: false },
+  { label: "CSS live preview",           cloudide: true,  codepen: true,  jsfiddle: true,  stackblitz: false },
+  { label: "Markdown rendering",         cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
+  { label: "SVG live preview",           cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
+  { label: "APK / Mobile builder",       cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
+  { label: "Fork & share projects",      cloudide: true,  codepen: true,  jsfiddle: true,  stackblitz: false },
+  { label: "Version history",            cloudide: true,  codepen: false, jsfiddle: false, stackblitz: false },
+  { label: "Free tier",                  cloudide: true,  codepen: true,  jsfiddle: true,  stackblitz: true  },
 ];
 
 // ── Features ──────────────────────────────────────────────────────────────────
@@ -203,14 +228,14 @@ const FEATURES = [
   {
     icon: <Eye size={20} className="text-purple-400" />,
     color: "border-purple-400/20 hover:border-purple-400/50 hover:bg-purple-400/5",
-    title: "5 instant browser previews",
-    desc: "HTML, CSS (on real elements), Markdown, JSON (syntax highlighted), and SVG — rendered client-side with zero latency.",
+    title: "10+ instant browser previews",
+    desc: "HTML, CSS, Markdown, JSON, SVG, React 18 (CDN), Vue 3, Three.js 3D, p5.js, and Chart.js — all rendered client-side with zero latency.",
   },
   {
     icon: <Smartphone size={20} className="text-cyan-400" />,
     color: "border-cyan-400/20 hover:border-cyan-400/50 hover:bg-cyan-400/5",
-    title: "Flutter & Android APK builder",
-    desc: "Write Flutter or Kotlin code and queue a real cloud APK build. The only browser IDE that does this.",
+    title: "React Native live preview + APK builder",
+    desc: "React Native code runs live in-browser via React Native Web. Flutter and Kotlin projects queue a real cloud APK build.",
   },
   {
     icon: <GitBranch size={20} className="text-orange-400" />,
@@ -227,8 +252,8 @@ const FEATURES = [
   {
     icon: <Layers size={20} className="text-green-400" />,
     color: "border-green-400/20 hover:border-green-400/50 hover:bg-green-400/5",
-    title: "24 production-ready templates",
-    desc: "Algorithms, data structures, API mocks, regex playground, CSS animations, SVG art, and more — all runnable immediately.",
+    title: "35+ production-ready templates",
+    desc: "Algorithms, data structures, React (CDN), Vue 3, Three.js 3D, p5.js art, Chart.js dashboard, and more — all runnable immediately.",
   },
   {
     icon: <BarChart2 size={20} className="text-red-400" />,
@@ -261,9 +286,12 @@ const LANG_GRID = [
   { icon: "📝", name: "Markdown",     sub: "rendered to HTML",     color: "text-purple-400", bg: "bg-purple-400/8  border-purple-400/15", runnable: false },
   { icon: "📋", name: "JSON",         sub: "syntax highlighted",   color: "text-yellow-300", bg: "bg-yellow-300/8  border-yellow-300/15", runnable: false },
   { icon: "🖼️", name: "SVG",          sub: "rendered preview",     color: "text-teal-400",   bg: "bg-teal-400/8    border-teal-400/15",   runnable: false },
+  // CDN / Framework
+  { icon: "⚛️", name: "React",         sub: "CDN + JSX via Babel",   color: "text-sky-400",    bg: "bg-sky-400/8     border-sky-400/15",    runnable: false },
+  { icon: "🟢", name: "Vue 3",         sub: "CDN composition API",   color: "text-emerald-400",bg: "bg-emerald-400/8 border-emerald-400/15", runnable: false },
   // Mobile
   { icon: "🐦", name: "Flutter",      sub: "APK build pipeline",   color: "text-cyan-400",   bg: "bg-cyan-400/8    border-cyan-400/15",   runnable: null  },
-  { icon: "⚛",  name: "React Native", sub: "Expo Snack preview",   color: "text-blue-300",   bg: "bg-blue-300/8    border-blue-300/15",   runnable: null  },
+  { icon: "⚛",  name: "React Native", sub: "RNW live preview",      color: "text-blue-300",   bg: "bg-blue-300/8    border-blue-300/15",   runnable: null  },
   { icon: "🤖", name: "Android",      sub: "Kotlin · APK build",   color: "text-green-300",  bg: "bg-green-300/8   border-green-300/15",  runnable: null  },
 ];
 
@@ -393,9 +421,9 @@ export default function LandingPage() {
               <p className="text-lg text-white/55 mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed">
                 A full cloud IDE that executes{" "}
                 <span className="text-white font-semibold">JS, TS, Python, Bash, Perl, C, C++</span>{" "}
-                server-side and previews{" "}
-                <span className="text-white font-semibold">HTML, CSS, Markdown, JSON &amp; SVG</span>{" "}
-                live in the browser — with a Flutter &amp; Android APK builder built in.
+                server-side, renders{" "}
+                <span className="text-white font-semibold">React, Vue 3, Three.js, p5.js, HTML &amp; CSS</span>{" "}
+                live in-browser, and builds Flutter &amp; Android APKs — zero setup.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start mb-6">
@@ -433,8 +461,8 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           {[
             { val: "7",   label: "Execution languages",  color: "text-yellow-400" },
-            { val: "12",  label: "Preview formats",       color: "text-blue-400"  },
-            { val: "24",  label: "Starter templates",     color: "text-green-400" },
+            { val: "15",  label: "Preview formats",       color: "text-blue-400"  },
+            { val: "35+", label: "Starter templates",     color: "text-green-400" },
             { val: "<1s", label: "Time to first output",  color: "text-pink-400"  },
           ].map(s => (
             <div key={s.label}>
@@ -485,11 +513,11 @@ export default function LandingPage() {
               Language Support
             </span>
             <h2 className="text-3xl md:text-5xl font-black mb-4">
-              12 languages.<br />
+              15 languages.<br />
               <span className="text-[#4ade80]">One editor.</span>
             </h2>
             <p className="text-white/50 text-lg">
-              7 execute server-side · 5 render live in the browser · 3 build mobile APKs
+              7 execute server-side · 7 render live in the browser · 3 build mobile APKs
             </p>
           </div>
 
@@ -635,7 +663,7 @@ export default function LandingPage() {
             <span className="inline-block font-mono text-xs text-amber-400 border border-amber-400/20 bg-amber-400/8 px-3 py-1 rounded-full mb-4">
               Templates
             </span>
-            <h2 className="text-3xl md:text-5xl font-black mb-4">24 templates. All runnable.</h2>
+            <h2 className="text-3xl md:text-5xl font-black mb-4">35+ templates. All runnable.</h2>
             <p className="text-white/50 text-lg">Pick a starter and be writing real code in under 5 seconds.</p>
           </div>
 
@@ -644,8 +672,12 @@ export default function LandingPage() {
               { icon: "⚡", name: "JavaScript",    color: "text-yellow-400 bg-yellow-400/8  border-yellow-400/15" },
               { icon: "📘", name: "TypeScript",    color: "text-blue-400   bg-blue-400/8    border-blue-400/15"   },
               { icon: "🐍", name: "Python",        color: "text-green-400  bg-green-400/8   border-green-400/15"  },
+              { icon: "⚛️", name: "React (CDN)",   color: "text-sky-400    bg-sky-400/8     border-sky-400/15"    },
+              { icon: "🟢", name: "Vue 3 (CDN)",   color: "text-emerald-400 bg-emerald-400/8 border-emerald-400/15"},
+              { icon: "🎲", name: "Three.js 3D",   color: "text-violet-400 bg-violet-400/8  border-violet-400/15" },
+              { icon: "🎨", name: "p5.js Art",     color: "text-pink-400   bg-pink-400/8    border-pink-400/15"   },
+              { icon: "📊", name: "Chart.js",      color: "text-cyan-400   bg-cyan-400/8    border-cyan-400/15"   },
               { icon: "🌐", name: "HTML Page",     color: "text-orange-400 bg-orange-400/8  border-orange-400/15" },
-              { icon: "🎨", name: "CSS Animations",color: "text-pink-400   bg-pink-400/8    border-pink-400/15"   },
               { icon: "🖥️", name: "HTML Canvas",   color: "text-teal-400   bg-teal-400/8    border-teal-400/15"   },
               { icon: "🧮", name: "Algorithms",    color: "text-indigo-400 bg-indigo-400/8  border-indigo-400/15" },
               { icon: "🐚", name: "Bash Script",   color: "text-lime-400   bg-lime-400/8    border-lime-400/15"   },

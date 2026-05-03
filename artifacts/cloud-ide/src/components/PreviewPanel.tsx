@@ -1,3 +1,5 @@
+import React, { useState } from "react";
+import { RefreshCw, ExternalLink } from "lucide-react";
 import { BuildLog }       from "./BuildLog";
 import { ConsoleOutput }  from "./ConsoleOutput";
 import { MobilePreview }  from "./MobilePreview";
@@ -129,14 +131,47 @@ export function PreviewPanel({
 }
 
 function WebPreviewContent({ htmlPreview }: { htmlPreview?: string | null }) {
+  const [frameKey, setFrameKey] = useState(0);
+
   if (htmlPreview) {
+    const openInTab = () => {
+      const blob = new Blob([htmlPreview], { type: "text/html" });
+      const url  = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener");
+      // Revoke after a short delay to let the tab load
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    };
+
     return (
-      <iframe
-        className="w-full h-full border-0 bg-white"
-        sandbox="allow-scripts"
-        srcDoc={htmlPreview}
-        title="Live Preview"
-      />
+      <div className="flex flex-col h-full">
+        {/* Mini toolbar */}
+        <div className="shrink-0 flex items-center gap-1 px-2 py-1 bg-[#161b22] border-b border-white/8">
+          <span className="flex-1 text-[10px] font-mono text-white/25 truncate pl-1">
+            Live Preview
+          </span>
+          <button
+            onClick={() => setFrameKey((k) => k + 1)}
+            title="Refresh preview"
+            className="p-1 text-white/30 hover:text-white/70 transition-colors"
+          >
+            <RefreshCw size={11} />
+          </button>
+          <button
+            onClick={openInTab}
+            title="Open in new tab"
+            className="p-1 text-white/30 hover:text-white/70 transition-colors"
+          >
+            <ExternalLink size={11} />
+          </button>
+        </div>
+        <iframe
+          key={frameKey}
+          className="flex-1 border-0 bg-white w-full"
+          sandbox="allow-scripts allow-same-origin allow-forms"
+          srcDoc={htmlPreview}
+          title="Live Preview"
+        />
+      </div>
     );
   }
 

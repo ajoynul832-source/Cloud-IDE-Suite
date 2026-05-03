@@ -19,6 +19,70 @@ function fmtTime(ts: number): string {
   ].join(":");
 }
 
+// ── ANSI → HTML ───────────────────────────────────────────────────────────────
+// Converts ANSI escape sequences to styled <span> elements.
+// Text is HTML-escaped first to prevent XSS.
+
+const ANSI_FG: Record<number, string> = {
+  30: "#6e7681",  31: "#ff7b72",  32: "#4ade80",  33: "#e3b341",
+  34: "#79c0ff",  35: "#d2a8ff",  36: "#56d364",  37: "#e6edf3",
+  90: "#8b949e",  91: "#ff9492",  92: "#6de9a9",  93: "#f0c040",
+  94: "#a5d6ff",  95: "#f0b3ff",  96: "#71e8e8",  97: "#ffffff",
+};
+
+function ansiToHtml(raw: string): string {
+  // 1. HTML-escape all content first (prevents XSS)
+  const escaped = raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // 2. Split on ANSI escape sequences: ESC [ <codes> m
+  const parts = escaped.split(/\x1b\[([0-9;]*)m/);
+
+  let html      = "";
+  let openSpan  = false;
+
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 0) {
+      // Plain text segment
+      html += parts[i];
+    } else {
+      // ANSI code segment
+      const codes = parts[i] === "" ? [0] : parts[i].split(";").map(Number);
+
+      if (openSpan) {
+        html += "</span>";
+        openSpan = false;
+      }
+
+      const isReset = codes.includes(0);
+      if (isReset) continue;
+
+      const fgCode = codes.find((c) => (c >= 30 && c <= 37) || (c >= 90 && c <= 97));
+      const isBold = codes.includes(1);
+      const isItalic = codes.includes(3);
+      const isUnder  = codes.includes(4);
+      const isDim    = codes.includes(2);
+
+      // Only open a span if we have styling to apply
+      if (fgCode !== undefined || isBold || isItalic || isUnder || isDim) {
+        const styles: string[] = [];
+        if (fgCode !== undefined) styles.push(`color:${ANSI_FG[fgCode]}`);
+        if (isBold)   styles.push("font-weight:700");
+        if (isItalic) styles.push("font-style:italic");
+        if (isUnder)  styles.push("text-decoration:underline");
+        if (isDim)    styles.push("opacity:0.5");
+        html += `<span style="${styles.join(";")}">`;
+        openSpan = true;
+      }
+    }
+  }
+
+  if (openSpan) html += "</span>";
+  return html;
+}
+
 export function ConsoleOutput({ stream, isRunning, runsRemaining, stdinInput, onStdinChange }: ConsoleOutputProps) {
   const bottomRef    = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -202,11 +266,11 @@ export function ConsoleOutput({ stream, isRunning, runsRemaining, stdinInput, on
             <pre
               className={[
                 "whitespace-pre-wrap leading-relaxed text-[11px] flex-1 min-w-0",
-                chunk.type === "stdout" ? "text-white/85" : "text-red-400",
+                chunk.type === "stderr" ? "text-red-400" : "text-white/85",
               ].join(" ")}
-            >
-              {chunk.text}
-            </pre>
+              // Safe: ansiToHtml HTML-escapes all text before adding span tags
+              dangerouslySetInnerHTML={{ __html: ansiToHtml(chunk.text) }}
+            />
           </div>
         ))}
 

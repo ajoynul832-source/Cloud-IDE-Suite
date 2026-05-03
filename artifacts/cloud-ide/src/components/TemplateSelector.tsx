@@ -8,15 +8,15 @@ interface TemplateSelectorProps {
 }
 
 const QUICK_START_IDS = [
-  "js-algorithms",
+  "html-react-cdn",
   "ts-starter",
   "python-data",
-  "python-starter",
-  "html-page",
-  "html-canvas",
+  "html-threejs",
+  "html-p5js",
+  "html-chartjs",
 ];
 
-const LIVE_PREVIEW_IDS = ["expo-starter"];
+const LIVE_PREVIEW_IDS = ["expo-starter", "react-native-ts"];
 
 export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
   const [hovered, setHovered] = useState<string | null>(null);

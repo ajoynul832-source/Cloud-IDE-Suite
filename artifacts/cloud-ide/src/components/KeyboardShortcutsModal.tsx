@@ -38,6 +38,7 @@ const SECTIONS: Section[] = [
     items: [
       { keys: ["?"],                                               label: "Open keyboard shortcuts" },
       { keys: ["Ctrl", ","],             mac: ["⌘", ","],         label: "Open settings" },
+      { keys: ["Alt", "Z"],                                        label: "Toggle word wrap" },
     ],
   },
 ];

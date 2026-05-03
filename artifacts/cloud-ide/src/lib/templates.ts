@@ -3592,6 +3592,693 @@ console.time("built-in");   [...big].sort((a, b) => a - b); console.timeEnd("bui
 `,
     },
   },
+
+  // ── HTML / CDN — live-preview in browser, no backend needed ──────────────────
+  {
+    id: "html-react-cdn",
+    name: "React (CDN)",
+    description: "React 18 + JSX via Babel CDN — counter, todo list, hooks. No build step needed.",
+    icon: "⚛️",
+    language: "HTML",
+    runnable: true,
+    files: {
+      "index.html": `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>React App</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0d1117;color:#e6edf3;font-family:system-ui,-apple-system,sans-serif;min-height:100vh;padding:32px 16px}
+    h1{color:#4ade80;font-family:monospace;font-size:1.2rem;margin-bottom:24px}
+    .card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;margin-bottom:16px}
+    .label{font-size:11px;color:#7d8590;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+    .counter{font-size:3rem;font-weight:bold;color:#4ade80;text-align:center;margin-bottom:12px}
+    .row{display:flex;gap:8px;justify-content:center}
+    button{padding:8px 20px;border-radius:8px;cursor:pointer;font-size:14px;transition:opacity .15s}
+    .btn-primary{border:none;background:#4ade80;color:#000;font-weight:bold}
+    .btn-secondary{border:1px solid #30363d;background:#21262d;color:#e6edf3}
+    .btn-primary:hover,.btn-secondary:hover{opacity:.85}
+    .todo-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #21262d;cursor:pointer}
+    .todo-check{font-size:14px}
+    .todo-text{font-size:14px;flex:1}
+    .done{text-decoration:line-through;color:#7d8590}
+    .add-row{display:flex;gap:8px;margin-top:12px}
+    input{flex:1;padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;font-size:13px;outline:none}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState } = React;
+
+    function TodoApp() {
+      const [count, setCount] = useState(0);
+      const [todos, setTodos] = useState([
+        { id: 1, text: "Build something awesome", done: true },
+        { id: 2, text: "Add React components", done: false },
+        { id: 3, text: "Deploy to production", done: false },
+      ]);
+      const [input, setInput] = useState("");
+
+      const toggle = (id) =>
+        setTodos((t) => t.map((x) => (x.id === id ? { ...x, done: !x.done } : x)));
+
+      const add = () => {
+        if (!input.trim()) return;
+        setTodos((t) => [...t, { id: Date.now(), text: input.trim(), done: false }]);
+        setInput("");
+      };
+
+      const remaining = todos.filter((t) => !t.done).length;
+
+      return (
+        <div style={{ maxWidth: 440, margin: "0 auto" }}>
+          <h1>&#x269B;&#xFE0F; React App (CDN)</h1>
+
+          <div className="card">
+            <div className="label">useState Counter</div>
+            <div className="counter">{count}</div>
+            <div className="row">
+              <button className="btn-secondary" onClick={() => setCount((c) => c - 1)}>&#8722;</button>
+              <button className="btn-primary"   onClick={() => setCount((c) => c + 1)}>+</button>
+              <button className="btn-secondary" onClick={() => setCount(0)}>Reset</button>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="label">Todo List &mdash; {remaining} remaining</div>
+            {todos.map((todo) => (
+              <div key={todo.id} className="todo-row" onClick={() => toggle(todo.id)}>
+                <span className="todo-check" style={{ color: todo.done ? "#4ade80" : "#30363d" }}>
+                  {todo.done ? "&#10003;" : "&#9675;"}
+                </span>
+                <span className={"todo-text" + (todo.done ? " done" : "")}>{todo.text}</span>
+              </div>
+            ))}
+            <div className="add-row">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && add()}
+                placeholder="Add a todo&hellip;"
+              />
+              <button className="btn-primary" onClick={add} style={{ padding: "8px 14px" }}>+</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<TodoApp />);
+  </script>
+</body>
+</html>
+`,
+    },
+  },
+  {
+    id: "html-vue3",
+    name: "Vue 3 (CDN)",
+    description: "Vue 3 Composition API via CDN — reactive counter, v-for list, v-model input.",
+    icon: "🟢",
+    language: "HTML",
+    runnable: true,
+    files: {
+      "index.html": `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Vue 3 App</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-height:100vh;padding:32px 16px}
+    h1{color:#4ade80;font-family:monospace;font-size:1.2rem;margin-bottom:24px}
+    .card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;margin-bottom:16px}
+    .label{font-size:11px;color:#7d8590;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+    .counter{font-size:3rem;font-weight:bold;color:#4ade80;text-align:center;margin:8px 0 14px}
+    .row{display:flex;gap:8px;justify-content:center}
+    button{padding:8px 20px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;transition:opacity .15s}
+    .primary{border:none;background:#4ade80;color:#000;font-weight:bold}
+    .secondary{border:1px solid #30363d;background:#21262d;color:#e6edf3}
+    .primary:hover,.secondary:hover{opacity:.85}
+    .item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #21262d;cursor:pointer;font-size:14px}
+    .add-row{display:flex;gap:8px;margin-top:12px}
+    input{flex:1;padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;font-size:13px;outline:none}
+    .empty{color:#7d8590;font-size:12px;text-align:center;padding:12px 0}
+    .chip{display:inline-block;padding:2px 10px;border-radius:99px;background:#4ade80;color:#000;font-size:11px;font-weight:bold;margin-left:6px}
+  </style>
+</head>
+<body>
+<div id="app">
+  <h1>&#x1F7E2; Vue 3 App</h1>
+
+  <div class="card">
+    <div class="label">Reactive Counter <span class="chip">ref()</span></div>
+    <div class="counter">{{ count }}</div>
+    <div class="row">
+      <button class="secondary" @click="count--">&#8722;</button>
+      <button class="primary"   @click="count++">+</button>
+      <button class="secondary" @click="count = 0">Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">List <span class="chip">v-for</span> &mdash; {{ items.length }} items</div>
+    <div class="add-row" style="margin-bottom:12px;margin-top:0">
+      <input v-model="newItem" @keydown.enter="addItem" placeholder="Add an item&hellip;">
+      <button class="primary" @click="addItem" style="padding:8px 14px">+</button>
+    </div>
+    <div
+      v-for="(item, i) in items"
+      :key="i"
+      class="item"
+      @click="items.splice(i, 1)"
+      title="Click to remove"
+    >
+      <span style="color:#f472b6;font-size:12px">&#x2715;</span>
+      {{ item }}
+    </div>
+    <div v-if="items.length === 0" class="empty">No items &mdash; add one above</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Computed property</div>
+    <div style="font-size:13px;color:#e6edf3">
+      Count is <strong :style="{ color: count > 0 ? '#4ade80' : count < 0 ? '#ff7b72' : '#7d8590' }">
+        {{ count > 0 ? 'positive' : count < 0 ? 'negative' : 'zero' }}
+      </strong>
+      &mdash; doubled: <strong style="color:#79c0ff">{{ count * 2 }}</strong>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp, ref } = Vue;
+createApp({
+  setup() {
+    const count   = ref(0);
+    const newItem = ref("");
+    const items   = ref(["Learn Vue 3", "Build something cool", "Ship it"]);
+    const addItem = () => {
+      if (newItem.value.trim()) {
+        items.value.push(newItem.value.trim());
+        newItem.value = "";
+      }
+    };
+    return { count, newItem, items, addItem };
+  },
+}).mount("#app");
+</script>
+</body>
+</html>
+`,
+    },
+  },
+  {
+    id: "html-threejs",
+    name: "Three.js 3D",
+    description: "Three.js rotating icosahedron with dynamic lighting and window-resize support.",
+    icon: "🎲",
+    language: "HTML",
+    runnable: true,
+    files: {
+      "index.html": `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html,body{margin:0;height:100%;overflow:hidden;background:#0d1117}
+    canvas{display:block}
+  </style>
+  <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
+</head>
+<body>
+<script>
+  const scene    = new THREE.Scene();
+  const camera   = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 100);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(devicePixelRatio);
+  document.body.appendChild(renderer.domElement);
+
+  // Geometry + material
+  const geo = new THREE.IcosahedronGeometry(1.8, 1);
+  const mat = new THREE.MeshPhongMaterial({
+    color: 0x4ade80,
+    emissive: 0x0d2d1a,
+    shininess: 90,
+    flatShading: true,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  scene.add(mesh);
+
+  // Wireframe overlay
+  const wireMat = new THREE.MeshBasicMaterial({ color: 0x22c55e, wireframe: true, opacity: 0.12, transparent: true });
+  scene.add(new THREE.Mesh(geo, wireMat));
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+  const key = new THREE.DirectionalLight(0x4ade80, 2);
+  key.position.set(4, 6, 5);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0x60a5fa, 1.4);
+  fill.position.set(-5, -4, -3);
+  scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xf472b6, 0.9);
+  rim.position.set(0, -6, 4);
+  scene.add(rim);
+
+  camera.position.z = 5;
+
+  // Animate
+  let t = 0;
+  function animate() {
+    requestAnimationFrame(animate);
+    t += 0.008;
+    mesh.rotation.x = t * 0.4;
+    mesh.rotation.y = t * 0.7;
+    mesh.rotation.z = t * 0.2;
+    // Subtle pulsing scale
+    const s = 1 + Math.sin(t * 1.2) * 0.04;
+    mesh.scale.set(s, s, s);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener("resize", () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+</script>
+</body>
+</html>
+`,
+    },
+  },
+  {
+    id: "html-p5js",
+    name: "p5.js Art",
+    description: "Generative particle art with Perlin noise flow fields. Edit parameters to make it yours.",
+    icon: "🎨",
+    language: "HTML",
+    runnable: true,
+    files: {
+      "sketch.html": `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html,body{margin:0;overflow:hidden;background:#0d1117}
+    canvas{display:block}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.3/lib/p5.js"></script>
+</head>
+<body>
+<script>
+// ── Tune these ────────────────────────────────────────────
+const NUM_PARTICLES = 900;
+const SPEED         = 1.8;
+const NOISE_SCALE   = 0.0028;
+const FADE          = 0.09;     // 0 = full trails, 1 = no trails
+const HUE_START     = 140;      // green-ish
+const HUE_RANGE     = 80;
+// ─────────────────────────────────────────────────────────
+
+let particles = [];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  colorMode(HSB, 360, 100, 100, 1);
+  background(220, 20, 8);
+  for (let i = 0; i < NUM_PARTICLES; i++) {
+    particles.push({
+      x: random(width),
+      y: random(height),
+      hue: random(HUE_START, HUE_START + HUE_RANGE),
+      size: random(1.2, 3.5),
+    });
+  }
+}
+
+function draw() {
+  // Fade background slightly to create trails
+  fill(220, 20, 8, FADE);
+  noStroke();
+  rect(0, 0, width, height);
+
+  for (let p of particles) {
+    // Perlin noise gives smooth directional angle
+    const angle = noise(p.x * NOISE_SCALE, p.y * NOISE_SCALE, frameCount * 0.003) * TWO_PI * 3;
+    p.x += cos(angle) * SPEED;
+    p.y += sin(angle) * SPEED;
+
+    // Wrap around edges
+    if (p.x < 0) p.x = width;
+    if (p.x > width) p.x = 0;
+    if (p.y < 0) p.y = height;
+    if (p.y > height) p.y = 0;
+
+    stroke(p.hue, 65, 95, 0.75);
+    strokeWeight(p.size);
+    point(p.x, p.y);
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+// Click to randomise hues
+function mousePressed() {
+  for (let p of particles) {
+    p.hue = random(HUE_START, HUE_START + HUE_RANGE);
+  }
+}
+</script>
+</body>
+</html>
+`,
+    },
+  },
+  {
+    id: "html-chartjs",
+    name: "Chart.js Dashboard",
+    description: "4-panel analytics dashboard using Chart.js 4 — line, doughnut, bar, and radar charts.",
+    icon: "📊",
+    language: "HTML",
+    runnable: true,
+    files: {
+      "dashboard.html": `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;padding:20px;height:100vh;display:flex;flex-direction:column;gap:14px}
+    h1{font-size:13px;font-weight:700;color:#4ade80;text-transform:uppercase;letter-spacing:2px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0}
+    .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px;display:flex;flex-direction:column;min-height:0}
+    .card h2{font-size:10px;color:#7d8590;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;flex-shrink:0}
+    canvas{flex:1;min-height:0}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <h1>&#x1F4CA; CloudIDE Analytics Dashboard</h1>
+  <div class="grid">
+    <div class="card"><h2>Monthly Active Users</h2><canvas id="c1"></canvas></div>
+    <div class="card"><h2>Language Distribution</h2><canvas id="c2"></canvas></div>
+    <div class="card"><h2>Daily Runs This Week</h2><canvas id="c3"></canvas></div>
+    <div class="card"><h2>Build Success Rate</h2><canvas id="c4"></canvas></div>
+  </div>
+  <script>
+    Chart.defaults.color = "#7d8590";
+    Chart.defaults.borderColor = "#21262d";
+
+    new Chart("c1", { type: "line", data: {
+      labels: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+      datasets: [{
+        label: "MAU",
+        data: [120,195,310,490,640,820,960,1110,1280,1450,1620,1850],
+        borderColor: "#4ade80", backgroundColor: "rgba(74,222,128,.08)",
+        tension: 0.4, fill: true, pointRadius: 3, pointBackgroundColor: "#4ade80",
+      }],
+    }, options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} }});
+
+    new Chart("c2", { type: "doughnut", data: {
+      labels: ["JavaScript","Python","TypeScript","HTML","C/C++","Other"],
+      datasets: [{ data:[35,28,18,10,6,3], backgroundColor:["#f7df1e","#3776ab","#3178c6","#e34c26","#00599c","#444d56"], borderWidth:0 }],
+    }, options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"right",labels:{boxWidth:10,font:{size:10}}}} }});
+
+    new Chart("c3", { type: "bar", data: {
+      labels: ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+      datasets: [{
+        label: "Runs",
+        data: [430,590,680,520,730,380,290],
+        backgroundColor: "rgba(96,165,250,.5)", borderColor:"#60a5fa", borderWidth:1, borderRadius:4,
+      }],
+    }, options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{grid:{color:"#21262d"}}} }});
+
+    new Chart("c4", { type: "radar", data: {
+      labels: ["JS/TS","Python","C/C++","Bash","React Native","Flutter"],
+      datasets: [{
+        label: "Success %",
+        data: [98,95,87,97,74,52],
+        borderColor:"#f472b6", backgroundColor:"rgba(244,114,182,.08)",
+        pointBackgroundColor:"#f472b6",
+      }],
+    }, options: { responsive:true, maintainAspectRatio:false, scales:{r:{min:0,max:100,ticks:{stepSize:25,font:{size:9}},grid:{color:"#21262d"},pointLabels:{font:{size:10}}}} }});
+  </script>
+</body>
+</html>
+`,
+    },
+  },
+
+  // ── TypeScript / JavaScript — runnable in sandbox ─────────────────────────
+  {
+    id: "ts-classes",
+    name: "TypeScript OOP",
+    description: "Abstract classes, generics, interfaces, Comparable, Serializable — full TypeScript OOP demo.",
+    icon: "🏗️",
+    language: "TypeScript",
+    runnable: true,
+    files: {
+      "oop.ts": `// TypeScript OOP & Generics — run with Run ▶ or Ctrl+Enter
+
+// ── Interfaces ──────────────────────────────────────────────────────────────
+interface Serializable {
+  serialize(): string;
+}
+
+interface Comparable<T> {
+  compareTo(other: T): number;
+}
+
+// ── Generic Stack<T> ────────────────────────────────────────────────────────
+class Stack<T> {
+  private items: T[] = [];
+
+  push(item: T): this { this.items.push(item); return this; }
+  pop(): T | undefined { return this.items.pop(); }
+  peek(): T | undefined { return this.items[this.items.length - 1]; }
+  get size(): number { return this.items.length; }
+  isEmpty(): boolean { return this.items.length === 0; }
+  [Symbol.iterator]() { return this.items[Symbol.iterator](); }
+}
+
+// ── Abstract Shape with Comparable + Serializable ───────────────────────────
+abstract class Shape implements Serializable, Comparable<Shape> {
+  constructor(public readonly color: string) {}
+
+  abstract area(): number;
+  abstract perimeter(): number;
+
+  compareTo(other: Shape): number { return this.area() - other.area(); }
+
+  serialize(): string {
+    return JSON.stringify({
+      type: this.constructor.name,
+      color: this.color,
+      area: this.area().toFixed(2),
+    });
+  }
+
+  toString(): string {
+    return (
+      this.constructor.name +
+      "(color=" + this.color +
+      ", area=" + this.area().toFixed(2) +
+      ", perimeter=" + this.perimeter().toFixed(2) + ")"
+    );
+  }
+}
+
+// ── Concrete shapes ──────────────────────────────────────────────────────────
+class Circle extends Shape {
+  constructor(color: string, public readonly radius: number) { super(color); }
+  area(): number      { return Math.PI * this.radius ** 2; }
+  perimeter(): number { return 2 * Math.PI * this.radius; }
+}
+
+class Rectangle extends Shape {
+  constructor(color: string, public readonly w: number, public readonly h: number) { super(color); }
+  area(): number      { return this.w * this.h; }
+  perimeter(): number { return 2 * (this.w + this.h); }
+}
+
+class Triangle extends Shape {
+  constructor(color: string, public readonly a: number, public readonly b: number, public readonly c: number) {
+    super(color);
+  }
+  perimeter(): number { return this.a + this.b + this.c; }
+  area(): number {
+    const s = this.perimeter() / 2;
+    return Math.sqrt(s * (s - this.a) * (s - this.b) * (s - this.c)); // Heron
+  }
+}
+
+// ── Utility types ────────────────────────────────────────────────────────────
+type ShapeStats = { count: number; totalArea: number; largest: Shape };
+
+function analyseShapes(shapes: Shape[]): ShapeStats {
+  return shapes.reduce<ShapeStats>(
+    (acc, s) => ({
+      count:     acc.count + 1,
+      totalArea: acc.totalArea + s.area(),
+      largest:   s.area() > acc.largest.area() ? s : acc.largest,
+    }),
+    { count: 0, totalArea: 0, largest: shapes[0] }
+  );
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+console.log("=== Generic Stack<number> ===");
+const stack = new Stack<number>().push(10).push(20).push(30);
+console.log("size:", stack.size, " peek:", stack.peek(), " pop:", stack.pop(), " size:", stack.size);
+
+console.log("\\n=== Polymorphism + Sort by area ===");
+const shapes: Shape[] = [
+  new Circle("blue", 5),
+  new Rectangle("red", 4, 6),
+  new Circle("green", 2),
+  new Rectangle("yellow", 10, 3),
+  new Triangle("purple", 3, 4, 5),
+];
+shapes.sort((a, b) => a.compareTo(b));
+shapes.forEach((s) => console.log(" ", s.toString()));
+
+console.log("\\n=== Serialization ===");
+shapes.forEach((s) => console.log(" ", s.serialize()));
+
+console.log("\\n=== Analysis ===");
+const stats = analyseShapes(shapes);
+console.log("count:",      stats.count);
+console.log("totalArea:", stats.totalArea.toFixed(2));
+console.log("largest:",   stats.largest.toString());
+
+console.log("\\n=== Stack<Shape> ===");
+const shapeStack = new Stack<Shape>();
+shapes.forEach((s) => shapeStack.push(s));
+console.log("stack size:", shapeStack.size);
+for (const s of shapeStack) console.log(" -", s.toString());
+`,
+    },
+  },
+  {
+    id: "js-async",
+    name: "Async Patterns",
+    description: "async/await, Promise.all, Promise.race, error handling, sequential vs parallel — full guide.",
+    icon: "⏳",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "async.js": `// Async / Await Patterns — run with Run ▶ or Ctrl+Enter
+
+// ── Simulated async data layer ────────────────────────────────────────────────
+const DB = {
+  1: { id: 1, name: "Alice",   role: "admin"  },
+  2: { id: 2, name: "Bob",     role: "editor" },
+  3: { id: 3, name: "Charlie", role: "viewer" },
+};
+
+function fetchUser(id, delayMs = 40) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const user = DB[id];
+      if (user) resolve(user);
+      else reject(new Error("User " + id + " not found"));
+    }, delayMs);
+  });
+}
+
+function delay(ms, value) {
+  return new Promise((r) => setTimeout(() => r(value), ms));
+}
+
+// ── 1. Basic async/await ──────────────────────────────────────────────────────
+async function demo1() {
+  console.log("--- 1. Basic async/await ---");
+  const user = await fetchUser(1);
+  console.log("Fetched:", user);
+}
+
+// ── 2. Parallel with Promise.all ──────────────────────────────────────────────
+async function demo2() {
+  console.log("\\n--- 2. Promise.all (parallel) ---");
+  const t0 = Date.now();
+  const [a, b, c] = await Promise.all([fetchUser(1), fetchUser(2), fetchUser(3)]);
+  console.log("All users:", [a, b, c].map((u) => u.name).join(", "));
+  console.log("Time:", Date.now() - t0, "ms  (ran in parallel)");
+}
+
+// ── 3. Sequential with for...of ───────────────────────────────────────────────
+async function demo3() {
+  console.log("\\n--- 3. Sequential for...of ---");
+  const t0 = Date.now();
+  const names = [];
+  for (const id of [1, 2, 3]) {
+    const user = await fetchUser(id);
+    names.push(user.name);
+  }
+  console.log("Users:", names.join(", "));
+  console.log("Time:", Date.now() - t0, "ms  (ran sequentially)");
+}
+
+// ── 4. Error handling with try/catch ──────────────────────────────────────────
+async function demo4() {
+  console.log("\\n--- 4. Error handling ---");
+  try {
+    const user = await fetchUser(999); // does not exist
+    console.log("Should not reach here:", user);
+  } catch (err) {
+    console.log("Caught error:", err.message);
+  }
+}
+
+// ── 5. Promise.allSettled (tolerates failures) ────────────────────────────────
+async function demo5() {
+  console.log("\\n--- 5. Promise.allSettled ---");
+  const results = await Promise.allSettled([
+    fetchUser(1), fetchUser(404), fetchUser(3), fetchUser(500)
+  ]);
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") console.log("  ok[" + i + "]:", r.value.name);
+    else                          console.log("  err[" + i + "]:", r.reason.message);
+  });
+}
+
+// ── 6. Promise.race (first wins) ──────────────────────────────────────────────
+async function demo6() {
+  console.log("\\n--- 6. Promise.race ---");
+  const winner = await Promise.race([
+    delay(80,  "slow"),
+    delay(15,  "fast"),
+    delay(40, "medium"),
+  ]);
+  console.log("Winner:", winner);
+}
+
+// ── Run all demos ─────────────────────────────────────────────────────────────
+(async () => {
+  await demo1();
+  await demo2();
+  await demo3();
+  await demo4();
+  await demo5();
+  await demo6();
+  console.log("\\nAll demos complete!");
+})();
+`,
+    },
+  },
 ];
 
 export function getTemplateById(id: string): ProjectTemplate | undefined {

@@ -1,6 +1,6 @@
 # CloudIDE — Master Build Document
 
-> **Version**: 2.1 | **Updated**: May 2026
+> **Version**: 2.2 | **Updated**: May 2026
 >
 > This is the single source of truth for the CloudIDE product.
 > It documents every feature that works, every bug that exists,
@@ -28,7 +28,7 @@ A professional, browser-based cloud IDE with real code execution, live previews,
 - **Word wrap toggle** — toolbar button + Alt+Z
 - **Font size controls** — status bar +/- buttons, persisted to localStorage
 - **Line/column display** — real-time cursor position in status bar
-- **Theme switching** — VS Code Dark, GitHub Dark, Dracula (settings panel)
+- **Theme switching** — VS Code Dark, GitHub Dark, Dracula, Monokai (settings panel)
 
 ### Code Execution
 - **JavaScript / TypeScript** — Node.js (backend sandboxed child process)
@@ -40,11 +40,16 @@ A professional, browser-based cloud IDE with real code execution, live previews,
 - **Streaming output** — real-time stdout/stderr via SSE
 
 ### Live Previews (no backend needed)
-- **HTML** — runs in sandboxed iframe instantly
+- **HTML** — runs in sandboxed iframe instantly (Refresh + Open in new tab buttons)
 - **CSS** — applied to a rich demo page with common UI patterns
-- **Markdown** — rendered to styled HTML
+- **Markdown** — rendered to styled GitHub-flavoured HTML
 - **JSON** — colorized tree viewer
 - **SVG** — rendered preview with dimensions
+- **React (CDN)** — React 18 + Babel standalone, JSX works out of the box
+- **Vue 3 (CDN)** — Composition API, no build step
+- **Three.js** — UMD build, full 3D canvas via WebGL
+- **p5.js** — creative coding, Perlin noise, generative art
+- **Chart.js** — 4-panel responsive dashboard
 
 ### Mobile / React Native
 - **React Native Web runner** — Expo Starter and RN templates run live in the browser via React Native Web 0.19 + Babel standalone. No Expo Snack API needed for web preview.
@@ -197,6 +202,7 @@ pnpm --filter @workspace/api-server run db:push
 | `Ctrl+D` | Select next occurrence |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / Redo |
 | `Ctrl+F` | Find in file |
+| `Alt+Z` | Toggle word wrap |
 | `Ctrl+G` | Go to line |
 
 ---
@@ -212,11 +218,16 @@ pnpm --filter @workspace/api-server run db:push
 | Perl (.pl) | perl backend | — |
 | C (.c) | gcc → run | — |
 | C++ (.cpp, .cxx) | g++ → run | — |
-| HTML (.html) | — | Inline iframe (instant) |
+| HTML (.html) | — | Sandboxed iframe (instant) |
 | CSS (.css) | — | Styled demo page |
-| Markdown (.md) | — | Rendered HTML |
+| Markdown (.md) | — | GitHub-flavoured HTML |
 | JSON (.json) | — | Colorized tree |
 | SVG (.svg) | — | Rendered image |
+| React CDN (.html) | — | React 18 + Babel standalone |
+| Vue 3 CDN (.html) | — | Composition API via CDN |
+| Three.js (.html) | — | WebGL 3D canvas |
+| p5.js (.html) | — | Creative coding canvas |
+| Chart.js (.html) | — | Responsive chart dashboard |
 | React Native (.js) | — | React Native Web (browser) |
 | Go, Rust, Kotlin, Swift, … | — | Syntax highlight only |
 
@@ -266,20 +277,25 @@ All routes prefixed with `/api`.
 
 ## Templates
 
-35 project templates in `artifacts/cloud-ide/src/lib/templates.ts`:
+35+ project templates in `artifacts/cloud-ide/src/lib/templates.ts`:
 
-**Runnable Now** (execute instantly, no build required):
-- JS Algorithms, TS Starter, Python Data, Python Script, HTML Page, HTML Canvas
-- Fibonacci, Sorting Algorithms, API Mock, Regex Playground, Data Structures
-- Bash Script, C Program, C++ Program, Perl Script, CSS Animations, Markdown, SVG Art
-- JSON Explorer, Go Starter, Rust Starter, JS API Mock, JS Fetch Mock
+**Quick Start** (featured 6, run in < 2 seconds):
+- React 18 CDN, TypeScript Starter, Python Data Science
+- Three.js 3D, p5.js Flow Field, Chart.js Dashboard
 
-**Live Preview** (runs in browser without backend):
+**More Languages** (also runnable in the sandbox):
+- JS Algorithms, TS Types/Generics, TS OOP, TS Async
+- Python ML, Python Regex, Python Web Scrape
+- Bash Script, C Program, C++ Program, Perl Script
+- Vue 3 CDN, HTML Page, HTML Canvas, CSS Animations, CSS Grid
+- Markdown Doc, JSON Explorer, SVG Art, API Mock
+
+**Mobile Live Preview** (runs in-browser, no build):
 - Expo Starter (React Native Web)
+- React Native TypeScript (React Native Web)
 
-**Mobile (Build Required)**:
-- React Native TS, Android Kotlin, Android Java, iOS Swift, Flutter, Python Kivy
-- .NET MAUI, Ionic Capacitor, Rust Mobile, Go Mobile, Android NDK
+**Mobile — Build Required**:
+- Flutter, Android Kotlin, Android Java, iOS Swift, Python Kivy
 
 ### Adding a template
 
