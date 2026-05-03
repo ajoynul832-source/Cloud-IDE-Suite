@@ -18,33 +18,69 @@ import { useRun } from "@/hooks/useRun";
 import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProjectTemplate } from "@/lib/templates";
+import {
+  generateCSSPreview,
+  generateMarkdownPreview,
+  generateJSONPreview,
+  generateSVGPreview,
+} from "@/lib/preview-generators";
 import { Zap, Code2, Globe, Terminal } from "lucide-react";
 
 const AUTOSAVE_DEBOUNCE_MS = 3_000;
-const FONT_SIZE_KEY   = "cloudide_font_size";
-const WORD_WRAP_KEY   = "cloudide_word_wrap";
+const FONT_SIZE_KEY        = "cloudide_font_size";
+const WORD_WRAP_KEY        = "cloudide_word_wrap";
 
-function getExecLanguage(filename: string): string | null {
+// ─── Language helpers ─────────────────────────────────────────────────────────
+
+type RunTarget =
+  | "javascript" | "typescript" | "python"
+  | "html" | "css" | "markdown" | "json" | "svg"   // ← preview-only (no backend)
+  | "bash" | "perl" | "c" | "cpp";                  // ← compiled / shell
+
+/** Maps file extension → run target. null = not runnable. */
+function getRunTarget(filename: string): RunTarget | null {
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-  const map: Record<string, string> = {
-    js: "javascript", jsx: "javascript", mjs: "javascript", cjs: "javascript",
-    ts: "typescript", tsx: "typescript",
-    py: "python",
-    html: "html", htm: "html",
+  const map: Record<string, RunTarget> = {
+    // JS / TS
+    js:  "javascript", jsx: "javascript", mjs: "javascript", cjs: "javascript",
+    ts:  "typescript", tsx: "typescript",
+    // Python
+    py:  "python",
+    // HTML
+    html:"html",  htm: "html",
+    // Frontend-only previews
+    css: "css",   scss:"css",
+    md:  "markdown", markdown:"markdown",
+    json:"json",
+    svg: "svg",
+    // Shell
+    sh:  "bash",  bash:"bash",
+    // Scripting
+    pl:  "perl",  pm:  "perl",
+    // Compiled
+    c:   "c",
+    cpp: "cpp",   cxx: "cpp",  cc: "cpp",
   };
   return map[ext] ?? null;
 }
 
+/** Returns a human-readable language label for the status bar. */
 function getDisplayLanguage(filename: string): string | undefined {
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-  const extMap: Record<string, string> = {
-    dart: "Dart", kt: "Kotlin", kts: "Kotlin", java: "Java",
-    swift: "Swift", py: "Python", rs: "Rust", go: "Go",
-    cs: "C#", cpp: "C++", c: "C", h: "C/C++",
-    ts: "TypeScript", tsx: "TypeScript", js: "JavaScript", jsx: "JavaScript",
-    html: "HTML", css: "CSS", json: "JSON", xml: "XML", md: "Markdown",
+  const map: Record<string, string> = {
+    dart:"Dart", kt:"Kotlin", kts:"Kotlin", java:"Java", swift:"Swift",
+    py:"Python", rs:"Rust", go:"Go", cs:"C#", cpp:"C++", cxx:"C++", cc:"C++", c:"C",
+    ts:"TypeScript", tsx:"TypeScript", js:"JavaScript", jsx:"JavaScript",
+    html:"HTML", css:"CSS", scss:"SCSS", json:"JSON", xml:"XML",
+    md:"Markdown", markdown:"Markdown", svg:"SVG",
+    sh:"Bash", bash:"Bash", pl:"Perl",
   };
-  return extMap[ext];
+  return map[ext];
+}
+
+/** True when the run button should say "Preview" rather than "Run". */
+function isPreviewOnly(target: RunTarget | null): boolean {
+  return target === "css" || target === "markdown" || target === "json" || target === "svg";
 }
 
 function loadPref<T>(key: string, fallback: T, parse: (v: string) => T): T {
@@ -53,6 +89,17 @@ function loadPref<T>(key: string, fallback: T, parse: (v: string) => T): T {
     return stored !== null ? parse(stored) : fallback;
   } catch { return fallback; }
 }
+
+// ─── Mobile import guard ──────────────────────────────────────────────────────
+const MOBILE_IMPORT_PATTERNS = [
+  /from\s+['"]react-native['"]/,
+  /require\s*\(\s*['"]react-native['"]\s*\)/,
+  /from\s+['"]expo['"]/,
+  /from\s+['"]kivy/,
+  /import\s+kivy/,
+];
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function IDE() {
   const { files, saveFile, createFile, renameFile, deleteFile, loadTemplate, resetToDefaults } = useFileSystem();
@@ -105,24 +152,27 @@ export default function IDE() {
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedHash = useRef<string>("");
 
+  const runTarget       = getRunTarget(activeFile ?? "");
   const currentLanguage = getDisplayLanguage(activeFile ?? Object.keys(files)[0] ?? "");
-  const canRun   = !!activeFile && !!getExecLanguage(activeFile);
-  const canShare = !!currentProjectId;
+  const canRun          = !!runTarget;
+  const canShare        = !!currentProjectId;
+  const previewMode     = isPreviewOnly(runTarget);
 
-  // Auto-open first runnable file
+  // Auto-open first file
   useEffect(() => {
     if (openFiles.length > 0 || Object.keys(files).length === 0) return;
     const allFiles = Object.keys(files);
-    const preferred = allFiles.find(f => /\.(js|jsx|mjs)$/.test(f))
-      ?? allFiles.find(f => /\.(ts|tsx)$/.test(f))
-      ?? allFiles.find(f => /\.py$/.test(f))
-      ?? allFiles.find(f => /\.html?$/.test(f))
-      ?? allFiles[0];
+    const preferred =
+      allFiles.find(f => /\.(js|jsx|mjs)$/.test(f)) ??
+      allFiles.find(f => /\.(ts|tsx)$/.test(f)) ??
+      allFiles.find(f => /\.py$/.test(f)) ??
+      allFiles.find(f => /\.html?$/.test(f)) ??
+      allFiles[0];
     if (preferred) { setOpenFiles([preferred]); setActiveFile(preferred); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files]);
 
-  // Sync runs remaining from SSE
+  // Sync runs-remaining from SSE hook
   useEffect(() => {
     if (runsRemaining !== null) setLocalRunsRemaining(runsRemaining);
   }, [runsRemaining]);
@@ -137,7 +187,7 @@ export default function IDE() {
       .catch(() => {});
   }, []);
 
-  // Keyboard shortcut: "?" → open shortcuts panel
+  // Global "?" shortcut → keyboard shortcuts modal
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -179,7 +229,7 @@ export default function IDE() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files]);
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
+  // ── Event handlers ─────────────────────────────────────────────────────────
 
   const handleSelectFile = (path: string) => {
     if (!openFiles.includes(path)) setOpenFiles((prev) => [...prev, path]);
@@ -195,29 +245,48 @@ export default function IDE() {
     });
   };
 
-  const MOBILE_IMPORT_PATTERNS = [
-    /from\s+['"]react-native['"]/,
-    /require\s*\(\s*['"]react-native['"]\s*\)/,
-    /from\s+['"]expo['"]/,
-    /from\s+['"]kivy/,
-    /import\s+kivy/,
-    /from\s+kivy\b/,
-  ];
-
   const handleRun = useCallback(async () => {
     const file = activeFile;
     if (!file) return;
+
     const content = editorRef.current?.getContent() ?? files[file] ?? "";
     saveFile(file, content);
-    const lang = getExecLanguage(file);
-    if (!lang) { setRightPanelTab("preview"); return; }
-    if (lang === "html") { setHtmlPreview(content); setRightPanelTab("preview"); return; }
 
-    const hasMobileImport = MOBILE_IMPORT_PATTERNS.some(p => p.test(content));
-    if (hasMobileImport) {
+    const target = getRunTarget(file);
+    if (!target) { setRightPanelTab("preview"); return; }
+
+    // ── Frontend-only previews (no backend call) ──────────────────────────
+    if (target === "html") {
+      setHtmlPreview(content);
+      setRightPanelTab("preview");
+      return;
+    }
+    if (target === "css") {
+      setHtmlPreview(generateCSSPreview(content));
+      setRightPanelTab("preview");
+      return;
+    }
+    if (target === "markdown") {
+      setHtmlPreview(generateMarkdownPreview(content));
+      setRightPanelTab("preview");
+      return;
+    }
+    if (target === "json") {
+      setHtmlPreview(generateJSONPreview(content));
+      setRightPanelTab("preview");
+      return;
+    }
+    if (target === "svg") {
+      setHtmlPreview(generateSVGPreview(content));
+      setRightPanelTab("preview");
+      return;
+    }
+
+    // ── Mobile guard ──────────────────────────────────────────────────────
+    if (MOBILE_IMPORT_PATTERNS.some((p) => p.test(content))) {
       setRightPanelTab("console");
       showClientError(
-        "This file imports a mobile framework (react-native, expo, kivy) that\n" +
+        "This file imports a mobile framework (react-native / expo / kivy) that\n" +
         "cannot run in the browser sandbox.\n\n" +
         "→ Use Build APK to compile it, or click New to start a\n" +
         "  JavaScript / Python / HTML project that runs instantly."
@@ -225,8 +294,9 @@ export default function IDE() {
       return;
     }
 
+    // ── Backend execution (JS/TS/Python/Bash/Perl/C/C++) ─────────────────
     setRightPanelTab("console");
-    await runCode(lang, content, file);
+    await runCode(target, content, file);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFile, files, saveFile, runCode, showClientError]);
 
@@ -238,7 +308,9 @@ export default function IDE() {
     } else {
       startBuild(files);
     }
-    const isRN = Object.values(files).some((c) => c.includes("react-native") || c.includes("expo"));
+    const isRN = Object.values(files).some((c) =>
+      c.includes("react-native") || c.includes("expo")
+    );
     setRightPanelTab(isRN ? "preview" : "build");
   };
 
@@ -253,7 +325,9 @@ export default function IDE() {
     if (first) { setOpenFiles([first]); setActiveFile(first); }
   };
 
-  const handleLoadProject = (loadedFiles: Record<string, string>, name: string, id: string) => {
+  const handleLoadProject = (
+    loadedFiles: Record<string, string>, name: string, id: string
+  ) => {
     loadTemplate(loadedFiles);
     setOpenFiles([]); setActiveFile(null); setHtmlPreview(null);
     setCurrentProjectId(id); setCurrentProjectName(name);
@@ -270,6 +344,8 @@ export default function IDE() {
     createVersion(id, "Saved");
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#0d1117]">
       <Toolbar
@@ -282,9 +358,8 @@ export default function IDE() {
         onShare={() => user ? setShowShare(true) : setShowSignIn(true)}
         onReset={() => {
           resetToDefaults();
-          setOpenFiles([]); setActiveFile(null);
-          setHtmlPreview(null); setCurrentProjectId(null);
-          setCurrentProjectName("Untitled Project");
+          setOpenFiles([]); setActiveFile(null); setHtmlPreview(null);
+          setCurrentProjectId(null); setCurrentProjectName("Untitled Project");
           setCursorPos(null);
         }}
         onShowSettings={() => setShowSettings((v) => !v)}
@@ -294,6 +369,7 @@ export default function IDE() {
         currentLanguage={currentLanguage}
         canRun={canRun}
         canShare={canShare}
+        previewMode={previewMode}
         projectName={currentProjectName}
         autosaveStatus={autosaveStatus}
         runsRemaining={localRunsRemaining}
@@ -338,9 +414,10 @@ export default function IDE() {
                 ) : (
                   <WelcomeScreen
                     onNewProject={() => setShowTemplates(true)}
-                    onSelectFile={(f) => handleSelectFile(
-                      Object.keys(files).find(k => k.endsWith(`.${f}`)) ?? Object.keys(files)[0]
-                    )}
+                    onSelectFile={(ext) => {
+                      const match = Object.keys(files).find(k => k.endsWith(`.${ext}`));
+                      if (match) handleSelectFile(match);
+                    }}
                     files={files}
                   />
                 )}
@@ -435,18 +512,16 @@ export default function IDE() {
   );
 }
 
-// ── Welcome screen ────────────────────────────────────────────────────────────
+// ── Welcome screen ─────────────────────────────────────────────────────────────
 const QUICK_START = [
-  { ext: "js",   label: "JavaScript", icon: <Zap  size={20} className="text-yellow-400" />, bg: "bg-yellow-400/8 border-yellow-400/20 hover:border-yellow-400/50" },
-  { ext: "ts",   label: "TypeScript", icon: <Code2 size={20} className="text-blue-400" />,  bg: "bg-blue-400/8 border-blue-400/20 hover:border-blue-400/50" },
-  { ext: "py",   label: "Python",     icon: <Terminal size={20} className="text-green-400" />, bg: "bg-green-400/8 border-green-400/20 hover:border-green-400/50" },
-  { ext: "html", label: "HTML",       icon: <Globe size={20} className="text-orange-400" />,  bg: "bg-orange-400/8 border-orange-400/20 hover:border-orange-400/50" },
+  { ext: "js",   label: "JavaScript", icon: <Zap     size={20} className="text-yellow-400" />, bg: "bg-yellow-400/8  border-yellow-400/20  hover:border-yellow-400/50"  },
+  { ext: "ts",   label: "TypeScript", icon: <Code2   size={20} className="text-blue-400"   />, bg: "bg-blue-400/8    border-blue-400/20    hover:border-blue-400/50"    },
+  { ext: "py",   label: "Python",     icon: <Terminal size={20} className="text-green-400" />, bg: "bg-green-400/8   border-green-400/20   hover:border-green-400/50"   },
+  { ext: "html", label: "HTML",       icon: <Globe   size={20} className="text-orange-400" />, bg: "bg-orange-400/8  border-orange-400/20  hover:border-orange-400/50"  },
 ] as const;
 
 function WelcomeScreen({
-  onNewProject,
-  onSelectFile,
-  files,
+  onNewProject, onSelectFile, files,
 }: {
   onNewProject: () => void;
   onSelectFile: (ext: string) => void;
@@ -461,7 +536,6 @@ function WelcomeScreen({
           <h2 className="text-white/80 font-semibold text-base">Open a file to start editing</h2>
           <p className="text-xs text-white/30 mt-1">or pick a quick-start below</p>
         </div>
-
         <div className="grid grid-cols-2 gap-2">
           {QUICK_START.map(({ ext, label, icon, bg }) => {
             const match = fileKeys.find(k => k.endsWith(`.${ext}`));
@@ -478,7 +552,6 @@ function WelcomeScreen({
             );
           })}
         </div>
-
         <button
           onClick={onNewProject}
           className="w-full py-2 rounded border border-white/10 text-xs font-mono text-white/40 hover:border-white/30 hover:text-white/70 transition-colors"

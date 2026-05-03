@@ -13,6 +13,8 @@ interface SnackPreview {
 
 interface PreviewPanelProps {
   logs?:          string | null;
+  buildStatus?:   string | null;
+  buildError?:    string | null;
   isBuilding:     boolean;
   isRunning?:     boolean;
   activeTab:      PanelTab;
@@ -24,8 +26,16 @@ interface PreviewPanelProps {
   runsRemaining?: number | null;
 }
 
+const RUNNABLE_LANGS = [
+  "JavaScript", "TypeScript", "Python", "HTML",
+  "CSS", "Markdown", "JSON", "SVG",
+  "Bash", "Shell", "Perl", "C", "C++",
+];
+
 export function PreviewPanel({
   logs,
+  buildStatus,
+  buildError,
   isBuilding,
   isRunning,
   activeTab,
@@ -37,35 +47,35 @@ export function PreviewPanel({
   runsRemaining,
 }: PreviewPanelProps) {
   const tabs: { id: PanelTab; label: string }[] = [
-    { id: "preview", label: "Preview" },
-    { id: "console", label: "Console" },
+    { id: "preview", label: "Preview"   },
+    { id: "console", label: "Console"   },
     { id: "build",   label: "Build Log" },
   ];
 
   const defaultStream: StreamState = { chunks: [], result: null };
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="h-full flex flex-col bg-[#0d1117]">
       {/* Tab bar */}
-      <div className="h-9 flex border-b border-border bg-card shrink-0">
+      <div className="h-9 flex border-b border-white/8 bg-[#161b22] shrink-0">
         {tabs.map(({ id, label }) => (
           <button
             key={id}
             data-testid={`button-tab-${id}`}
             onClick={() => onTabChange(id)}
             className={[
-              "px-4 text-xs font-mono uppercase tracking-wider relative",
+              "px-4 text-[10px] font-mono uppercase tracking-widest relative transition-colors",
               activeTab === id
-                ? "text-primary border-b-2 border-primary"
-                : "text-muted-foreground hover:text-foreground",
+                ? "text-[#4ade80] border-b-2 border-[#4ade80]"
+                : "text-white/40 hover:text-white/70",
             ].join(" ")}
           >
             {label}
             {id === "build" && isBuilding && (
-              <span className="ml-2 inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
+              <span className="ml-1.5 inline-block w-1.5 h-1.5 bg-primary rounded-full animate-pulse align-middle" />
             )}
             {id === "console" && isRunning && (
-              <span className="ml-2 inline-block w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+              <span className="ml-1.5 inline-block w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse align-middle" />
             )}
           </button>
         ))}
@@ -87,7 +97,13 @@ export function PreviewPanel({
             runsRemaining={runsRemaining}
           />
         )}
-        {activeTab === "build" && <BuildLog logs={logs} />}
+        {activeTab === "build" && (
+          <BuildLog
+            logs={logs}
+            status={buildStatus}
+            error={buildError}
+          />
+        )}
       </div>
     </div>
   );
@@ -108,7 +124,7 @@ function PreviewContent({
         className="w-full h-full border-0 bg-white"
         sandbox="allow-scripts"
         srcDoc={htmlPreview}
-        title="HTML Preview"
+        title="Live Preview"
       />
     );
   }
@@ -116,9 +132,9 @@ function PreviewContent({
   if (snackPreview) {
     return (
       <div className="h-full flex flex-col">
-        <div className="shrink-0 flex items-center gap-3 px-3 py-2 border-b border-border bg-card text-xs font-mono">
+        <div className="shrink-0 flex items-center gap-3 px-3 py-2 border-b border-white/8 bg-[#161b22] text-xs font-mono">
           <span className="text-primary font-semibold">Expo Snack</span>
-          <span className="text-muted-foreground flex-1 truncate">{snackPreview.snackUrl}</span>
+          <span className="text-white/40 flex-1 truncate">{snackPreview.snackUrl}</span>
           <a
             href={snackPreview.snackUrl}
             target="_blank"
@@ -136,41 +152,60 @@ function PreviewContent({
             title="Expo Snack Preview"
           />
         </div>
-        <div className="shrink-0 flex items-center gap-3 px-3 py-2 border-t border-border bg-card">
-          <QrCode size={13} className="text-muted-foreground" />
-          <span className="text-xs font-mono text-muted-foreground">Scan to open on device</span>
+        <div className="shrink-0 flex items-center gap-3 px-3 py-2 border-t border-white/8 bg-[#161b22]">
+          <QrCode size={13} className="text-white/40" />
+          <span className="text-xs font-mono text-white/40">Scan to open on device</span>
           <img src={snackPreview.qrUrl} alt="QR Code" className="w-14 h-14 ml-auto rounded" />
         </div>
       </div>
     );
   }
 
+  // Empty state — vary message by project type
   return (
-    <div className="w-full h-full flex items-center justify-center text-muted-foreground font-mono text-sm p-8 text-center">
-      <div className="space-y-3">
+    <div className="w-full h-full flex items-center justify-center text-white/30 font-mono text-xs p-8 text-center">
+      <div className="space-y-3 max-w-xs">
         {projectType === "react-native" ? (
           <>
-            <p>React Native preview not generated yet.</p>
-            <p className="text-primary text-xs">Click <span className="font-bold">Build APK</span> to create an Expo Snack preview.</p>
+            <p className="text-sm text-white/50">React Native preview</p>
+            <p>Click <span className="text-primary font-bold">Build APK</span> to create an Expo Snack preview.</p>
           </>
         ) : projectType === "flutter" ? (
           <>
-            <p>Flutter apps cannot run directly in browser preview.</p>
-            <p className="mt-2 text-primary">Click <span className="font-bold">Build APK</span> to compile.</p>
+            <p className="text-sm text-white/50">Flutter project</p>
+            <p>Flutter cannot run directly in the browser.</p>
+            <p>Click <span className="text-primary font-bold">Build APK</span> to compile.</p>
           </>
         ) : projectType === "android" ? (
           <>
-            <p>Android apps require a native build.</p>
-            <p className="mt-2 text-primary text-xs">Click <span className="font-bold">Build APK</span> to compile.</p>
+            <p className="text-sm text-white/50">Android project</p>
+            <p>Click <span className="text-primary font-bold">Build APK</span> to compile.</p>
           </>
         ) : (
           <>
-            <p className="text-base">Open a file and click <span className="text-primary font-bold">Run ▶</span></p>
-            <p className="text-xs mt-1">
-              JavaScript &amp; TypeScript → Console tab<br />
-              HTML files → renders here as a live preview<br />
-              Python → Console tab
+            <p className="text-base text-white/50">
+              Open a file and click{" "}
+              <span className="text-[#4ade80] font-bold">Run ▶</span>
             </p>
+            <div className="space-y-1 text-left text-white/25">
+              {[
+                ["🟡", "JS / TS",       "→ Console output"],
+                ["🐍", "Python",        "→ Console output"],
+                ["🌐", "HTML",          "→ Live preview here"],
+                ["🎨", "CSS",           "→ Live preview here"],
+                ["📄", "Markdown",      "→ Rendered preview here"],
+                ["📋", "JSON",          "→ Formatted viewer here"],
+                ["🖼",  "SVG",           "→ Rendered preview here"],
+                ["⚡", "Bash / Perl",   "→ Console output"],
+                ["⚙",  "C / C++",       "→ Compile → Console"],
+              ].map(([icon, lang, note]) => (
+                <div key={lang} className="flex items-center gap-2">
+                  <span>{icon}</span>
+                  <span className="text-white/40 w-24">{lang}</span>
+                  <span>{note}</span>
+                </div>
+              ))}
+            </div>
           </>
         )}
       </div>

@@ -63,8 +63,8 @@ const FEATURES = [
   },
   {
     icon: <Code2 size={22} className="text-blue-400" />,
-    title: "4 Languages Ready",
-    desc: "JavaScript, TypeScript, Python, and HTML run natively in a secure sandbox.",
+    title: "10 Languages Ready",
+    desc: "JS, TS, Python, Bash, Perl, C/C++ execute server-side. HTML, CSS, Markdown, JSON and SVG render live in the preview panel.",
   },
   {
     icon: <Smartphone size={22} className="text-green-400" />,
@@ -73,8 +73,8 @@ const FEATURES = [
   },
   {
     icon: <Globe size={22} className="text-purple-400" />,
-    title: "HTML Live Preview",
-    desc: "HTML files render as a live page inside the IDE. See every change immediately.",
+    title: "Live Previews",
+    desc: "HTML renders as a live page. CSS applies to real elements. Markdown renders to styled HTML. JSON gets a syntax-highlighted viewer.",
   },
   {
     icon: <GitBranch size={22} className="text-orange-400" />,
@@ -89,14 +89,18 @@ const FEATURES = [
 ];
 
 const TEMPLATES = [
-  { icon: "⚡", name: "JavaScript", color: "text-yellow-400", bg: "bg-yellow-400/10 border-yellow-400/20" },
-  { icon: "🔷", name: "TypeScript", color: "text-blue-400",   bg: "bg-blue-400/10 border-blue-400/20" },
-  { icon: "🐍", name: "Python",     color: "text-green-400",  bg: "bg-green-400/10 border-green-400/20" },
-  { icon: "🌐", name: "HTML",       color: "text-orange-400", bg: "bg-orange-400/10 border-orange-400/20" },
-  { icon: "🐦", name: "Flutter",    color: "text-cyan-400",   bg: "bg-cyan-400/10 border-cyan-400/20" },
-  { icon: "⚛",  name: "React Native",color: "text-blue-300", bg: "bg-blue-300/10 border-blue-300/20" },
-  { icon: "🤖", name: "Android",    color: "text-green-300",  bg: "bg-green-300/10 border-green-300/20" },
-  { icon: "🍎", name: "iOS Swift",  color: "text-red-400",    bg: "bg-red-400/10 border-red-400/20" },
+  { icon: "⚡", name: "JavaScript",  color: "text-yellow-400", bg: "bg-yellow-400/10 border-yellow-400/20" },
+  { icon: "🔷", name: "TypeScript",  color: "text-blue-400",   bg: "bg-blue-400/10 border-blue-400/20" },
+  { icon: "🐍", name: "Python",      color: "text-green-400",  bg: "bg-green-400/10 border-green-400/20" },
+  { icon: "🌐", name: "HTML",        color: "text-orange-400", bg: "bg-orange-400/10 border-orange-400/20" },
+  { icon: "🎨", name: "CSS",         color: "text-pink-400",   bg: "bg-pink-400/10 border-pink-400/20" },
+  { icon: "📄", name: "Markdown",    color: "text-purple-400", bg: "bg-purple-400/10 border-purple-400/20" },
+  { icon: "🐚", name: "Bash",        color: "text-lime-400",   bg: "bg-lime-400/10 border-lime-400/20" },
+  { icon: "⚙️", name: "C / C++",     color: "text-sky-400",    bg: "bg-sky-400/10 border-sky-400/20" },
+  { icon: "🐦", name: "Flutter",     color: "text-cyan-400",   bg: "bg-cyan-400/10 border-cyan-400/20" },
+  { icon: "⚛",  name: "React Native",color: "text-blue-300",  bg: "bg-blue-300/10 border-blue-300/20" },
+  { icon: "🤖", name: "Android",     color: "text-green-300",  bg: "bg-green-300/10 border-green-300/20" },
+  { icon: "🍎", name: "iOS Swift",   color: "text-red-400",    bg: "bg-red-400/10 border-red-400/20" },
 ];
 
 const STEPS = [
@@ -115,7 +119,7 @@ const PLANS = [
     badge: null,
     features: [
       "50 runs per day",
-      "JavaScript, TypeScript, Python, HTML",
+      "JS, TS, Python, Bash, Perl, C/C++, HTML, CSS, Markdown, SVG",
       "Unlimited file edits",
       "3 saved projects",
       "Public share links",
@@ -200,8 +204,9 @@ export default function LandingPage() {
               </h1>
 
               <p className="text-lg text-white/60 mb-8 max-w-xl mx-auto lg:mx-0">
-                A full cloud IDE that runs JavaScript, TypeScript, Python, and HTML instantly —
-                with a Flutter &amp; Android APK builder built right in. No setup. Open and code.
+                A full cloud IDE that runs JS, TS, Python, Bash, Perl, C/C++ and previews HTML,
+                CSS, Markdown, JSON &amp; SVG — with a Flutter &amp; Android APK builder built in.
+                No setup. Open and code.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">

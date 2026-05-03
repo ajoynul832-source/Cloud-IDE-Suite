@@ -1,10 +1,12 @@
-# Flutter APK Builder — Cloud IDE System
+# CloudIDE — Full-Stack Browser IDE
 
 ## Overview
 
-A mobile-first cloud IDE system with two frontends:
-1. **Expo mobile app** — for submitting Flutter ZIPs via URL and tracking builds
-2. **Web Cloud IDE** — full browser-based code editor supporting 10+ mobile development languages with APK build pipeline, SSE code execution, and PostgreSQL project storage
+A professional browser-based code IDE with:
+- **Real execution** of 6 languages: JavaScript, TypeScript, Python, Bash/Shell, Perl, C, C++
+- **Live in-browser previews** for: HTML, CSS, Markdown, JSON, SVG
+- **Mobile APK build pipeline**: Flutter + Android (requires SDK)
+- **JWT auth**, PostgreSQL projects, BullMQ queues, SSE streaming, share links
 
 ## Architecture
 
@@ -81,42 +83,55 @@ A mobile-first cloud IDE system with two frontends:
 - **HTML live preview** — running an HTML file renders it directly in the Preview iframe
 - **Version history** — up to 10 snapshots per project with restore
 
-### Supported Languages (CodeMirror 6)
+### Supported Languages (CodeMirror 6 editor)
 
-| Language | Extension | Package |
-|----------|-----------|---------|
-| Dart/Flutter | .dart | JS fallback |
-| Kotlin | .kt, .kts | @codemirror/lang-java |
-| Java | .java | @codemirror/lang-java |
-| Swift | .swift | JS fallback |
-| Python | .py | @codemirror/lang-python |
-| C# | .cs | @codemirror/lang-cpp |
-| C/C++ | .c/.cpp/.h | @codemirror/lang-cpp |
-| Rust | .rs | @codemirror/lang-rust |
-| Go | .go | @codemirror/lang-go |
-| JavaScript/JSX | .js/.jsx | @codemirror/lang-javascript |
-| TypeScript/TSX | .ts/.tsx | @codemirror/lang-javascript |
-| HTML | .html | @codemirror/lang-html |
-| CSS/SCSS | .css | @codemirror/lang-css |
-| JSON | .json | @codemirror/lang-json |
-| XML | .xml | @codemirror/lang-xml |
-| Markdown | .md | @codemirror/lang-markdown |
+| Language | Extension | Executable |
+|----------|-----------|------------|
+| JavaScript/JSX | .js/.jsx | ✅ Node.js sandbox |
+| TypeScript/TSX | .ts/.tsx | ✅ tsx sandbox |
+| Python | .py | ✅ python3 sandbox |
+| Bash/Shell | .sh/.bash | ✅ bash execution |
+| Perl | .pl/.pm | ✅ perl execution |
+| C | .c | ✅ gcc compile + run |
+| C++ | .cpp/.cxx/.cc | ✅ g++ compile + run |
+| HTML | .html | ✅ live preview (iframe) |
+| CSS/SCSS | .css | ✅ live preview (sample elements) |
+| Markdown | .md | ✅ rendered HTML preview |
+| JSON | .json | ✅ syntax-highlighted viewer |
+| SVG | .svg | ✅ direct render preview |
+| Dart/Flutter | .dart | ❌ requires Flutter SDK build |
+| Kotlin/Java | .kt/.java | ❌ requires Android build |
+| Go/Rust/Swift | various | ❌ not installed on host |
 
-### Project Templates
+### Preview Generators (client-side, no backend)
+- **CSS** → `generateCSSPreview(css)` in `preview-generators.ts` — wraps in HTML page with 50+ sample elements (buttons, cards, alerts, tables, badges)
+- **Markdown** → `generateMarkdownPreview(md)` — inline JS parser in sandboxed iframe; handles headings, bold/italic, code blocks, tables, links, images, task lists
+- **JSON** → `generateJSONPreview(json)` — syntax highlights keys/strings/numbers/booleans/null; shows parse errors clearly
+- **SVG** → `generateSVGPreview(svg)` — parses and renders SVG via DOMParser in sandboxed iframe
 
-| Template | Language | Framework |
-|----------|----------|-----------|
-| Flutter | Dart | Flutter SDK |
-| React Native (TypeScript) | TypeScript | React Native 0.73 |
-| Android Kotlin | Kotlin | Android SDK |
-| Android Java | Java | Android SDK |
-| iOS Swift | Swift | SwiftUI |
-| Python Kivy | Python | Kivy + buildozer |
-| .NET MAUI | C# | .NET 8 |
-| Ionic / Capacitor | TypeScript | Ionic Angular |
-| Rust Tauri Mobile | Rust | Tauri 2.0 |
-| Go gomobile | Go | golang.org/x/mobile |
-| C++ NDK | C++ | Android NDK |
+### Project Templates (18 total)
+
+**Runnable Instantly:**
+| Template | Language | Key Content |
+|----------|----------|-------------|
+| JavaScript Starter | JS | Async/await, closures, DOM |
+| TypeScript Starter | TS | Types, generics, interfaces |
+| Python Script | Python | Classes, decorators, generators |
+| Python Data | Python | Numpy-style algorithms |
+| HTML Page | HTML | Full responsive page |
+| HTML Canvas | HTML | Animated canvas game |
+| JS Algorithms | JS | Sort, BST, linked list, fib |
+| Bash Script | Bash | Arrays, functions, word freq |
+| C Program | C | Structs, sorting, linked list |
+| C++ Program | C++ | STL, lambdas, templates |
+| Perl Script | Perl | Regex, hashes, text processing |
+| CSS Animations | CSS | Keyframes, transitions, gradients |
+| Markdown Doc | Markdown | All syntax features |
+| SVG Art | SVG | Gradients, filters, geometry |
+| JSON Explorer | JSON | Rich API-style data |
+
+**Build Required (APK pipeline):**
+Flutter, React Native, Android Kotlin/Java, iOS Swift, Python Kivy, .NET MAUI, Ionic, Rust Tauri, Go gomobile, C++ NDK
 
 ## Execution Queue — Phase 2 (Complete)
 

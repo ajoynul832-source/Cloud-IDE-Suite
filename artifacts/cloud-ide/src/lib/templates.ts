@@ -558,6 +558,696 @@ console.log("\\nFibonacci[0..9]:", fibs);
     },
   },
 
+  {
+    id: "bash-script",
+    name: "Bash Script",
+    description: "Shell scripting — variables, arrays, functions, and text processing",
+    icon: "🐚",
+    language: "Bash",
+    runnable: true,
+    files: {
+      "script.sh": `#!/usr/bin/env bash
+# Bash Script — click Run ▶ or press Ctrl+Enter
+set -euo pipefail
+
+echo "=== Bash Scripting Demo ==="
+echo
+
+# Variables & arithmetic
+NAME="CloudIDE"
+VERSION=2
+SUM=$((37 + 5))
+echo "App:  $NAME v$VERSION"
+echo "Sum:  37 + 5 = $SUM"
+echo
+
+# Arrays
+echo "=== Arrays ==="
+FRUITS=("apple" "banana" "cherry" "mango" "kiwi")
+echo "Fruits: \${FRUITS[*]}"
+echo "Count:  \${#FRUITS[@]}"
+echo "Sorted: $(printf '%s\\n' "\${FRUITS[@]}" | sort | tr '\\n' ' ')"
+echo
+
+# String operations
+echo "=== Strings ==="
+TEXT="Hello, World from Bash!"
+echo "Original:   $TEXT"
+echo "Uppercase:  \${TEXT^^}"
+echo "Length:     \${#TEXT}"
+echo "Replace:    \${TEXT/World/CloudIDE}"
+echo
+
+# Functions
+echo "=== Functions ==="
+factorial() {
+    local n=$1
+    if [ "$n" -le 1 ]; then echo 1; return; fi
+    echo $(( n * $(factorial $((n-1))) ))
+}
+for i in 0 1 2 3 4 5 6; do
+    printf "  %d! = %d\\n" "$i" "$(factorial "$i")"
+done
+echo
+
+# Word frequency
+echo "=== Word Frequency ==="
+SENTENCE="the quick brown fox jumps over the lazy dog the fox"
+declare -A FREQ
+for W in $SENTENCE; do FREQ[$W]=$(( \${FREQ[$W]:-0} + 1 )); done
+for W in "\${!FREQ[@]}"; do
+    printf "  %-8s %d\\n" "$W" "\${FREQ[$W]}"
+done | sort -k2 -rn
+echo
+echo "✓ Done!"
+`,
+    },
+  },
+
+  {
+    id: "c-program",
+    name: "C Program",
+    description: "C with structs, pointers, sorting, and dynamic memory — compiled with gcc",
+    icon: "⚙️",
+    language: "C",
+    runnable: true,
+    files: {
+      "main.c": `// C Program — click Run ▶ (compiles with gcc, then executes)
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+// ── Struct + comparator ─────────────────────────────────────────
+typedef struct { char name[32]; int score; } Student;
+
+int cmp_score(const void *a, const void *b) {
+    return ((Student*)b)->score - ((Student*)a)->score;
+}
+
+// ── Sorting ─────────────────────────────────────────────────────
+void bubble_sort(int *a, int n) {
+    for (int i = 0; i < n-1; i++)
+        for (int j = 0; j < n-i-1; j++)
+            if (a[j] > a[j+1]) { int t=a[j]; a[j]=a[j+1]; a[j+1]=t; }
+}
+
+void print_arr(int *a, int n) {
+    printf("[");
+    for (int i=0; i<n; i++) printf(i<n-1?"%d, ":"%d", a[i]);
+    printf("]\\n");
+}
+
+// ── Linked list ─────────────────────────────────────────────────
+typedef struct Node { int val; struct Node *next; } Node;
+
+Node *prepend(Node *head, int val) {
+    Node *n = malloc(sizeof(Node));
+    n->val = val; n->next = head; return n;
+}
+
+void print_list(Node *h) {
+    printf("[");
+    while (h) { printf(h->next?"%d -> ":"%d", h->val); h=h->next; }
+    printf("]\\n");
+}
+
+void free_list(Node *h) {
+    while (h) { Node *t=h; h=h->next; free(t); }
+}
+
+// ── Main ─────────────────────────────────────────────────────────
+int main(void) {
+    printf("=== C Program ===\\n\\n");
+
+    // Sorting
+    int nums[] = {64, 34, 25, 12, 22, 11, 90, 45};
+    int n = (int)(sizeof(nums)/sizeof(nums[0]));
+    printf("Before: "); print_arr(nums, n);
+    bubble_sort(nums, n);
+    printf("After:  "); print_arr(nums, n);
+    printf("\\n");
+
+    // Structs + qsort
+    Student students[] = {{"Alice",92},{"Bob",78},{"Charlie",95},{"Diana",88}};
+    int ns = (int)(sizeof(students)/sizeof(students[0]));
+    qsort(students, ns, sizeof(Student), cmp_score);
+    printf("Leaderboard:\\n");
+    for (int i=0; i<ns; i++)
+        printf("  %d. %-10s %d\\n", i+1, students[i].name, students[i].score);
+    printf("\\n");
+
+    // Linked list
+    Node *list = NULL;
+    for (int i=5; i>=1; i--) list = prepend(list, i*10);
+    printf("List:   "); print_list(list);
+    free_list(list);
+    printf("\\n");
+
+    // Math
+    printf("Square roots:\\n");
+    for (int i=1; i<=6; i++)
+        printf("  sqrt(%2d) = %.4f\\n", i*i, sqrt((double)(i*i)));
+
+    return 0;
+}
+`,
+    },
+  },
+
+  {
+    id: "cpp-program",
+    name: "C++ Program",
+    description: "Modern C++17 — STL containers, lambdas, templates, and algorithms",
+    icon: "🔷",
+    language: "C++",
+    runnable: true,
+    files: {
+      "main.cpp": `// C++ Program — click Run ▶ (compiled with g++ -std=c++17)
+#include <iostream>
+#include <vector>
+#include <map>
+#include <algorithm>
+#include <numeric>
+#include <string>
+#include <sstream>
+
+// ── Template function ───────────────────────────────────────────
+template<typename T>
+void printVec(const std::string& label, const std::vector<T>& v) {
+    std::cout << label << ": [";
+    for (size_t i=0; i<v.size(); i++) {
+        std::cout << v[i];
+        if (i+1 < v.size()) std::cout << ", ";
+    }
+    std::cout << "]\\n";
+}
+
+// ── Stack using vector ───────────────────────────────────────────
+template<typename T>
+class Stack {
+    std::vector<T> data;
+public:
+    void push(T val)     { data.push_back(val); }
+    T    pop()           { T v=data.back(); data.pop_back(); return v; }
+    T    peek() const    { return data.back(); }
+    bool empty() const   { return data.empty(); }
+    size_t size() const  { return data.size(); }
+};
+
+int main() {
+    std::cout << "=== C++17 Demo ===\\n\\n";
+
+    // STL algorithms + lambdas
+    std::vector<int> nums = {9,2,7,4,1,8,3,6,5};
+    printVec("Original", nums);
+    std::sort(nums.begin(), nums.end());
+    printVec("Sorted  ", nums);
+
+    auto evens = nums;
+    evens.erase(std::remove_if(evens.begin(), evens.end(),
+        [](int x){ return x%2!=0; }), evens.end());
+    printVec("Evens   ", evens);
+
+    int sum = std::accumulate(nums.begin(), nums.end(), 0);
+    double avg = (double)sum / nums.size();
+    std::cout << "Sum=" << sum << "  Avg=" << avg << "\\n\\n";
+
+    // std::map — word frequency
+    std::string text = "the quick brown fox jumps over the lazy dog the fox";
+    std::map<std::string,int> freq;
+    std::istringstream ss(text);
+    std::string w;
+    while (ss >> w) freq[w]++;
+
+    std::cout << "Word frequencies:\\n";
+    std::vector<std::pair<std::string,int>> pairs(freq.begin(),freq.end());
+    std::sort(pairs.begin(),pairs.end(),[](auto& a,auto& b){ return a.second>b.second; });
+    for (auto& [word,count] : pairs)
+        std::cout << "  " << word << ": " << count << "\\n";
+    std::cout << "\\n";
+
+    // Template stack
+    Stack<int> stk;
+    for (int v : {10,20,30,40,50}) stk.push(v);
+    std::cout << "Stack (top→bottom): ";
+    while (!stk.empty()) std::cout << stk.pop() << " ";
+    std::cout << "\\n";
+
+    return 0;
+}
+`,
+    },
+  },
+
+  {
+    id: "perl-script",
+    name: "Perl Script",
+    description: "Perl — text processing, regex, hashes, and array manipulation",
+    icon: "🐪",
+    language: "Perl",
+    runnable: true,
+    files: {
+      "script.pl": `#!/usr/bin/perl
+# Perl Script — click Run ▶ or press Ctrl+Enter
+use strict;
+use warnings;
+use List::Util qw(sum min max first reduce);
+use POSIX qw(floor);
+
+print "=== Perl Demo ===\\n\\n";
+
+# Arrays
+my @nums = (9, 2, 7, 4, 1, 8, 3, 6, 5, 10);
+print "Original: [@nums]\\n";
+my @sorted = sort { $a <=> $b } @nums;
+print "Sorted:   [@sorted]\\n";
+my @evens  = grep { $_ % 2 == 0 } @nums;
+print "Evens:    [@evens]\\n";
+my @sq     = map  { $_ ** 2 } @nums[0..4];
+print "Squares:  [@sq]\\n";
+printf "Sum=%d  Min=%d  Max=%d\\n\\n", sum(@nums), min(@nums), max(@nums);
+
+# Hashes
+print "=== Hashes ===\\n";
+my %scores = (Alice => 92, Bob => 78, Charlie => 95, Diana => 88);
+for my $name (sort { $scores{$b} <=> $scores{$a} } keys %scores) {
+    printf "  %-10s %d\\n", $name, $scores{$name};
+}
+print "\\n";
+
+# Regex & text processing
+print "=== Regex ===\\n";
+my $text = "The quick brown Fox jumps over 42 lazy dogs!";
+(my $clean = $text) =~ s/[^a-zA-Z ]//g;
+print "Original: $text\\n";
+print "Cleaned:  $clean\\n";
+my @words = split /\\s+/, $clean;
+printf "Words:    %d\\n", scalar @words;
+my $upper = uc($text);
+print "Upper:    $upper\\n\\n";
+
+# Word frequency
+print "=== Word Frequency ===\\n";
+my $sentence = "the quick brown fox jumps over the lazy dog the fox";
+my %freq;
+$freq{$_}++ for split /\\s+/, $sentence;
+for my $w (sort { $freq{$b} <=> $freq{$a} } keys %freq) {
+    printf "  %-8s %d\\n", $w, $freq{$w};
+}
+print "\\nDone!\\n";
+`,
+    },
+  },
+
+  {
+    id: "css-animations",
+    name: "CSS Animations",
+    description: "Keyframe animations, transitions, gradients — live preview instantly",
+    icon: "🎨",
+    language: "CSS",
+    runnable: true,
+    files: {
+      "styles.css": `/* CSS Animations — click Run ▶ to see the live preview */
+
+/* ── Reset & base ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+  padding: 3rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+  min-height: 100vh;
+}
+
+/* ── Keyframes ─────────────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .65; transform: scale(.93); }
+}
+@keyframes slideIn {
+  from { transform: translateX(-60px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); animation-timing-function: ease-in; }
+  50%       { transform: translateY(-28px); animation-timing-function: ease-out; }
+}
+@keyframes gradientShift {
+  0%   { background-position: 0%   50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
+@keyframes fadeScale {
+  from { opacity: 0; transform: scale(.8); }
+  to   { opacity: 1; transform: scale(1);  }
+}
+
+/* ── Title with animated gradient text ──────────────────────────── */
+h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #4ade80, #60a5fa, #f472b6, #facc15);
+  background-size: 300% 300%;
+  animation: gradientShift 4s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -.02em;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────── */
+.spinner {
+  width: 64px; height: 64px;
+  border: 5px solid rgba(255,255,255,.1);
+  border-top-color: #4ade80;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* ── Pulse button ────────────────────────────────────────────────── */
+.pulse-btn {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  color: #000;
+  border: none;
+  padding: .9rem 2.5rem;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  animation: pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 32px rgba(74,222,128,.35);
+}
+
+/* ── Slide-in card ───────────────────────────────────────────────── */
+.slide-card {
+  background: #161b22;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px;
+  padding: 1.5rem 2rem;
+  width: 280px;
+  animation: slideIn .7s cubic-bezier(.2,.8,.4,1) forwards;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+}
+.slide-card h2 { font-size: 1.1rem; margin-bottom: .5rem; color: #4ade80; }
+.slide-card p  { color: rgba(255,255,255,.55); font-size: .9rem; }
+
+/* ── Bounce ball ──────────────────────────────────────────────────── */
+.bounce-ball {
+  width: 48px; height: 48px;
+  background: radial-gradient(circle at 35% 35%, #f472b6, #ec4899);
+  border-radius: 50%;
+  animation: bounce 1s ease infinite;
+  box-shadow: 0 12px 20px rgba(244,114,182,.4);
+}
+
+/* ── Fade-scale items ─────────────────────────────────────────────── */
+.items { display: flex; gap: 1rem; }
+.item {
+  padding: .6rem 1.2rem;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  font-size: .85rem;
+  animation: fadeScale .4s ease both;
+}
+.item:nth-child(1) { animation-delay: 0s;    }
+.item:nth-child(2) { animation-delay: .15s;  }
+.item:nth-child(3) { animation-delay: .3s;   }
+.item:nth-child(4) { animation-delay: .45s;  }
+`,
+    },
+  },
+
+  {
+    id: "markdown-doc",
+    name: "Markdown Doc",
+    description: "Full Markdown showcase — rendered as HTML in the preview tab",
+    icon: "📄",
+    language: "Markdown",
+    runnable: true,
+    files: {
+      "README.md": `# CloudIDE Markdown Preview
+
+> Write documentation, README files, wikis, and notes.  
+> Click **Run ▶** (or Ctrl+Enter) to see the live rendered preview.
+
+---
+
+## Features
+
+CloudIDE is a **browser-based code editor** with real execution:
+
+| Language    | How it runs         | Preview tab |
+|-------------|---------------------|-------------|
+| JavaScript  | Node.js sandbox     | Console     |
+| TypeScript  | tsx sandbox         | Console     |
+| Python      | Python 3 sandbox    | Console     |
+| Bash / Perl | Shell execution     | Console     |
+| C / C++     | gcc / g++ compile   | Console     |
+| HTML        | Direct render       | ✅ Preview  |
+| CSS         | Sample page         | ✅ Preview  |
+| **Markdown**| **This file!**      | **✅ Preview** |
+| JSON        | Syntax viewer       | ✅ Preview  |
+| SVG         | Direct render       | ✅ Preview  |
+
+---
+
+## Text Formatting
+
+- **Bold** with \`**text**\`
+- *Italic* with \`*text*\`
+- ***Bold italic*** with \`***text***\`
+- ~~Strikethrough~~ with \`~~text~~\`
+- \`inline code\` with backticks
+- [Hyperlinks](https://cloudide.replit.app) with \`[text](url)\`
+
+---
+
+## Code Blocks
+
+\`\`\`javascript
+// JavaScript
+const fib = (n, memo = {}) =>
+  n in memo ? memo[n] : n <= 1 ? n : (memo[n] = fib(n-1,memo) + fib(n-2,memo));
+
+console.log(Array.from({length:10}, (_,i) => fib(i)));
+// → [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
+\`\`\`
+
+\`\`\`python
+# Python
+def sieve(n):
+    is_prime = [True] * (n+1)
+    is_prime[0] = is_prime[1] = False
+    for i in range(2, int(n**.5)+1):
+        if is_prime[i]:
+            for j in range(i*i, n+1, i):
+                is_prime[j] = False
+    return [i for i, p in enumerate(is_prime) if p]
+
+print(sieve(50))
+\`\`\`
+
+---
+
+## Lists
+
+### Ordered
+1. Open a file
+2. Press **Run ▶** or \`Ctrl+Enter\`
+3. See output instantly
+4. Share with one click
+
+### Unordered
+- Languages with instant preview
+  - HTML, CSS, Markdown, JSON, SVG
+- Languages with console output
+  - JavaScript, TypeScript, Python
+  - Bash, Perl, C, C++
+
+---
+
+## Blockquote
+
+> "First, solve the problem. Then, write the code."  
+> — John Johnson
+
+---
+
+*Rendered by CloudIDE's built-in Markdown engine.*
+`,
+    },
+  },
+
+  {
+    id: "svg-art",
+    name: "SVG Art",
+    description: "Vector graphics with gradients, filters, and geometry — live preview",
+    icon: "🖼️",
+    language: "SVG",
+    runnable: true,
+    files: {
+      "artwork.svg": `<?xml version="1.0" encoding="UTF-8"?>
+<!-- SVG Art — click Run ▶ to preview instantly -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 500 500" width="500" height="500">
+
+  <defs>
+    <!-- Background gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="45%" r="65%">
+      <stop offset="0%"   stop-color="#1a2332"/>
+      <stop offset="100%" stop-color="#0d1117"/>
+    </radialGradient>
+
+    <!-- Accent gradients -->
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#4ade80"/>
+      <stop offset="100%" stop-color="#22c55e"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#f472b6"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+    <linearGradient id="g4" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#facc15"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Soft shadow -->
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity=".5"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="500" height="500" fill="url(#bgGrad)"/>
+
+  <!-- Outer decorative rings -->
+  <circle cx="250" cy="250" r="200" fill="none" stroke="rgba(255,255,255,.03)" stroke-width="1"/>
+  <circle cx="250" cy="250" r="165" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="1"/>
+  <circle cx="250" cy="250" r="130" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="1"/>
+
+  <!-- Rotated hexagons (petal pattern) -->
+  <g transform="translate(250,250)" opacity=".18">
+    <polygon points="0,-90 78,-45 78,45 0,90 -78,45 -78,-45" fill="url(#g1)" transform="rotate(0)"/>
+    <polygon points="0,-90 78,-45 78,45 0,90 -78,45 -78,-45" fill="url(#g2)" transform="rotate(30)"/>
+    <polygon points="0,-90 78,-45 78,45 0,90 -78,45 -78,-45" fill="url(#g3)" transform="rotate(60)"/>
+    <polygon points="0,-90 78,-45 78,45 0,90 -78,45 -78,-45" fill="url(#g4)" transform="rotate(90)"/>
+  </g>
+
+  <!-- Inner triangle motif -->
+  <g transform="translate(250,250)" opacity=".35">
+    <polygon points="0,-55 47,27 -47,27" fill="url(#g2)" transform="rotate(0)"/>
+    <polygon points="0,-55 47,27 -47,27" fill="url(#g3)" transform="rotate(120)"/>
+    <polygon points="0,-55 47,27 -47,27" fill="url(#g1)" transform="rotate(240)"/>
+  </g>
+
+  <!-- Cardinal accent dots (glowing) -->
+  <circle cx="250" cy="55"  r="9" fill="#4ade80" filter="url(#glow)" opacity=".9"/>
+  <circle cx="445" cy="250" r="9" fill="#60a5fa" filter="url(#glow)" opacity=".9"/>
+  <circle cx="250" cy="445" r="9" fill="#f472b6" filter="url(#glow)" opacity=".9"/>
+  <circle cx="55"  cy="250" r="9" fill="#facc15" filter="url(#glow)" opacity=".9"/>
+
+  <!-- Diagonal accent dots -->
+  <circle cx="393" cy="107" r="6" fill="#4ade80" opacity=".5"/>
+  <circle cx="393" cy="393" r="6" fill="#60a5fa" opacity=".5"/>
+  <circle cx="107" cy="393" r="6" fill="#f472b6" opacity=".5"/>
+  <circle cx="107" cy="107" r="6" fill="#facc15" opacity=".5"/>
+
+  <!-- Center core -->
+  <circle cx="250" cy="250" r="52" fill="url(#g1)" filter="url(#shadow)" opacity=".95"/>
+  <circle cx="250" cy="250" r="36" fill="#0d1117"/>
+  <circle cx="250" cy="250" r="20" fill="url(#g1)" filter="url(#glow)"/>
+  <circle cx="250" cy="250" r="8"  fill="#fff" opacity=".9"/>
+
+  <!-- Label -->
+  <text x="250" y="486" text-anchor="middle"
+        font-family="'Menlo','Monaco',monospace" font-size="12"
+        fill="rgba(255,255,255,.35)" letter-spacing="2">
+    CLOUDIDE · SVG PREVIEW
+  </text>
+</svg>
+`,
+    },
+  },
+
+  {
+    id: "json-explorer",
+    name: "JSON Explorer",
+    description: "JSON data with syntax highlighting and validation — live formatted viewer",
+    icon: "📋",
+    language: "JSON",
+    runnable: true,
+    files: {
+      "data.json": `{
+  "project": {
+    "name": "CloudIDE",
+    "version": "2.0.0",
+    "description": "Browser-based code editor with real execution",
+    "author": "CloudIDE Team",
+    "license": "MIT"
+  },
+  "languages": [
+    { "id": "javascript", "name": "JavaScript", "extension": ".js",  "runs": true,    "preview": "console" },
+    { "id": "typescript", "name": "TypeScript", "extension": ".ts",  "runs": true,    "preview": "console" },
+    { "id": "python",     "name": "Python",     "extension": ".py",  "runs": true,    "preview": "console" },
+    { "id": "html",       "name": "HTML",        "extension": ".html","runs": true,    "preview": "iframe"  },
+    { "id": "css",        "name": "CSS",         "extension": ".css", "runs": true,    "preview": "iframe"  },
+    { "id": "markdown",   "name": "Markdown",    "extension": ".md",  "runs": true,    "preview": "iframe"  },
+    { "id": "json",       "name": "JSON",        "extension": ".json","runs": true,    "preview": "iframe"  },
+    { "id": "svg",        "name": "SVG",         "extension": ".svg", "runs": true,    "preview": "iframe"  },
+    { "id": "bash",       "name": "Bash",        "extension": ".sh",  "runs": true,    "preview": "console" },
+    { "id": "perl",       "name": "Perl",        "extension": ".pl",  "runs": true,    "preview": "console" },
+    { "id": "c",          "name": "C",           "extension": ".c",   "runs": true,    "preview": "console", "compiled": true },
+    { "id": "cpp",        "name": "C++",         "extension": ".cpp", "runs": true,    "preview": "console", "compiled": true },
+    { "id": "flutter",    "name": "Flutter",     "extension": ".dart","runs": false,   "preview": "apk"     },
+    { "id": "android",    "name": "Android",     "extension": ".kt",  "runs": false,   "preview": "apk"     }
+  ],
+  "stats": {
+    "totalRuns":      142897,
+    "activeUsers":    3841,
+    "templatesCount": 16,
+    "sharedProjects": 2741
+  },
+  "config": {
+    "maxRunsPerDay":    50,
+    "execTimeoutSec":   10,
+    "maxOutputKB":      100,
+    "supportedFormats": ["zip", "json"],
+    "features": {
+      "auth":         true,
+      "projects":     true,
+      "sharing":      true,
+      "buildAPK":     false,
+      "collaboration": false
+    }
+  }
+}
+`,
+    },
+  },
+
   // ── Mobile / Build Required ────────────────────────────────────────────────
   {
     id: "flutter",

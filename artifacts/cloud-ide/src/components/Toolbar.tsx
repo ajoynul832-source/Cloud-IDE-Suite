@@ -25,6 +25,7 @@ interface ToolbarProps {
   currentLanguage?:  string;
   canRun?:           boolean;
   canShare?:         boolean;
+  previewMode?:      boolean;
   projectName?:      string;
   autosaveStatus?:   AutosaveStatus;
   runsRemaining?:    number | null;
@@ -46,6 +47,7 @@ export function Toolbar({
   currentLanguage,
   canRun,
   canShare,
+  previewMode,
   projectName,
   autosaveStatus = "idle",
   runsRemaining,
@@ -153,9 +155,11 @@ export function Toolbar({
           title={
             runsRemaining === 0
               ? "Daily run limit reached (50/day). Resets at midnight UTC."
+              : canRun && previewMode
+              ? "Preview in right panel  (Ctrl+Enter)"
               : canRun
               ? "Run current file  (Ctrl+Enter)"
-              : "Open a JS, TS, Python, or HTML file to run"
+              : "Open a runnable file (JS, TS, Python, HTML, CSS, Bash, C…)"
           }
           className={[
             "flex items-center gap-1.5 px-3 h-7 rounded font-mono text-xs font-bold transition-all",
@@ -166,6 +170,8 @@ export function Toolbar({
         >
           {isRunning ? (
             <><Loader2 size={11} className="animate-spin" />Running…</>
+          ) : previewMode ? (
+            <><Play size={11} fill="currentColor" />Preview</>
           ) : (
             <><Play size={11} fill="currentColor" />Run</>
           )}
