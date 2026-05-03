@@ -50,14 +50,15 @@ export function getBuildQueueEvents(): QueueEvents {
 export async function startBuildWorker(): Promise<void> {
   if (_buildWorker) return;
 
-  const { buildJobProcessor }   = await import("../workers/buildJob");
-  const { androidJobProcessor } = await import("../workers/androidJob");
+  const { buildJobProcessor }      = await import("../workers/buildJob");
+  const { androidJobProcessor }    = await import("../workers/androidJob");
+  const { capacitorJobProcessor }  = await import("../workers/capacitorJob");
 
-  // Dispatcher: routes to Flutter or Android processor based on job name
-  async function buildDispatcher(job: Job<BuildJobData | AndroidJobData>): Promise<void> {
-    if (job.name === "android-build") {
-      return androidJobProcessor(job as Job<AndroidJobData>);
-    }
+  // Dispatcher: routes to Flutter, Android, or Capacitor processor based on job name
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function buildDispatcher(job: Job<any>): Promise<void> {
+    if (job.name === "android-build")    return androidJobProcessor(job as Job<AndroidJobData>);
+    if (job.name === "capacitor-build")  return capacitorJobProcessor(job);
     return buildJobProcessor(job as Job<BuildJobData>);
   }
 

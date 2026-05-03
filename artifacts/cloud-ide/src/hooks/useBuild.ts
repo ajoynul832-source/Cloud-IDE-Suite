@@ -7,24 +7,85 @@ import {
   getGetBuildLogsQueryKey,
 } from "@workspace/api-client-react";
 
-/** Detect project type from file map */
-function detectProjectType(files: Record<string, string>): string {
-  const paths = Object.keys(files).map((p) => p.toLowerCase());
+// ─── Project type detection ───────────────────────────────────────────────────
+
+export type ProjectBuildType =
+  | "flutter"
+  | "react-native"
+  | "android"
+  | "capacitor"   // HTML/JS/TS → Android APK via Capacitor
+  | "web";        // Plain web — run in browser, no APK
+
+/** Detect what kind of project this is from the file map */
+export function detectProjectType(files: Record<string, string>): ProjectBuildType {
+  const paths   = Object.keys(files).map((p) => p.toLowerCase());
+  const content = Object.values(files).join("\n");
+
+  // Flutter: has pubspec.yaml
   if (paths.some((p) => p.endsWith("pubspec.yaml"))) return "flutter";
+
+  // Android native: has build.gradle (Kotlin/Java)
+  if (paths.some((p) => p.endsWith("build.gradle") || p.endsWith("gradlew"))) return "android";
+
+  // React Native / Expo: package.json mentions react-native or expo
   if (
     paths.some((p) => p.endsWith("package.json")) &&
-    Object.values(files).some(
-      (c) => c.includes("react-native") || c.includes("expo")
-    )
-  )
-    return "react-native";
-  if (
-    paths.some((p) => p.endsWith("build.gradle") || p.endsWith("gradlew"))
-  )
-    return "android";
-  // Plain JS/TS/Python/HTML — runnable in sandbox, no APK build needed
+    (content.includes("react-native") || content.includes('"expo"') || content.includes("'expo'"))
+  ) return "react-native";
+
+  // Capacitor-compatible: HTML/JS/TS project with an index.html
+  if (paths.some((p) => p.endsWith("index.html"))) return "capacitor";
+
+  // JS/TS-only without HTML: can use Capacitor if user wants, otherwise web
+  if (paths.some((p) => p.endsWith(".html") || p.endsWith(".htm"))) return "capacitor";
+
   return "web";
 }
+
+/** Human-readable label + description per project type */
+export const BUILD_TYPE_META: Record<ProjectBuildType, {
+  label: string;
+  icon: string;
+  apkSupported: boolean;
+  previewSupported: boolean;
+  description: string;
+}> = {
+  flutter: {
+    label: "Flutter",
+    icon: "💙",
+    apkSupported: true,
+    previewSupported: false,
+    description: "Compile to native Android APK with Flutter SDK",
+  },
+  "react-native": {
+    label: "React Native",
+    icon: "⚛️",
+    apkSupported: true,
+    previewSupported: true,
+    description: "Live phone preview via Expo Snack, or build APK with Gradle",
+  },
+  android: {
+    label: "Android",
+    icon: "🤖",
+    apkSupported: true,
+    previewSupported: false,
+    description: "Compile Kotlin/Java Android project to APK with Gradle",
+  },
+  capacitor: {
+    label: "HTML/JS/TS → APK",
+    icon: "🌐",
+    apkSupported: true,
+    previewSupported: true,
+    description: "Wrap your web app in a native Android shell using Capacitor",
+  },
+  web: {
+    label: "Web",
+    icon: "🌍",
+    apkSupported: false,
+    previewSupported: true,
+    description: "Runs in the browser — live preview, no APK needed",
+  },
+};
 
 export interface BuildResult {
   jobId: string;
@@ -39,7 +100,7 @@ export function useBuild() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [projectType, setProjectType] = useState<string>("web");
+  const [projectType, setProjectType] = useState<ProjectBuildType>("web");
   const [previewData, setPreviewData] = useState<{
     embedUrl: string;
     qrUrl: string;
@@ -80,34 +141,36 @@ export function useBuild() {
     }
   }, [buildStatus.data?.status]);
 
-  const startBuild = useCallback(async (files: Record<string, string>) => {
+  const startBuild = useCallback(async (
+    files: Record<string, string>,
+    forcedType?: ProjectBuildType,
+  ) => {
     setIsBuilding(true);
     setError(null);
     setJobId(null);
     setPreviewData(null);
 
-    const type = detectProjectType(files);
+    const type = forcedType ?? detectProjectType(files);
     setProjectType(type);
 
     try {
-      // React Native → JSON body to /build/project (creates Expo Snack)
+      // ── React Native → Expo Snack (fast preview, no queue) ─────────────────
       if (type === "react-native") {
         const res = await fetch(`/api/build/project`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type, files, name: "CloudIDE App" }),
         });
 
-        const data = (await res.json()) as BuildResult;
-        if (!res.ok) {
-          throw new Error((data as unknown as { error: string }).error ?? "Build failed");
-        }
+        const data = (await res.json()) as BuildResult & { error?: string };
+        if (!res.ok) throw new Error(data.error ?? "Build failed");
 
         setJobId(data.jobId);
         if (data.embedUrl && data.qrUrl && data.previewUrl) {
           setPreviewData({
             embedUrl: data.embedUrl,
-            qrUrl: data.qrUrl,
+            qrUrl:    data.qrUrl,
             snackUrl: data.previewUrl,
           });
         }
@@ -115,28 +178,56 @@ export function useBuild() {
         return;
       }
 
-      // Flutter / Android → ZIP upload
+      // ── Capacitor (HTML/JS/TS → APK via JSON) ──────────────────────────────
+      if (type === "capacitor") {
+        const res = await fetch(`/api/build/project`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type, files, name: "CloudIDE App" }),
+        });
+
+        const data = (await res.json()) as BuildResult & { error?: string; code?: string };
+        if (!res.ok) {
+          if (data.code === "CAPACITOR_DISABLED") {
+            throw new Error(
+              "Capacitor SDK not available on this server.\n" +
+              "To enable HTML/JS/TS → APK builds, self-host CloudIDE with Dockerfile.sdk.\n" +
+              "See DEPLOY.md for instructions."
+            );
+          }
+          throw new Error(data.error ?? "Build failed");
+        }
+
+        setJobId(data.jobId);
+        setIsBuilding(true); // stay in building state, polling will update
+        return;
+      }
+
+      // ── Flutter / Android → ZIP upload ────────────────────────────────────
       const zip = new JSZip();
-      Object.entries(files).forEach(([path, content]) => {
-        zip.file(path, content);
+      Object.entries(files).forEach(([filePath, content]) => {
+        zip.file(filePath.replace(/^\//, ""), content);
       });
 
-      const blob = await zip.generateAsync({ type: "blob" });
+      const blob     = await zip.generateAsync({ type: "blob" });
       const formData = new FormData();
       formData.append("project", blob, "project.zip");
 
       const res = await fetch(`/api/build`, {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error((body as { error: string }).error || "Failed to start build");
+        const body = await res.json().catch(() => ({ error: "Unknown error" })) as { error: string };
+        throw new Error(body.error || "Failed to start build");
       }
 
       const data = await res.json() as { jobId: string };
       setJobId(data.jobId);
+
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error occurred";
       setError(msg);

@@ -6,6 +6,7 @@ import { startBuildWorker, shutdownBuildQueue } from "./lib/build-queue";
 import { ensureApkStorage, pruneStaleApks }    from "./lib/apk-storage";
 import { checkFlutter }                        from "./lib/flutter";
 import { checkAndroid }                        from "./lib/android";
+import { checkCapacitor }                      from "./lib/capacitor";
 import { mountAdminBoard }                     from "./lib/bull-board";
 
 const rawPort = process.env["PORT"];
@@ -19,6 +20,7 @@ async function main() {
   await ensureApkStorage();
   await checkFlutter();          // sets FLUTTER_DISABLED env var; never throws
   await checkAndroid();          // sets ANDROID_DISABLED env var; never throws
+  await checkCapacitor();        // sets CAPACITOR_DISABLED env var; never throws
 
   // ── BullMQ workers ──────────────────────────────────────────────────────
   await startWorker();           // code-execution worker (codeRuns queue)

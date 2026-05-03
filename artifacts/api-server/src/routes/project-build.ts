@@ -21,6 +21,7 @@ import { optionalAuth } from "../middlewares/require-auth";
 import { checkAndIncrementBuilds, resolveUsageKey } from "../lib/usage";
 import { isFlutterAvailable } from "../lib/flutter";
 import { isAndroidAvailable } from "../lib/android";
+import { isCapacitorAvailable } from "../lib/capacitor";
 import { getBuildQueue }      from "../lib/build-queue";
 
 const router = Router();
@@ -113,8 +114,8 @@ router.post("/build/project", optionalAuth, buildLimiter, async (req, res) => {
     projectId?: string;
   };
 
-  if (!type || !["flutter", "react-native", "android", "ios"].includes(type)) {
-    res.status(400).json({ error: "type must be one of: flutter, react-native, android, ios" });
+  if (!type || !["flutter", "react-native", "android", "ios", "capacitor", "html", "web"].includes(type)) {
+    res.status(400).json({ error: "type must be one of: flutter, react-native, android, ios, capacitor, html, web" });
     return;
   }
   if (!files || typeof files !== "object" || Object.keys(files).length === 0) {
@@ -255,10 +256,65 @@ router.post("/build/project", optionalAuth, buildLimiter, async (req, res) => {
     return;
   }
 
+  // ── Capacitor / HTML / Web → Android APK ────────────────────────────────
+  if (type === "capacitor" || type === "html" || type === "web") {
+    if (!isCapacitorAvailable()) {
+      res.status(503).json({
+        error: "Capacitor SDK is not installed on this server. HTML/JS/TS → APK builds are unavailable.",
+        code: "CAPACITOR_DISABLED",
+        setupInstructions: [
+          "Install Node.js 20+",
+          "Run: npm install -g @capacitor/cli",
+          "Install Android SDK (ANDROID_HOME) + Java 17",
+          "Restart the server",
+        ],
+      });
+      return;
+    }
+
+    if (req.user?.userId) {
+      const active = await countActiveBuildsForUser(req.user.userId);
+      if (active >= 10) {
+        res.status(429).json({ error: "Too many builds in queue. Wait for some to complete.", code: "QUEUE_FULL" });
+        return;
+      }
+    }
+
+    try {
+      const zipPath = path.join(os.tmpdir(), `cap_build_${buildId}.zip`);
+      await writeZip(files, zipPath);
+
+      await db.insert(buildsTable).values({
+        id: buildId, userId: req.user?.userId ?? null, projectId: projectId ?? null,
+        language: "capacitor", status: "queued",
+        logText: `[${new Date().toISOString()}] Queued Capacitor build (HTML/JS/TS → Android APK)\n`,
+      });
+
+      const queue  = getBuildQueue();
+      const waiting = await queue.getWaitingCount();
+      await queue.add("capacitor-build", {
+        buildId, zipPath, language: "capacitor",
+        userId: req.user?.userId ?? null,
+        appName: name ?? "CloudIDE App",
+        appId:   "com.cloudide." + buildId.replace(/-/g, "").slice(0, 12),
+      });
+
+      res.json({
+        jobId: buildId, status: "queued", queuePosition: waiting,
+        message: `Capacitor build queued. Your HTML/JS/TS app will be wrapped in a native Android APK. Poll /api/status/${buildId} for updates.`,
+      });
+    } catch (err) {
+      logger.error({ err, buildId }, "capacitor build queue failed");
+      res.status(500).json({ error: `Failed to queue build: ${err instanceof Error ? err.message : "Unknown error"}` });
+    }
+    return;
+  }
+
   // ── iOS ──────────────────────────────────────────────────────────────────
   if (type === "ios") {
     res.status(400).json({
       error: "iOS builds require macOS and Xcode and cannot run on this server. Use Expo EAS (expo.dev/eas) for cloud iOS builds.",
+      code: "IOS_REQUIRES_MACOS",
     });
     return;
   }

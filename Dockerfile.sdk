@@ -1,0 +1,192 @@
+# ─── Dockerfile.sdk ───────────────────────────────────────────────────────────
+# CloudIDE API Server — Production image with ALL build SDKs pre-installed:
+#   - Flutter SDK (stable)            → flutter build apk
+#   - Android SDK (API 34)            → Gradle assembleDebug
+#   - Java 17 (OpenJDK)               → required by Gradle
+#   - Node.js 20 + Capacitor CLI      → HTML/JS/TS → Android APK
+#   - Python 3                        → code execution
+#
+# Build time:  ~20-40 min (downloads ~8 GB of SDKs)
+# Image size:  ~12-15 GB
+# APK build time per project:
+#   Flutter:    3-8 min
+#   Android:    3-10 min (Gradle downloads deps on first run)
+#   Capacitor:  2-5 min  (with pre-built template at /opt/capacitor-template)
+#
+# Usage:
+#   docker build -f Dockerfile.sdk -t cloudide-api-sdk .
+#   docker run -p 8080:8080 --env-file .env cloudide-api-sdk
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ─── Stage 1: Node builder ────────────────────────────────────────────────────
+FROM node:20-slim AS builder
+
+WORKDIR /app
+RUN npm install -g pnpm@10
+
+# Copy workspace manifests
+COPY package.json pnpm-workspace.yaml ./
+COPY artifacts/api-server/package.json ./artifacts/api-server/
+COPY lib/db/package.json               ./lib/db/
+COPY lib/api-spec/package.json         ./lib/api-spec/
+COPY lib/api-zod/package.json          ./lib/api-zod/
+COPY lib/api-client-react/package.json ./lib/api-client-react/
+COPY scripts/package.json              ./scripts/
+
+RUN pnpm install --frozen-lockfile
+
+COPY tsconfig.base.json tsconfig.json ./
+COPY lib/ ./lib/
+COPY artifacts/api-server/ ./artifacts/api-server/
+
+RUN pnpm run typecheck:libs || true
+RUN pnpm --filter @workspace/api-server run build
+
+# ─── Stage 2: SDK installer ───────────────────────────────────────────────────
+FROM ubuntu:22.04 AS sdk-installer
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV ANDROID_HOME=/opt/android-sdk
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV FLUTTER_ROOT=/opt/flutter
+ENV PATH="${FLUTTER_ROOT}/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${JAVA_HOME}/bin:${PATH}"
+
+# ── System dependencies ───────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jdk-headless \
+    curl \
+    git \
+    unzip \
+    wget \
+    xz-utils \
+    libglu1-mesa \
+    python3 \
+    python3-pip \
+    ca-certificates \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Node.js 20 ────────────────────────────────────────────────────────────────
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Android SDK command-line tools ───────────────────────────────────────────
+RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
+    wget -q "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
+         -O /tmp/cmdline-tools.zip && \
+    unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools-extracted && \
+    mv /tmp/cmdline-tools-extracted/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest && \
+    rm -rf /tmp/cmdline-tools.zip /tmp/cmdline-tools-extracted
+
+# Accept all SDK licenses
+RUN yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+# Install Android SDK platforms + build tools
+RUN sdkmanager \
+    "platforms;android-34" \
+    "build-tools;34.0.0" \
+    "platform-tools" \
+    "extras;android;m2repository" \
+    "extras;google;m2repository" \
+    > /dev/null 2>&1
+
+# ── Flutter SDK (stable) ──────────────────────────────────────────────────────
+RUN git clone --depth 1 --branch stable \
+    https://github.com/flutter/flutter.git \
+    ${FLUTTER_ROOT}
+
+# Pre-cache Flutter Android artifacts (downloads Dart SDK + pub cache)
+RUN flutter precache --android --no-ios --no-web --no-linux --no-macos --no-windows --no-fuchsia
+
+# Disable analytics and disable version check
+RUN flutter config --no-analytics && \
+    flutter config --no-cli-animations && \
+    flutter --version
+
+# ── Capacitor CLI + pre-built Android template ────────────────────────────────
+RUN npm install -g @capacitor/cli@6 pnpm@10
+
+# Build a Capacitor Android template project at /opt/capacitor-template
+# This pre-seeding avoids running `npm install` + `cap add android` per build
+RUN mkdir -p /opt/capacitor-template && \
+    cd /opt/capacitor-template && \
+    echo '{"name":"cap-template","version":"1.0.0","dependencies":{"@capacitor/android":"^6.0.0","@capacitor/core":"^6.0.0"},"devDependencies":{"@capacitor/cli":"^6.0.0"}}' > package.json && \
+    mkdir -p www && \
+    echo '<html><body>Loading...</body></html>' > www/index.html && \
+    echo '{"appId":"com.cloudide.app","appName":"CloudIDE App","webDir":"www","server":{"androidScheme":"https"}}' > capacitor.config.json && \
+    npm install && \
+    npx cap add android && \
+    cd android && \
+    chmod +x gradlew && \
+    # Warm up Gradle by assembling once (caches all deps in ~/.gradle)
+    ANDROID_HOME=${ANDROID_HOME} ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT} \
+    JAVA_HOME=${JAVA_HOME} \
+    ./gradlew assembleDebug --no-daemon -q || true
+
+# ─── Stage 3: Production image ────────────────────────────────────────────────
+FROM ubuntu:22.04 AS production
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NODE_ENV=production
+ENV PORT=8080
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV ANDROID_HOME=/opt/android-sdk
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV FLUTTER_ROOT=/opt/flutter
+ENV CAPACITOR_TEMPLATE_DIR=/opt/capacitor-template
+ENV PATH="${FLUTTER_ROOT}/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${JAVA_HOME}/bin:/usr/local/bin:${PATH}"
+
+# Runtime system deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless \
+    redis-server \
+    python3 \
+    python3-pip \
+    python3-numpy \
+    python3-matplotlib \
+    curl \
+    git \
+    bash \
+    perl \
+    libglu1-mesa \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js 20
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install global Node packages
+RUN npm install -g pnpm@10 @capacitor/cli@6
+
+# Copy SDKs from sdk-installer stage
+COPY --from=sdk-installer /opt/android-sdk   /opt/android-sdk
+COPY --from=sdk-installer /opt/flutter       /opt/flutter
+COPY --from=sdk-installer /opt/capacitor-template /opt/capacitor-template
+COPY --from=sdk-installer /root/.gradle      /root/.gradle
+
+# Create runtime user
+RUN useradd -m -u 1001 ide && \
+    mkdir -p /tmp/apk_builds /app/logs && \
+    chown -R ide:ide /app /tmp/apk_builds /opt/capacitor-template && \
+    chmod -R 755 /opt/flutter /opt/android-sdk
+
+WORKDIR /app
+
+# Copy built API server
+COPY --from=builder --chown=ide:ide /app/artifacts/api-server/dist      ./dist
+COPY --from=builder --chown=ide:ide /app/artifacts/api-server/package.json ./
+
+RUN npm install -g pnpm@10 && pnpm install --prod --frozen-lockfile
+
+USER ide
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/api/healthz || exit 1
+
+CMD ["node", "--enable-source-maps", "./dist/index.mjs"]
