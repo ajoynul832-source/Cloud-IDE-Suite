@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { StreamState } from "@/hooks/useRun";
-import { Trash2, Clock } from "lucide-react";
+import { Trash2, Clock, Copy, Check, Terminal, ChevronDown, ChevronRight } from "lucide-react";
 
 interface ConsoleOutputProps {
-  stream:         StreamState;
-  isRunning:      boolean;
-  runsRemaining?: number | null;
+  stream:          StreamState;
+  isRunning:       boolean;
+  runsRemaining?:  number | null;
+  stdinInput?:     string;
+  onStdinChange?:  (v: string) => void;
 }
 
 function fmtTime(ts: number): string {
@@ -17,12 +19,14 @@ function fmtTime(ts: number): string {
   ].join(":");
 }
 
-export function ConsoleOutput({ stream, isRunning, runsRemaining }: ConsoleOutputProps) {
+export function ConsoleOutput({ stream, isRunning, runsRemaining, stdinInput, onStdinChange }: ConsoleOutputProps) {
   const bottomRef    = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [cleared,        setCleared]        = useState(false);
   const [clearedAt,      setClearedAt]      = useState(0);
   const [showTimestamps, setShowTimestamps] = useState(false);
+  const [copied,         setCopied]         = useState(false);
+  const [stdinOpen,      setStdinOpen]      = useState(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -42,35 +46,71 @@ export function ConsoleOutput({ stream, isRunning, runsRemaining }: ConsoleOutpu
   const succeeded     = result ? result.exitCode === 0 : null;
   const runsLow       = runsRemaining !== null && runsRemaining !== undefined && runsRemaining < 5;
 
+  const stdinPanel = onStdinChange ? (
+    <div className="shrink-0 border-b border-white/8">
+      <button
+        onClick={() => setStdinOpen((v) => !v)}
+        className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-white/40 hover:text-white/70 transition-colors"
+      >
+        {stdinOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+        <Terminal size={10} />
+        <span className="uppercase tracking-widest">Stdin</span>
+        {stdinInput && stdinInput.length > 0 && (
+          <span className="ml-1 text-[#4ade80]/60">
+            ({stdinInput.split("\n").filter(Boolean).length} line{stdinInput.split("\n").filter(Boolean).length !== 1 ? "s" : ""})
+          </span>
+        )}
+      </button>
+      {stdinOpen && (
+        <textarea
+          value={stdinInput ?? ""}
+          onChange={(e) => onStdinChange(e.target.value)}
+          placeholder={"Type program input here…\nEach line = one Enter press"}
+          spellCheck={false}
+          rows={4}
+          className="w-full bg-[#0a0d12] border-t border-white/5 text-white/75 font-mono text-[11px] px-3 py-2 resize-none outline-none placeholder:text-white/20 leading-relaxed"
+        />
+      )}
+    </div>
+  ) : null;
+
   if (!hasContent && !isRunning) {
     return (
-      <div className="h-full bg-[#0d1117] font-mono text-xs p-4 text-white/40 flex flex-col gap-2">
-        <p>
-          Press{" "}
-          <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[#4ade80] font-semibold text-[10px]">
-            Run ▶
-          </kbd>{" "}
-          or{" "}
-          <kbd className="px-1 py-0.5 rounded bg-white/10 text-white/60 font-semibold text-[10px]">
-            Ctrl+Enter
-          </kbd>{" "}
-          to execute the current file.
-        </p>
-        <p className="text-[10px] opacity-60">Execute: JS · TS · Python · Bash · Perl · C · C++</p>
-        <p className="text-[10px] opacity-40">Preview: HTML · CSS · Markdown · JSON · SVG</p>
-        {runsRemaining !== null && runsRemaining !== undefined && (
-          <p className={["text-[10px] mt-1", runsLow ? "text-orange-400" : "text-white/30"].join(" ")}>
-            {runsRemaining === 0
-              ? "No runs left today — resets at midnight UTC"
-              : `${runsRemaining} runs remaining today`}
+      <div className="h-full flex flex-col bg-[#0d1117] font-mono text-xs">
+        {stdinPanel}
+        <div className="flex-1 p-4 text-white/40 flex flex-col gap-2">
+          <p>
+            Press{" "}
+            <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[#4ade80] font-semibold text-[10px]">
+              Run ▶
+            </kbd>{" "}
+            or{" "}
+            <kbd className="px-1 py-0.5 rounded bg-white/10 text-white/60 font-semibold text-[10px]">
+              Ctrl+Enter
+            </kbd>{" "}
+            to execute the current file.
           </p>
-        )}
+          <p className="text-[10px] opacity-60">Execute: JS · TS · Python · Bash · Perl · C · C++</p>
+          <p className="text-[10px] opacity-40">Preview: HTML · CSS · Markdown · JSON · SVG</p>
+          <p className="text-[10px] opacity-40 mt-1">
+            ↑ Expand <span className="text-white/50">Stdin</span> above to provide program input (e.g. Python <code className="text-white/50">input()</code>)
+          </p>
+          {runsRemaining !== null && runsRemaining !== undefined && (
+            <p className={["text-[10px] mt-1", runsLow ? "text-orange-400" : "text-white/30"].join(" ")}>
+              {runsRemaining === 0
+                ? "No runs left today — resets at midnight UTC"
+                : `${runsRemaining} runs remaining today`}
+            </p>
+          )}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="h-full flex flex-col bg-[#0d1117] font-mono text-xs">
+      {stdinPanel}
+
       {/* Status bar */}
       <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-white/8">
         <div className={[
@@ -120,6 +160,23 @@ export function ConsoleOutput({ stream, isRunning, runsRemaining }: ConsoleOutpu
         >
           <Clock size={11} />
         </button>
+
+        {/* Copy output */}
+        {hasContent && !isRunning && (
+          <button
+            onClick={() => {
+              const text = visibleChunks.map((c) => c.text).join("");
+              navigator.clipboard.writeText(text).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }).catch(() => {});
+            }}
+            title="Copy all output"
+            className={["transition-colors", copied ? "text-[#4ade80]" : "text-white/25 hover:text-white/70"].join(" ")}
+          >
+            {copied ? <Check size={11} /> : <Copy size={11} />}
+          </button>
+        )}
 
         {/* Clear button */}
         {hasContent && !isRunning && (

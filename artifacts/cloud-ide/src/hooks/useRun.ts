@@ -34,6 +34,7 @@ export function useRun() {
     language: string,
     code:     string,
     filename?: string,
+    stdin?:    string,
   ) => {
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -47,7 +48,7 @@ export function useRun() {
         method:      "POST",
         headers:     { "Content-Type": "application/json" },
         credentials: "include",
-        body:        JSON.stringify({ language, code, filename }),
+        body:        JSON.stringify({ language, code, filename, stdin: stdin || undefined }),
         signal:      controller.signal,
       });
 

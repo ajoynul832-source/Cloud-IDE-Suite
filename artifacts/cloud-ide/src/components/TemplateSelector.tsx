@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Zap, Smartphone } from "lucide-react";
+import { X, Zap, Smartphone, Star } from "lucide-react";
 import { PROJECT_TEMPLATES, ProjectTemplate } from "@/lib/templates";
 
 interface TemplateSelectorProps {
@@ -7,13 +7,28 @@ interface TemplateSelectorProps {
   onClose:  () => void;
 }
 
+const QUICK_START_IDS = [
+  "js-algorithms",
+  "ts-starter",
+  "python-data",
+  "python-starter",
+  "html-page",
+  "html-canvas",
+];
+
 export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
   const [hovered, setHovered] = useState<string | null>(null);
 
-  const runnable = PROJECT_TEMPLATES.filter((t) => t.runnable);
-  const mobile   = PROJECT_TEMPLATES.filter((t) => !t.runnable);
+  const quickStart = QUICK_START_IDS
+    .map(id => PROJECT_TEMPLATES.find(t => t.id === id))
+    .filter((t): t is ProjectTemplate => !!t);
 
-  const renderCard = (template: ProjectTemplate) => (
+  const moreRunnable = PROJECT_TEMPLATES.filter(
+    (t) => t.runnable && !QUICK_START_IDS.includes(t.id)
+  );
+  const mobile = PROJECT_TEMPLATES.filter((t) => !t.runnable);
+
+  const renderCard = (template: ProjectTemplate, compact = false) => (
     <button
       key={template.id}
       data-testid={`template-${template.id}`}
@@ -21,17 +36,20 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
       onMouseLeave={() => setHovered(null)}
       onClick={() => onSelect(template)}
       className={[
-        "text-left p-4 rounded-lg border transition-all duration-150 cursor-pointer",
+        "text-left rounded-lg border transition-all duration-150 cursor-pointer",
+        compact ? "p-3" : "p-4",
         hovered === template.id
           ? "border-primary bg-primary/10"
           : "border-border bg-background hover:border-primary/50",
       ].join(" ")}
     >
       <div className="flex items-start gap-3">
-        <span className="text-2xl leading-none mt-0.5">{template.icon}</span>
+        <span className={["leading-none mt-0.5", compact ? "text-xl" : "text-2xl"].join(" ")}>
+          {template.icon}
+        </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="font-mono font-bold text-foreground text-sm">
+            <span className={["font-mono font-bold text-foreground", compact ? "text-xs" : "text-sm"].join(" ")}>
               {template.name}
             </span>
             <span className={[
@@ -43,9 +61,16 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
               {template.language}
             </span>
           </div>
-          <p className="text-muted-foreground text-xs leading-relaxed">
-            {template.description}
-          </p>
+          {!compact && (
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              {template.description}
+            </p>
+          )}
+          {compact && (
+            <p className="text-muted-foreground text-[10px] leading-tight truncate">
+              {template.description}
+            </p>
+          )}
         </div>
       </div>
     </button>
@@ -56,7 +81,7 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
       <div className="relative w-full max-w-3xl max-h-[88vh] flex flex-col bg-card border border-border rounded-lg shadow-2xl overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <div>
             <h2 className="text-foreground font-mono font-bold text-sm tracking-widest uppercase">
               New Project
@@ -76,24 +101,43 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
 
         {/* Scrollable body */}
         <div className="overflow-y-auto">
-          {/* Section 1: Run Instantly */}
+
+          {/* Section 1: Quick Start (featured 6) */}
           <div className="px-6 pt-5 pb-2">
             <div className="flex items-center gap-2 mb-3">
-              <Zap size={13} className="text-[#4ade80]" />
+              <Star size={13} className="text-[#4ade80]" />
               <h3 className="font-mono text-xs font-semibold uppercase tracking-widest text-[#4ade80]/80">
-                Run Instantly
+                Quick Start
               </h3>
               <span className="text-[10px] font-mono text-muted-foreground/50">
-                — executes in the sandbox, no build step
+                — run instantly, results in seconds
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {runnable.map(renderCard)}
+              {quickStart.map(t => renderCard(t))}
             </div>
           </div>
 
-          {/* Section 2: Mobile / Build Required */}
-          <div className="px-6 pt-5 pb-5">
+          {/* Section 2: More Runnable */}
+          {moreRunnable.length > 0 && (
+            <div className="px-6 pt-4 pb-2">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap size={13} className="text-[#4ade80]/60" />
+                <h3 className="font-mono text-xs font-semibold uppercase tracking-widest text-[#4ade80]/50">
+                  More Languages
+                </h3>
+                <span className="text-[10px] font-mono text-muted-foreground/40">
+                  — also run in the sandbox
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {moreRunnable.map(t => renderCard(t, true))}
+              </div>
+            </div>
+          )}
+
+          {/* Section 3: Mobile / Build Required */}
+          <div className="px-6 pt-4 pb-5">
             <div className="flex items-center gap-2 mb-3">
               <Smartphone size={13} className="text-amber-400/80" />
               <h3 className="font-mono text-xs font-semibold uppercase tracking-widest text-amber-400/80">
@@ -104,7 +148,7 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {mobile.map(renderCard)}
+              {mobile.map(t => renderCard(t))}
             </div>
           </div>
         </div>

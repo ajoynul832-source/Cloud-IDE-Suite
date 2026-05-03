@@ -71,17 +71,23 @@ A professional browser-based code IDE with:
 
 ## Cloud IDE Features (`artifacts/cloud-ide`)
 
-- **CodeMirror 6 editor** with syntax highlighting for 15+ languages
+- **CodeMirror 6 editor** with syntax highlighting for 20+ languages, 4 themes
 - **Multi-tab editor** with localStorage-based file persistence
-- **File tree** with folder grouping, language icons, inline rename, create/delete
-- **Project templates** for 10 mobile stacks (see below)
+- **File tree** with folder grouping, language icons, inline rename, create/delete, expand/collapse
+- **30+ project templates** — Quick Start, More Languages, Mobile/Build Required sections
 - **SSE streaming execution** — real-time line-by-line output via `POST /api/run/stream`
+- **Stdin support** — collapsible Stdin panel in Console tab; programs using `input()` / `scanf()` / `cin >>` work with provided input
 - **Project save/load** — PostgreSQL-backed, scoped per authenticated user
 - **APK Build pipeline**: zips files in-browser → uploads to `/api/build` → polls status → streams logs
 - **Resizable panels**: file tree, editor, preview/log panel
-- **Language badge** in toolbar shows detected language of active file
-- **HTML live preview** — running an HTML file renders it directly in the Preview iframe
+- **Language badge + cursor position** in StatusBar (line/column)
+- **Live auto-preview** — HTML/CSS/Markdown/JSON/SVG auto-refresh on every keystroke (500ms debounce); pulsing green "Live" badge on Preview tab
 - **Version history** — up to 10 snapshots per project with restore
+- **Settings panel** — gear icon or Ctrl+, → theme, font size (10–24px), word wrap
+- **Keyboard shortcuts** — ? → modal with full list; Ctrl+Enter=run, Ctrl+Shift+F=format, Ctrl+,=settings
+- **Prettier formatting** — Ctrl+Shift+F, supports JS/TS/JSON/HTML/CSS/Markdown
+- **Explore gallery** — search + language filter chips, fork/view counts
+- **SharedProject page** — read-only view, fork CTA, stats
 
 ### Supported Languages (CodeMirror 6 editor)
 
@@ -109,29 +115,27 @@ A professional browser-based code IDE with:
 - **JSON** → `generateJSONPreview(json)` — syntax highlights keys/strings/numbers/booleans/null; shows parse errors clearly
 - **SVG** → `generateSVGPreview(svg)` — parses and renders SVG via DOMParser in sandboxed iframe
 
-### Project Templates (18 total)
+### Project Templates (30+ total)
 
-**Runnable Instantly:**
-| Template | Language | Key Content |
-|----------|----------|-------------|
-| JavaScript Starter | JS | Async/await, closures, DOM |
-| TypeScript Starter | TS | Types, generics, interfaces |
-| Python Script | Python | Classes, decorators, generators |
-| Python Data | Python | Numpy-style algorithms |
-| HTML Page | HTML | Full responsive page |
-| HTML Canvas | HTML | Animated canvas game |
-| JS Algorithms | JS | Sort, BST, linked list, fib |
-| Bash Script | Bash | Arrays, functions, word freq |
-| C Program | C | Structs, sorting, linked list |
-| C++ Program | C++ | STL, lambdas, templates |
-| Perl Script | Perl | Regex, hashes, text processing |
-| CSS Animations | CSS | Keyframes, transitions, gradients |
-| Markdown Doc | Markdown | All syntax features |
-| SVG Art | SVG | Gradients, filters, geometry |
-| JSON Explorer | JSON | Rich API-style data |
+**Quick Start (featured in TemplateSelector, run instantly):**
+JS Algorithms, TypeScript, Python Data, Python Script, HTML Page, HTML Canvas
+
+**More Runnable (in sandbox):**
+Python Input (stdin demo), Bash Script, C Program, C++ Program, Perl Script,
+CSS Animations, Markdown Doc, SVG Art, JSON Explorer, API Mock, Regex Playground, Data Structures
 
 **Build Required (APK pipeline):**
 Flutter, React Native, Android Kotlin/Java, iOS Swift, Python Kivy, .NET MAUI, Ionic, Rust Tauri, Go gomobile, C++ NDK
+
+### Stdin Support (NEW)
+Programs that read from stdin (`input()`, `scanf()`, `cin >>`, `<STDIN>`, `read`) now work:
+1. Click the Console tab
+2. Expand the **Stdin** panel (always visible, collapsible)
+3. Type input lines (one per Enter)
+4. Press Run — input is piped to the process stdin
+
+Backend pipeline: `ExecOpts.stdin` → `spawnStream(stdin)` → `proc.stdin.write(stdin); proc.stdin.end()`.
+All handlers pass stdin through; `stdin.end()` is always called to prevent blocking.
 
 ## Execution Queue — Phase 2 (Complete)
 

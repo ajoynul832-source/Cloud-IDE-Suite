@@ -332,6 +332,9 @@ importers:
       '@codemirror/language':
         specifier: ^6.12.3
         version: 6.12.3
+      '@codemirror/lint':
+        specifier: ^6.9.5
+        version: 6.9.5
       '@codemirror/search':
         specifier: ^6.7.0
         version: 6.7.0
@@ -341,12 +344,24 @@ importers:
       '@codemirror/view':
         specifier: ^6.41.1
         version: 6.41.1
+      '@uiw/codemirror-theme-dracula':
+        specifier: ^4.25.9
+        version: 4.25.9(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.41.1)
+      '@uiw/codemirror-theme-github':
+        specifier: ^4.25.9
+        version: 4.25.9(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.41.1)
+      '@uiw/codemirror-theme-monokai':
+        specifier: ^4.25.9
+        version: 4.25.9(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.41.1)
       '@uiw/codemirror-theme-vscode':
         specifier: ^4.25.9
         version: 4.25.9(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.41.1)
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
+      prettier:
+        specifier: ^3.8.1
+        version: 3.8.1
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -2005,6 +2020,15 @@ packages:
 
   '@types/unzipper@0.10.11':
     resolution: {integrity: sha512-D25im2zjyMCcgL9ag6N46+wbtJBnXIr7SI4zHf9eJD2Dw2tEB5e+p5MYkrxKIVRscs5QV0EhtU9rgXSPx90oJg==}
+
+  '@uiw/codemirror-theme-dracula@4.25.9':
+    resolution: {integrity: sha512-0VTnpPCHPc+7LqYsQOX6nvW32XiiT+O6kJjReUbV7Eio3vPHsb+b9P4DKhz4AAvIIYMxmHkMuautHKuWktFXSg==}
+
+  '@uiw/codemirror-theme-github@4.25.9':
+    resolution: {integrity: sha512-AGpTamNiySKNzq3Jc7QjpwgQRVaHUaBtmOKiUDghYSfEGjsc5uW4NUW70sSU3BnkGv+lCTUnF3175KM24BWZbw==}
+
+  '@uiw/codemirror-theme-monokai@4.25.9':
+    resolution: {integrity: sha512-qKWRZOGpBCasZJdYU+SsXd92TjncF3QYHpraCPe29bxN22jeIxi2UC4MCuJHwa8hHljHOCSdx1XG/GuUMn7XiQ==}
 
   '@uiw/codemirror-theme-vscode@4.25.9':
     resolution: {integrity: sha512-9KTnScHTSk97yGnyNYvDm6QZuBCdbO1OzMQ5bHtoBSPSVtH0LjY3bS6CXsBagb22v8OLPx/XwrBYOjKFp409CQ==}
@@ -5312,6 +5336,30 @@ snapshots:
   '@types/unzipper@0.10.11':
     dependencies:
       '@types/node': 25.3.5
+
+  '@uiw/codemirror-theme-dracula@4.25.9(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.41.1)':
+    dependencies:
+      '@uiw/codemirror-themes': 4.25.9(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.41.1)
+    transitivePeerDependencies:
+      - '@codemirror/language'
+      - '@codemirror/state'
+      - '@codemirror/view'
+
+  '@uiw/codemirror-theme-github@4.25.9(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.41.1)':
+    dependencies:
+      '@uiw/codemirror-themes': 4.25.9(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.41.1)
+    transitivePeerDependencies:
+      - '@codemirror/language'
+      - '@codemirror/state'
+      - '@codemirror/view'
+
+  '@uiw/codemirror-theme-monokai@4.25.9(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.41.1)':
+    dependencies:
+      '@uiw/codemirror-themes': 4.25.9(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.41.1)
+    transitivePeerDependencies:
+      - '@codemirror/language'
+      - '@codemirror/state'
+      - '@codemirror/view'
 
   '@uiw/codemirror-theme-vscode@4.25.9(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.41.1)':
     dependencies:

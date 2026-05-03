@@ -1,7 +1,7 @@
 import {
   Play, Box, Download, Loader2, FolderOpen, ChevronDown,
   Database, Share2, Compass, CheckCircle2, LogOut, User, RotateCcw,
-  Settings, HelpCircle,
+  Settings, HelpCircle, Archive, Wand2,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "./ui/button";
@@ -30,6 +30,8 @@ interface ToolbarProps {
   autosaveStatus?:   AutosaveStatus;
   runsRemaining?:    number | null;
   showBuildButton?:  boolean;
+  onDownload?:       () => void;
+  onFormat?:         () => void;
 }
 
 export function Toolbar({
@@ -53,6 +55,8 @@ export function Toolbar({
   autosaveStatus = "idle",
   runsRemaining,
   showBuildButton = false,
+  onDownload,
+  onFormat,
 }: ToolbarProps) {
   const { user, logout } = useAuth();
   const runDisabled = isRunning || !canRun || runsRemaining === 0;
@@ -215,6 +219,29 @@ export function Toolbar({
 
         {buildStatus === "failed" && (
           <span className="text-xs font-mono text-red-400">Build failed</span>
+        )}
+
+        {/* Format code */}
+        {onFormat && (
+          <button
+            onClick={onFormat}
+            title="Format code with Prettier  (Ctrl+Shift+F)"
+            className="flex items-center gap-1 px-2 h-7 rounded text-[11px] font-mono text-white/40 hover:text-white hover:bg-white/8 transition-colors"
+          >
+            <Wand2 size={12} />
+            <span className="hidden lg:block">Format</span>
+          </button>
+        )}
+
+        {/* Download ZIP */}
+        {onDownload && (
+          <button
+            onClick={onDownload}
+            title="Download all files as ZIP"
+            className="w-7 h-7 flex items-center justify-center rounded text-white/40 hover:text-white hover:bg-white/8 transition-colors"
+          >
+            <Archive size={13} />
+          </button>
         )}
 
         <div className="w-px h-5 bg-white/10 mx-0.5" />

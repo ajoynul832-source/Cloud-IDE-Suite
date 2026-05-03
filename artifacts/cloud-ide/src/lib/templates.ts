@@ -559,6 +559,34 @@ console.log("\\nFibonacci[0..9]:", fibs);
   },
 
   {
+    id: "python-input",
+    name: "Python Input",
+    description: "Stdin demo — set input in the Console tab then press Run",
+    icon: "⌨️",
+    language: "Python",
+    runnable: true,
+    files: {
+      "main.py": `# Python stdin demo — reads real input from the Stdin panel
+# 1. Click the CONSOLE tab (top-right)
+# 2. Expand "Stdin" and paste these 3 lines:
+#       Alice
+#       30
+#       3 7 42
+# 3. Press Run ▶
+
+name  = input("Name:  ")
+age   = int(input("Age:   "))
+nums  = list(map(int, input("Nums:  ").split()))
+
+print(f"\\nHello, {name}! You are {age} years old.")
+print(f"Next birthday: {age + 1}")
+print(f"Numbers: {nums}")
+print(f"Sum: {sum(nums)}  Max: {max(nums)}  Min: {min(nums)}")
+`,
+    },
+  },
+
+  {
     id: "bash-script",
     name: "Bash Script",
     description: "Shell scripting — variables, arrays, functions, and text processing",

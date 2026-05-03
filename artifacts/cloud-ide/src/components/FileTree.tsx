@@ -1,16 +1,16 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   FileCode, FileJson, FileText, File, FileType, X,
-  Braces, Terminal, Globe, Cpu, ChevronRight, ChevronDown,
+  Braces, Terminal, Globe, Cpu, ChevronRight, ChevronDown, FilePlus,
 } from "lucide-react";
 
 interface FileTreeProps {
-  files:    Record<string, string>;
+  files:      Record<string, string>;
   activeFile: string | null;
-  onSelect: (path: string) => void;
-  onCreate: (path: string) => void;
-  onDelete: (path: string) => void;
-  onRename: (oldPath: string, newPath: string) => void;
+  onSelect:   (path: string) => void;
+  onCreate:   (path: string) => void;
+  onDelete:   (path: string) => void;
+  onRename:   (oldPath: string, newPath: string) => void;
 }
 
 function getIcon(path: string) {
@@ -50,13 +50,17 @@ function getIcon(path: string) {
 }
 
 export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRename }: FileTreeProps) {
-  const [editingPath,       setEditingPath]       = useState<string | null>(null);
-  const [editValue,         setEditValue]         = useState("");
-  const [collapsedFolders,  setCollapsedFolders]  = useState<Set<string>>(new Set());
+  const [editingPath,      setEditingPath]      = useState<string | null>(null);
+  const [editValue,        setEditValue]        = useState("");
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  const [creatingFile,     setCreatingFile]     = useState(false);
+  const [newFileName,      setNewFileName]      = useState("");
+  const newFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleCreate = () => {
-    const name = prompt("File name (e.g. lib/feature.dart, src/main.rs):");
-    if (name?.trim()) onCreate(name.trim());
+  const commitNewFile = () => {
+    if (newFileName.trim()) onCreate(newFileName.trim());
+    setCreatingFile(false);
+    setNewFileName("");
   };
 
   const toggleFolder = (folder: string) => {
@@ -106,7 +110,7 @@ export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRe
         {editingPath === path ? (
           <input
             autoFocus
-            className="flex-1 bg-input text-white px-1 text-xs border border-primary outline-none min-w-0"
+            className="flex-1 bg-input text-white px-1 text-xs border border-primary outline-none min-w-0 font-mono"
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={() => {
@@ -147,21 +151,41 @@ export function FileTree({ files, activeFile, onSelect, onCreate, onDelete, onRe
         </span>
         <button
           data-testid="button-create-file"
-          onClick={handleCreate}
-          className="text-[11px] font-mono text-muted-foreground hover:text-primary transition-colors"
+          onClick={() => { setCreatingFile(true); setNewFileName(""); setTimeout(() => newFileInputRef.current?.focus(), 10); }}
+          className="text-white/30 hover:text-[#4ade80] transition-colors"
           title="New file"
         >
-          + File
+          <FilePlus size={13} />
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto py-1">
+        {/* Inline new-file input */}
+        {creatingFile && (
+          <div className="flex items-center gap-1 pl-4 pr-2 py-[3px] bg-[#4ade80]/5 border-b border-[#4ade80]/10">
+            <File size={13} className="text-white/30 shrink-0 mr-0.5" />
+            <input
+              ref={newFileInputRef}
+              autoFocus
+              placeholder="filename.ext"
+              className="flex-1 bg-transparent text-white text-[11px] font-mono outline-none border-b border-[#4ade80]/60 pb-0.5 min-w-0 placeholder:text-white/25"
+              value={newFileName}
+              onChange={(e) => setNewFileName(e.target.value)}
+              onBlur={commitNewFile}
+              onKeyDown={(e) => {
+                if (e.key === "Enter")  commitNewFile();
+                if (e.key === "Escape") { setCreatingFile(false); setNewFileName(""); }
+              }}
+            />
+          </div>
+        )}
+
         {/* Folders */}
         {Object.entries(folderMap)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([folder, filePaths]) => {
-            const isCollapsed  = collapsedFolders.has(folder);
-            const folderName   = folder.split("/").pop() || folder;
+            const isCollapsed = collapsedFolders.has(folder);
+            const folderName  = folder.split("/").pop() || folder;
             return (
               <div key={folder}>
                 <button

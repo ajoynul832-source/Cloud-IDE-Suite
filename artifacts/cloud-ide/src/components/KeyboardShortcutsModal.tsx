@@ -15,28 +15,29 @@ const SECTIONS: Section[] = [
   {
     title: "Code Execution",
     items: [
-      { keys: ["Ctrl", "Enter"], mac: ["⌘", "↩"], label: "Run current file" },
+      { keys: ["Ctrl", "Enter"],         mac: ["⌘", "↩"],        label: "Run / Preview current file" },
     ],
   },
   {
     title: "Editing",
     items: [
-      { keys: ["Tab"],           label: "Indent (4 spaces)" },
-      { keys: ["Shift", "Tab"],  label: "Dedent" },
-      { keys: ["Ctrl", "Z"],     mac: ["⌘", "Z"],          label: "Undo" },
-      { keys: ["Ctrl", "Y"],     mac: ["⌘", "⇧", "Z"],     label: "Redo" },
-      { keys: ["Ctrl", "/"],     mac: ["⌘", "/"],           label: "Toggle line comment" },
-      { keys: ["Ctrl", "D"],     mac: ["⌘", "D"],           label: "Select next occurrence" },
-      { keys: ["Ctrl", "F"],     mac: ["⌘", "F"],           label: "Find in file" },
-      { keys: ["Alt", "↑/↓"],   mac: ["⌥", "↑/↓"],        label: "Move line up / down" },
-      { keys: ["Ctrl", "A"],     mac: ["⌘", "A"],           label: "Select all" },
+      { keys: ["Tab"],                                             label: "Indent selection (4 spaces)" },
+      { keys: ["Shift", "Tab"],                                    label: "Dedent selection" },
+      { keys: ["Ctrl", "Z"],             mac: ["⌘", "Z"],         label: "Undo" },
+      { keys: ["Ctrl", "Y"],             mac: ["⌘", "⇧", "Z"],   label: "Redo" },
+      { keys: ["Ctrl", "/"],             mac: ["⌘", "/"],         label: "Toggle line comment" },
+      { keys: ["Ctrl", "Shift", "F"],   mac: ["⌘", "⇧", "F"],   label: "Format with Prettier" },
+      { keys: ["Ctrl", "D"],             mac: ["⌘", "D"],         label: "Select next occurrence" },
+      { keys: ["Ctrl", "F"],             mac: ["⌘", "F"],         label: "Find in file" },
+      { keys: ["Alt", "↑ / ↓"],         mac: ["⌥", "↑ / ↓"],    label: "Move line up / down" },
+      { keys: ["Ctrl", "A"],             mac: ["⌘", "A"],         label: "Select all" },
     ],
   },
   {
     title: "IDE",
     items: [
-      { keys: ["?"],                          label: "Open keyboard shortcuts" },
-      { keys: ["Ctrl", ","],  mac: ["⌘", ","], label: "Open settings" },
+      { keys: ["?"],                                               label: "Open keyboard shortcuts" },
+      { keys: ["Ctrl", ","],             mac: ["⌘", ","],         label: "Open settings" },
     ],
   },
 ];
@@ -115,7 +116,7 @@ export function KeyboardShortcutsModal({ onClose }: KeyboardShortcutsModalProps)
         {/* Footer */}
         <div className="px-5 py-3 border-t border-white/8 flex items-center gap-2">
           <span className="text-[10px] font-mono text-white/25">
-            Press <Kbd>?</Kbd> to open this panel anytime
+            Press <Kbd>?</Kbd> anywhere to open this panel
           </span>
         </div>
       </div>

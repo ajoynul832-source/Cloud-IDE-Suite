@@ -57,8 +57,8 @@ function validateRunInput(
 // ─── SSE streaming endpoint ───────────────────────────────────────────────────
 
 router.post("/run/stream", optionalAuth, runLimiter, async (req, res) => {
-  const { language, code, filename } = req.body as {
-    language?: string; code?: string; filename?: string;
+  const { language, code, filename, stdin } = req.body as {
+    language?: string; code?: string; filename?: string; stdin?: string;
   };
 
   const validationErr = validateRunInput(language, code, filename);
@@ -83,6 +83,7 @@ router.post("/run/stream", optionalAuth, runLimiter, async (req, res) => {
     runId,
     userId:   req.user?.userId ?? usageKey,
     language: language!, code: code!, filename,
+    stdin:    typeof stdin === "string" && stdin.length > 0 ? stdin : undefined,
   });
 
   logger.info({ jobId: job.id, runId, language }, "stream: job queued");
@@ -149,8 +150,8 @@ router.post("/run/stream", optionalAuth, runLimiter, async (req, res) => {
 // ─── Buffered JSON endpoint ───────────────────────────────────────────────────
 
 router.post("/run", optionalAuth, runLimiter, async (req, res) => {
-  const { language, code, filename } = req.body as {
-    language?: string; code?: string; filename?: string;
+  const { language, code, filename, stdin } = req.body as {
+    language?: string; code?: string; filename?: string; stdin?: string;
   };
 
   const validationErr = validateRunInput(language, code, filename);
@@ -175,6 +176,7 @@ router.post("/run", optionalAuth, runLimiter, async (req, res) => {
     runId,
     userId:   req.user?.userId ?? usageKey,
     language: language!, code: code!, filename,
+    stdin:    typeof stdin === "string" && stdin.length > 0 ? stdin : undefined,
   });
 
   logger.info({ jobId: job.id, runId, language }, "buffered: job queued");

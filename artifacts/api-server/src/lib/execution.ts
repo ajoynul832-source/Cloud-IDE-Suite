@@ -30,6 +30,7 @@ export interface ExecOpts {
   code:      string;
   filename?: string;
   execId:    string;
+  stdin?:    string;
 }
 
 type HandlerFn = (opts: ExecOpts) => AsyncGenerator<ExecEvent>;
@@ -135,6 +136,7 @@ export async function* spawnStream(
   args: string[],
   cwd: string,
   env: NodeJS.ProcessEnv,
+  stdin?: string,
 ): AsyncGenerator<ExecEvent> {
   const start = Date.now();
   let totalOut = 0;
@@ -151,6 +153,10 @@ export async function* spawnStream(
   };
 
   const proc  = spawn(cmd, args, { cwd, env });
+
+  // Feed stdin then close it (prevents processes from blocking on interactive input)
+  if (stdin) proc.stdin.write(stdin);
+  proc.stdin.end();
   const timer = setTimeout(() => {
     killed = true;
     proc.kill("SIGKILL");
@@ -206,8 +212,9 @@ async function* compileAndRun(
   compilerArgs: string[],
   binary: string,
   dir: string,
+  stdin?: string,
 ): AsyncGenerator<ExecEvent> {
-  // Phase 1 — compile (capture stderr only; stdout is usually empty for gcc/g++)
+  // Phase 1 — compile (no stdin needed)
   let compileExit = 0;
   let compileDur  = 0;
 
@@ -235,33 +242,33 @@ async function* compileAndRun(
     return;
   }
 
-  // Phase 2 — run binary
-  yield* spawnStream(binary, [], dir, sandboxEnv());
+  // Phase 2 — run binary (pass stdin if provided)
+  yield* spawnStream(binary, [], dir, sandboxEnv(), stdin);
 }
 
 // ─── Language Handlers ────────────────────────────────────────────────────────
 
 const javascriptHandler: LanguageHandler = {
   id: "javascript", name: "JavaScript", extensions: ["js", "jsx", "mjs", "cjs"],
-  async *execute({ code, execId }) {
+  async *execute({ code, execId, stdin }) {
     yield* withTempDirStream(execId, async function* (dir) {
       const file    = path.join(dir, "main.mjs");
       const wrapped = `(async () => {\n${code}\n})().catch(e => { process.stderr.write(String(e) + '\\n'); process.exit(1); });`;
       await fsp.writeFile(file, wrapped, "utf8");
-      yield* spawnStream("node", ["--max-old-space-size=128", "--no-warnings", "--no-deprecation", file], dir, sandboxEnv());
+      yield* spawnStream("node", ["--max-old-space-size=128", "--no-warnings", "--no-deprecation", file], dir, sandboxEnv(), stdin);
     });
   },
 };
 
 const typescriptHandler: LanguageHandler = {
   id: "typescript", name: "TypeScript", extensions: ["ts", "tsx"],
-  async *execute({ code, execId }) {
+  async *execute({ code, execId, stdin }) {
     yield* withTempDirStream(execId, async function* (dir) {
       const file    = path.join(dir, "main.ts");
       const wrapped = `(async () => {\n${code}\n})().catch((e: unknown) => { process.stderr.write(String(e) + '\\n'); process.exit(1); });`;
       await fsp.writeFile(file, wrapped, "utf8");
       const tsxBin = path.resolve("node_modules/.bin/tsx");
-      yield* spawnStream(tsxBin, ["--max-old-space-size=128", "--no-warnings", file], dir, sandboxEnv());
+      yield* spawnStream(tsxBin, ["--max-old-space-size=128", "--no-warnings", file], dir, sandboxEnv(), stdin);
     });
   },
 };
@@ -278,10 +285,10 @@ const STDIN_MSG = (lang: string, tip: string) =>
 
 const pythonHandler: LanguageHandler = {
   id: "python", name: "Python", extensions: ["py"],
-  async *execute({ code, execId }) {
-    if (PYTHON_STDIN_RE.test(code)) {
+  async *execute({ code, execId, stdin }) {
+    if (PYTHON_STDIN_RE.test(code) && !stdin) {
       yield { type: "stderr", chunk: STDIN_MSG("Python",
-        "Replace  name = input('Enter name: ')  with  name = 'Alice'  to test your logic.") };
+        "Use the Stdin panel in the Console tab to provide input before running.") };
       yield { type: "done", exitCode: 1, duration: 0 };
       return;
     }
@@ -296,7 +303,7 @@ except Exception:
 del _r
 ${code}`;
       await fsp.writeFile(file, limitedCode, "utf8");
-      for await (const ev of spawnStream("python3", ["-u", file], dir, sandboxEnv())) {
+      for await (const ev of spawnStream("python3", ["-u", file], dir, sandboxEnv(), stdin)) {
         if (ev.type === "stderr" && ev.chunk) {
           yield {
             ...ev,
@@ -323,7 +330,7 @@ const htmlHandler: LanguageHandler = {
 
 const bashHandler: LanguageHandler = {
   id: "bash", name: "Bash", extensions: ["sh", "bash"],
-  async *execute({ code, execId }) {
+  async *execute({ code, execId, stdin }) {
     yield* withTempDirStream(execId, async function* (dir) {
       const file = path.join(dir, "script.sh");
       await fsp.writeFile(file, code, "utf8");
@@ -332,34 +339,34 @@ const bashHandler: LanguageHandler = {
         ...sandboxEnv(),
         BASH_ENV: "",
         ENV: "",
-      });
+      }, stdin);
     });
   },
 };
 
 const perlHandler: LanguageHandler = {
   id: "perl", name: "Perl", extensions: ["pl", "pm"],
-  async *execute({ code, execId }) {
-    if (PERL_STDIN_RE.test(code)) {
+  async *execute({ code, execId, stdin }) {
+    if (PERL_STDIN_RE.test(code) && !stdin) {
       yield { type: "stderr", chunk: STDIN_MSG("Perl",
-        "Replace  my $x = <STDIN>  with  my $x = 'hello'  to test your logic.") };
+        "Use the Stdin panel in the Console tab to provide input before running.") };
       yield { type: "done", exitCode: 1, duration: 0 };
       return;
     }
     yield* withTempDirStream(execId, async function* (dir) {
       const file = path.join(dir, "script.pl");
       await fsp.writeFile(file, code, "utf8");
-      yield* spawnStream("perl", ["-w", file], dir, sandboxEnv());
+      yield* spawnStream("perl", ["-w", file], dir, sandboxEnv(), stdin);
     });
   },
 };
 
 const cHandler: LanguageHandler = {
   id: "c", name: "C", extensions: ["c"],
-  async *execute({ code, execId }) {
-    if (C_STDIN_RE.test(code)) {
+  async *execute({ code, execId, stdin }) {
+    if (C_STDIN_RE.test(code) && !stdin) {
       yield { type: "stderr", chunk: STDIN_MSG("C",
-        "Replace  scanf(\"%s\", &buf)  with a hardcoded variable to test your logic.") };
+        "Use the Stdin panel in the Console tab to provide input before running.") };
       yield { type: "done", exitCode: 1, duration: 0 };
       return;
     }
@@ -370,7 +377,7 @@ const cHandler: LanguageHandler = {
       yield* compileAndRun(
         "gcc",
         ["-o", binary, src, "-lm", "-Wall", "-std=c11"],
-        binary, dir,
+        binary, dir, stdin,
       );
     });
   },
@@ -378,10 +385,10 @@ const cHandler: LanguageHandler = {
 
 const cppHandler: LanguageHandler = {
   id: "cpp", name: "C++", extensions: ["cpp", "cxx", "cc"],
-  async *execute({ code, execId }) {
-    if (CPP_STDIN_RE.test(code)) {
+  async *execute({ code, execId, stdin }) {
+    if (CPP_STDIN_RE.test(code) && !stdin) {
       yield { type: "stderr", chunk: STDIN_MSG("C++",
-        "Replace  cin >> x  with  int x = 42;  to test your logic.") };
+        "Use the Stdin panel in the Console tab to provide input before running.") };
       yield { type: "done", exitCode: 1, duration: 0 };
       return;
     }
@@ -392,7 +399,7 @@ const cppHandler: LanguageHandler = {
       yield* compileAndRun(
         "g++",
         ["-o", binary, src, "-lm", "-Wall", "-std=c++17"],
-        binary, dir,
+        binary, dir, stdin,
       );
     });
   },

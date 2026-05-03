@@ -24,6 +24,9 @@ interface PreviewPanelProps {
   htmlPreview?:   string | null;
   projectType?:   string;
   runsRemaining?: number | null;
+  livePreview?:   boolean;
+  stdinInput?:    string;
+  onStdinChange?: (v: string) => void;
 }
 
 const RUNNABLE_LANGS = [
@@ -45,6 +48,9 @@ export function PreviewPanel({
   htmlPreview,
   projectType,
   runsRemaining,
+  livePreview,
+  stdinInput,
+  onStdinChange,
 }: PreviewPanelProps) {
   const tabs: { id: PanelTab; label: string }[] = [
     { id: "preview", label: "Preview"   },
@@ -71,6 +77,12 @@ export function PreviewPanel({
             ].join(" ")}
           >
             {label}
+            {id === "preview" && livePreview && (
+              <span
+                title="Live preview — updates as you type"
+                className="ml-1.5 inline-block w-1.5 h-1.5 bg-[#4ade80] rounded-full animate-pulse align-middle"
+              />
+            )}
             {id === "build" && isBuilding && (
               <span className="ml-1.5 inline-block w-1.5 h-1.5 bg-primary rounded-full animate-pulse align-middle" />
             )}
@@ -95,6 +107,8 @@ export function PreviewPanel({
             stream={stream ?? defaultStream}
             isRunning={isRunning ?? false}
             runsRemaining={runsRemaining}
+            stdinInput={stdinInput}
+            onStdinChange={onStdinChange}
           />
         )}
         {activeTab === "build" && (

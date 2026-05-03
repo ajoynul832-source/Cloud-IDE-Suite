@@ -26,6 +26,7 @@ export interface RunJobData {
   language:  string;
   code:      string;
   filename?: string;
+  stdin?:    string;
 }
 
 export interface RunJobResult {
@@ -45,7 +46,7 @@ export function chunksKey(runId: string): string {
 }
 
 export async function runJobProcessor(job: Job<RunJobData>): Promise<RunJobResult> {
-  const { runId, language, code, filename, userId } = job.data;
+  const { runId, language, code, filename, userId, stdin } = job.data;
   const redis  = getSharedRedis();
   const key    = chunksKey(runId);
   const execId = newExecId();
@@ -80,7 +81,7 @@ export async function runJobProcessor(job: Job<RunJobData>): Promise<RunJobResul
   let isHtmlPreview = false;
 
   try {
-    for await (const event of handler.execute({ code, filename, execId })) {
+    for await (const event of handler.execute({ code, filename, execId, stdin })) {
       redis.rpush(key, JSON.stringify(event)).catch((err) =>
         logger.warn({ err, runId }, "worker: redis rpush failed"),
       );

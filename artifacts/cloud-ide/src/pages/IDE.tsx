@@ -25,10 +25,12 @@ import {
   generateSVGPreview,
 } from "@/lib/preview-generators";
 import { Zap, Code2, Globe, Terminal } from "lucide-react";
+import { EditorTheme } from "@/components/Editor";
 
 const AUTOSAVE_DEBOUNCE_MS = 3_000;
 const FONT_SIZE_KEY        = "cloudide_font_size";
 const WORD_WRAP_KEY        = "cloudide_word_wrap";
+const THEME_KEY            = "cloudide_theme";
 
 // ─── Language helpers ─────────────────────────────────────────────────────────
 
@@ -127,11 +129,17 @@ export default function IDE() {
   const [localRunsRemaining, setLocalRunsRemaining] = useState<number | null>(null);
   const [cursorPos,          setCursorPos]          = useState<{ line: number; col: number } | null>(null);
 
+  const [stdinInput, setStdinInput] = useState<string>("");
+
   const [fontSize, setFontSizeState] = useState<number>(() =>
     loadPref(FONT_SIZE_KEY, 13, Number)
   );
   const [wordWrap, setWordWrapState] = useState<boolean>(() =>
     loadPref(WORD_WRAP_KEY, false, (v) => v === "true")
+  );
+
+  const [theme, setThemeState] = useState<EditorTheme>(() =>
+    loadPref(THEME_KEY, "vscodeDark" as EditorTheme, (v) => v as EditorTheme)
   );
 
   const setFontSize = useCallback((size: number) => {
@@ -146,6 +154,11 @@ export default function IDE() {
       localStorage.setItem(WORD_WRAP_KEY, String(next));
       return next;
     });
+  }, []);
+
+  const setTheme = useCallback((t: EditorTheme) => {
+    setThemeState(t);
+    localStorage.setItem(THEME_KEY, t);
   }, []);
 
   const editorRef     = useRef<EditorRef>(null);
@@ -217,15 +230,23 @@ export default function IDE() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Global "?" shortcut → keyboard shortcuts modal
+  // Global keyboard shortcuts (outside CodeMirror)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag !== "INPUT" && tag !== "TEXTAREA") {
-          e.preventDefault();
-          setShowShortcuts(true);
-        }
+      const tag = (e.target as HTMLElement).tagName;
+      const inInput = tag === "INPUT" || tag === "TEXTAREA";
+
+      // "?" → keyboard shortcuts modal
+      if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey && !inInput) {
+        e.preventDefault();
+        setShowShortcuts(true);
+        return;
+      }
+
+      // Ctrl+, / Cmd+, → settings panel
+      if (e.key === "," && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        setShowSettings((v) => !v);
       }
     };
     window.addEventListener("keydown", handler);
@@ -258,6 +279,42 @@ export default function IDE() {
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files]);
+
+  // ── Auto-switch to Preview tab when opening a preview-type file ────────────
+  useEffect(() => {
+    if (!activeFile) return;
+    const ext = activeFile.split(".").pop()?.toLowerCase() ?? "";
+    if (["html", "htm", "css", "md", "markdown", "json", "svg"].includes(ext)) {
+      setRightPanelTab("preview");
+    }
+  }, [activeFile]);
+
+  // ── Live preview: debounced auto-update for HTML/CSS/MD/JSON/SVG ──────────
+  useEffect(() => {
+    if (!activeFile) return;
+    const content = files[activeFile];
+    if (content === undefined) return;
+    const ext = activeFile.split(".").pop()?.toLowerCase() ?? "";
+
+    type PreviewFn = (c: string) => string;
+    const PREVIEW_FNS: Record<string, PreviewFn> = {
+      html: (c) => c,
+      htm:  (c) => c,
+      css:      generateCSSPreview,
+      md:       generateMarkdownPreview,
+      markdown: generateMarkdownPreview,
+      json:     generateJSONPreview,
+      svg:      generateSVGPreview,
+    };
+    const previewFn = PREVIEW_FNS[ext];
+    if (!previewFn) return; // not a preview type
+
+    const timer = setTimeout(() => {
+      setHtmlPreview(previewFn(content));
+    }, 500);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFile, files]);
 
   // ── Event handlers ─────────────────────────────────────────────────────────
 
@@ -326,9 +383,9 @@ export default function IDE() {
 
     // ── Backend execution (JS/TS/Python/Bash/Perl/C/C++) ─────────────────
     setRightPanelTab("console");
-    await runCode(target, content, file);
+    await runCode(target, content, file, stdinInput || undefined);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeFile, files, saveFile, runCode, showClientError]);
+  }, [activeFile, files, saveFile, runCode, showClientError, stdinInput]);
 
   const handleBuild = () => {
     if (activeFile && editorRef.current) {
@@ -367,6 +424,86 @@ export default function IDE() {
     if (first) { setOpenFiles([first]); setActiveFile(first); }
   };
 
+  // ── Prettier format ────────────────────────────────────────────────────────
+
+  const FORMATTABLE_EXT: Record<string, string> = {
+    js: "babel", jsx: "babel", mjs: "babel", cjs: "babel",
+    ts: "typescript", tsx: "typescript",
+    html: "html", htm: "html",
+    css: "css", scss: "scss", less: "less",
+    json: "json",
+    md: "markdown", markdown: "markdown",
+  };
+
+  const handleFormat = useCallback(async () => {
+    if (!activeFile || !editorRef.current) return;
+    const ext    = activeFile.split(".").pop()?.toLowerCase() ?? "";
+    const parser = FORMATTABLE_EXT[ext];
+    if (!parser) return; // unsupported type — silently skip
+    const code = editorRef.current.getContent();
+    try {
+      const prettier = await import("prettier/standalone");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const plugins: any[] = [];
+      if (["babel", "json"].includes(parser)) {
+        const [babel, estree] = await Promise.all([
+          import("prettier/plugins/babel"),
+          import("prettier/plugins/estree"),
+        ]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        plugins.push((babel as any).default ?? babel, (estree as any).default ?? estree);
+      } else if (parser === "typescript") {
+        const [ts, estree] = await Promise.all([
+          import("prettier/plugins/typescript"),
+          import("prettier/plugins/estree"),
+        ]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        plugins.push((ts as any).default ?? ts, (estree as any).default ?? estree);
+      } else if (parser === "html") {
+        const html = await import("prettier/plugins/html");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        plugins.push((html as any).default ?? html);
+      } else if (["css", "scss", "less"].includes(parser)) {
+        const postcss = await import("prettier/plugins/postcss");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        plugins.push((postcss as any).default ?? postcss);
+      } else if (parser === "markdown") {
+        const md = await import("prettier/plugins/markdown");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        plugins.push((md as any).default ?? md);
+      }
+      const formatted = await prettier.format(code, {
+        parser,
+        plugins,
+        semi: true,
+        singleQuote: false,
+        tabWidth: 2,
+        printWidth: 100,
+        trailingComma: "all",
+      });
+      editorRef.current.setContent(formatted);
+      saveFile(activeFile, formatted);
+    } catch (err) {
+      console.warn("[Format] prettier failed:", err);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFile, files, saveFile]);
+
+  const handleDownload = useCallback(async () => {
+    const JSZip = (await import("jszip")).default;
+    const zip = new JSZip();
+    Object.entries(files).forEach(([path, content]) => zip.file(path, content));
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `${currentProjectName.replace(/[^a-z0-9-_ .]/gi, "-")}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [files, currentProjectName]);
+
   const handleProjectSaved = (id: string, name: string) => {
     setCurrentProjectId(id);
     setCurrentProjectName(name);
@@ -404,6 +541,8 @@ export default function IDE() {
         autosaveStatus={autosaveStatus}
         runsRemaining={localRunsRemaining}
         showBuildButton={isMobileProject}
+        onDownload={handleDownload}
+        onFormat={handleFormat}
       />
 
       {/* Guest warning banner */}
@@ -452,9 +591,11 @@ export default function IDE() {
                     filename={activeFile}
                     onChange={(content) => saveFile(activeFile, content)}
                     onRun={handleRun}
+                    onFormat={handleFormat}
                     onCursorChange={(line, col) => setCursorPos({ line, col })}
                     fontSize={fontSize}
                     wordWrap={wordWrap}
+                    theme={theme}
                   />
                 ) : (
                   <WelcomeScreen
@@ -486,6 +627,15 @@ export default function IDE() {
               htmlPreview={htmlPreview}
               projectType={projectType}
               runsRemaining={localRunsRemaining}
+              livePreview={
+                !!htmlPreview &&
+                !!activeFile &&
+                ["html","htm","css","md","markdown","json","svg"].includes(
+                  activeFile.split(".").pop()?.toLowerCase() ?? ""
+                )
+              }
+              stdinInput={stdinInput}
+              onStdinChange={setStdinInput}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -552,6 +702,8 @@ export default function IDE() {
         onFontSizeChange={setFontSize}
         wordWrap={wordWrap}
         onWordWrapToggle={toggleWordWrap}
+        theme={theme}
+        onThemeChange={setTheme}
       />
     </div>
   );
