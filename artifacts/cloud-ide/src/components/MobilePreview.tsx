@@ -1,4 +1,4 @@
-import { RefreshCw, ExternalLink, Smartphone, Monitor, Apple } from "lucide-react";
+import { RefreshCw, ExternalLink, Smartphone, Monitor, Apple, QrCode } from "lucide-react";
 import type { SnackPlatform, SnackSyncData } from "@/hooks/useSnackSync";
 
 interface MobilePreviewProps {
@@ -12,18 +12,20 @@ interface MobilePreviewProps {
 }
 
 const PLATFORMS: { id: SnackPlatform; label: string; icon: React.ReactNode }[] = [
-  { id: "android", label: "Android", icon: <Smartphone size={11} /> },
-  { id: "ios",     label: "iOS",     icon: <Apple      size={11} /> },
-  { id: "web",     label: "Web",     icon: <Monitor    size={11} /> },
+  { id: "web",     label: "Web (Live)",  icon: <Monitor    size={11} /> },
+  { id: "android", label: "Android",     icon: <Smartphone size={11} /> },
+  { id: "ios",     label: "iOS",         icon: <Apple      size={11} /> },
 ];
 
 export function MobilePreview({
   snackData, embedUrl, isSyncing, syncError, platform, setPlatform, syncNow,
 }: MobilePreviewProps) {
+  const showIframe = platform === "web";
+
   return (
     <div className="h-full flex flex-col bg-[#0d1117]">
 
-      {/* Top bar — platform switcher + sync status */}
+      {/* Top bar */}
       <div className="shrink-0 flex items-center gap-1 px-3 py-2 border-b border-white/8 bg-[#161b22]">
         <div className="flex items-center gap-0.5 bg-white/5 rounded-md p-0.5">
           {PLATFORMS.map(({ id, label, icon }) => (
@@ -71,47 +73,107 @@ export function MobilePreview({
         </div>
       </div>
 
-      {/* Phone frame area */}
+      {/* Main area */}
       <div className="flex-1 overflow-hidden flex items-center justify-center bg-[#080b0f] relative">
-        {snackData && embedUrl ? (
-          <PhoneFrame isSyncing={isSyncing}>
-            <iframe
-              key={embedUrl}
-              src={embedUrl}
-              className="w-full h-full border-0"
-              allow="geolocation; camera; microphone; accelerometer; gyroscope"
-              title="Expo Snack Preview"
+
+        {/* WEB tab — live iframe simulator */}
+        {showIframe && (
+          snackData && embedUrl ? (
+            <PhoneFrame isSyncing={isSyncing}>
+              <iframe
+                key={embedUrl}
+                src={embedUrl}
+                className="w-full h-full border-0"
+                allow="geolocation; camera; microphone; accelerometer; gyroscope"
+                title="Expo Snack Preview"
+              />
+            </PhoneFrame>
+          ) : (
+            <EmptyState isSyncing={isSyncing} syncError={syncError} />
+          )
+        )}
+
+        {/* ANDROID / iOS tabs — QR code + instructions */}
+        {!showIframe && (
+          snackData ? (
+            <DeviceInstructions
+              platform={platform}
+              snackData={snackData}
             />
-          </PhoneFrame>
-        ) : (
-          <EmptyState isSyncing={isSyncing} syncError={syncError} />
+          ) : (
+            <EmptyState isSyncing={isSyncing} syncError={syncError} />
+          )
         )}
       </div>
 
-      {/* Footer — QR code + links */}
+      {/* Footer — open in Expo Snack link */}
       {snackData && (
         <div className="shrink-0 flex items-center gap-3 px-3 py-2 border-t border-white/8 bg-[#161b22]">
+          <a
+            href={snackData.snackUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] font-mono text-[#4ade80]/60 hover:text-[#4ade80] flex items-center gap-1 transition-colors ml-auto"
+          >
+            <ExternalLink size={9} />
+            Open full Snack editor
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeviceInstructions({
+  platform,
+  snackData,
+}: {
+  platform: SnackPlatform;
+  snackData: SnackSyncData;
+}) {
+  const label = platform === "android" ? "Android" : "iPhone / iPad";
+  const store = platform === "android"
+    ? "Google Play Store"
+    : "App Store";
+
+  return (
+    <div className="flex flex-col items-center gap-5 p-6 max-w-xs text-center">
+      {/* QR code */}
+      {snackData.qrUrl ? (
+        <div className="bg-white rounded-xl p-2 shadow-lg shadow-black/50">
           <img
             src={snackData.qrUrl}
             alt="QR Code"
-            className="w-11 h-11 rounded bg-white p-0.5 shrink-0"
+            className="w-36 h-36 block"
           />
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-mono text-white/40 leading-relaxed">
-              Scan with <span className="text-white/60">Expo Go</span> to test on your real device
-            </p>
-            <a
-              href={snackData.snackUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] font-mono text-[#4ade80]/60 hover:text-[#4ade80] flex items-center gap-1 transition-colors"
-            >
-              <ExternalLink size={9} />
-              Open in Expo Snack
-            </a>
-          </div>
+        </div>
+      ) : (
+        <div className="w-36 h-36 rounded-xl border-2 border-white/10 flex items-center justify-center">
+          <QrCode size={48} className="text-white/15" />
         </div>
       )}
+
+      <div className="space-y-2">
+        <p className="text-xs font-mono text-white/60 font-medium">
+          Run on your {label}
+        </p>
+        <div className="text-[10px] font-mono text-white/30 space-y-1 text-left">
+          <p>1. Install <span className="text-white/50">Expo Go</span> from {store}</p>
+          <p>2. Open the app and tap <span className="text-white/50">Scan QR Code</span></p>
+          <p>3. Point your camera at the code above</p>
+          <p>4. Your app runs live on your device</p>
+        </div>
+      </div>
+
+      <a
+        href={snackData.snackUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[10px] font-mono text-[#4ade80]/60 hover:text-[#4ade80] flex items-center gap-1 transition-colors"
+      >
+        <ExternalLink size={9} />
+        Open in Expo Snack
+      </a>
     </div>
   );
 }
@@ -171,33 +233,29 @@ function PhoneFrame({
 function EmptyState({ isSyncing, syncError }: { isSyncing: boolean; syncError: string | null }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 text-center p-8 max-w-xs">
-      {/* Faint phone outline */}
       <div className="w-16 h-28 rounded-[10px] border-2 border-white/10 flex items-center justify-center">
         <Smartphone size={24} className="text-white/15" />
       </div>
 
       {syncError ? (
         <>
-          <p className="text-xs font-mono text-red-400/70">Expo Snack sync failed</p>
+          <p className="text-xs font-mono text-red-400/70">Sync failed</p>
           <p className="text-[10px] font-mono text-white/30 break-all">{syncError}</p>
-          <p className="text-[10px] font-mono text-white/20">Check your internet connection and try again.</p>
         </>
       ) : isSyncing ? (
         <>
-          <p className="text-xs font-mono text-[#4ade80]/60 animate-pulse">Uploading to Expo Snack…</p>
+          <p className="text-xs font-mono text-[#4ade80]/60 animate-pulse">Uploading to Expo…</p>
           <p className="text-[10px] font-mono text-white/30">Your app will appear here in a moment.</p>
         </>
       ) : (
         <>
           <p className="text-sm font-mono text-white/40">React Native Preview</p>
           <p className="text-[10px] font-mono text-white/25 leading-relaxed">
-            Edit any file to sync your app to<br />
-            Expo's cloud and see it here live.
+            Edit any file — the app syncs<br />automatically after 3 seconds.
           </p>
           <div className="mt-1 text-[10px] font-mono text-white/20 text-left space-y-1">
-            <p>✓ Web simulator — runs in this panel</p>
-            <p>✓ Android / iOS tabs above</p>
-            <p>✓ QR code — test on real device</p>
+            <p>✓ <span className="text-white/35">Web (Live)</span> — runs right here in this panel</p>
+            <p>✓ <span className="text-white/35">Android/iOS</span> — scan QR with Expo Go app</p>
             <p>✓ Auto-syncs as you type</p>
           </div>
         </>

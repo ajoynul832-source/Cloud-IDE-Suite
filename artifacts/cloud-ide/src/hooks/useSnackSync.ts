@@ -46,7 +46,7 @@ export function useSnackSync(files: Record<string, string>) {
   const [snackData,  setSnackData]  = useState<SnackSyncData | null>(null);
   const [isSyncing,  setIsSyncing]  = useState(false);
   const [syncError,  setSyncError]  = useState<string | null>(null);
-  const [platform,   setPlatform]   = useState<SnackPlatform>("android");
+  const [platform,   setPlatform]   = useState<SnackPlatform>("web");
 
   const timerRef        = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSyncedHash  = useRef<string>("");
@@ -122,13 +122,11 @@ export function useSnackSync(files: Record<string, string>) {
     syncToSnack(filesRef.current, true);
   }, [syncToSnack]);
 
-  // Build embed URL: prefer server-provided, fall back to constructing from snackId
-  const embedUrl = snackData
-    ? snackData.embedUrl
-      ?? (snackData.snackId
-          ? `https://snack.expo.dev/embedded?snack=${snackData.snackId}&platform=${platform}&preview=true&theme=dark&sdkVersion=51.0.0`
-          : null)
-    : null;
+  // The live in-browser simulator ALWAYS uses platform=web.
+  // Android/iOS tabs show QR code instructions (they need the Expo Go native app).
+  const embedUrl = snackData?.snackId
+    ? `https://snack.expo.dev/embedded?snack=${snackData.snackId}&platform=web&preview=true&theme=dark&sdkVersion=51.0.0`
+    : (snackData?.embedUrl ?? null);
 
   return { isRNProject, snackData, embedUrl, isSyncing, syncError, platform, setPlatform, syncNow };
 }
