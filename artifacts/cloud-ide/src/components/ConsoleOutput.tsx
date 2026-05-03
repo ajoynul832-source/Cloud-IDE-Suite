@@ -142,29 +142,31 @@ export function ConsoleOutput({ stream, isRunning, runsRemaining, stdinInput, on
     return (
       <div className="h-full flex flex-col bg-[#0d1117] font-mono text-xs">
         {stdinPanel}
-        <div className="flex-1 p-4 text-white/40 flex flex-col gap-2">
-          <p>
-            Press{" "}
-            <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[#4ade80] font-semibold text-[10px]">
-              Run ▶
-            </kbd>{" "}
-            or{" "}
-            <kbd className="px-1 py-0.5 rounded bg-white/10 text-white/60 font-semibold text-[10px]">
-              Ctrl+Enter
-            </kbd>{" "}
-            to execute the current file.
-          </p>
-          <p className="text-[10px] opacity-60">Execute: JS · TS · Python · Bash · Perl · C · C++</p>
-          <p className="text-[10px] opacity-40">Preview: HTML · CSS · Markdown · JSON · SVG</p>
-          <p className="text-[10px] opacity-40 mt-1">
-            ↑ Expand <span className="text-white/50">Stdin</span> above to provide program input (e.g. Python <code className="text-white/50">input()</code>)
-          </p>
-          {runsRemaining !== null && runsRemaining !== undefined && (
-            <p className={["text-[10px] mt-1", runsLow ? "text-orange-400" : "text-white/30"].join(" ")}>
-              {runsRemaining === 0
-                ? "No runs left today — resets at midnight UTC"
-                : `${runsRemaining} runs remaining today`}
+        <div className="flex-1 p-6 text-white/50 flex flex-col gap-4 justify-center">
+          <div className="space-y-3">
+            <p className="text-white/70 font-semibold">Ready to run code</p>
+            <p className="text-[11px]">
+              Press{" "}
+              <kbd className="px-2 py-1 rounded bg-[#4ade80]/20 text-[#4ade80] font-mono font-bold text-[10px] border border-[#4ade80]/30">
+                Run ▶
+              </kbd>{" "}
+              or{" "}
+              <kbd className="px-2 py-1 rounded bg-white/10 text-white/60 font-mono font-semibold text-[10px] border border-white/15">
+                Ctrl+Enter
+              </kbd>
             </p>
+          </div>
+          <div className="space-y-1 text-[10px] text-white/40">
+            <p>⚡ <span className="text-white/60">Execute:</span> JS · TS · Python · Bash · Perl · C · C++</p>
+            <p>👁 <span className="text-white/60">Preview:</span> HTML · CSS · Markdown · JSON · SVG</p>
+            <p className="text-white/30 mt-2">Tip: Expand <span className="text-white/50">Stdin</span> above to provide input</p>
+          </div>
+          {runsRemaining !== null && runsRemaining !== undefined && (
+            <div className={["text-[10px] mt-3 px-3 py-2 rounded border", runsLow ? "text-orange-400 border-orange-400/20 bg-orange-400/5" : "text-white/40 border-white/10 bg-white/5"].join(" ")}>
+              {runsRemaining === 0
+                ? "⚠ No runs left today — resets at midnight UTC"
+                : `✓ ${runsRemaining} runs remaining today`}
+            </div>
           )}
         </div>
       </div>
@@ -176,9 +178,9 @@ export function ConsoleOutput({ stream, isRunning, runsRemaining, stdinInput, on
       {stdinPanel}
 
       {/* Status bar */}
-      <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-white/8">
+      <div className="shrink-0 flex items-center gap-3 px-3 py-2 border-b border-white/[0.08] bg-gradient-to-r from-white/[0.01] to-transparent">
         <div className={[
-          "flex items-center gap-2 flex-1 text-[10px]",
+          "flex items-center gap-2 flex-1 text-[10px] font-semibold uppercase tracking-wide",
           isRunning
             ? "text-yellow-400"
             : succeeded === true
@@ -188,7 +190,7 @@ export function ConsoleOutput({ stream, isRunning, runsRemaining, stdinInput, on
                 : "text-white/40",
         ].join(" ")}>
           <span className={[
-            "w-1.5 h-1.5 rounded-full shrink-0",
+            "w-2 h-2 rounded-full shrink-0",
             isRunning
               ? "bg-yellow-400 animate-pulse"
               : succeeded === true
@@ -255,30 +257,32 @@ export function ConsoleOutput({ stream, isRunning, runsRemaining, stdinInput, on
       </div>
 
       {/* Output area */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto p-3 space-y-0">
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         {visibleChunks.map((chunk, i) => (
-          <div key={i} className="flex items-start gap-2">
+          <div key={i} className={[
+            "flex items-start gap-2.5 leading-relaxed",
+            chunk.type === "stderr" ? "bg-red-500/8 px-2 py-1 rounded border-l-2 border-red-400/40" : "",
+          ].join(" ")}>
             {showTimestamps && (
-              <span className="shrink-0 text-white/20 text-[10px] leading-relaxed pt-[1px] select-none">
-                {fmtTime(chunk.timestamp)}
+              <span className="shrink-0 text-white/25 text-[9px] pt-0.5 select-none font-mono">
+                [{fmtTime(chunk.timestamp)}]
               </span>
             )}
             <pre
               className={[
-                "whitespace-pre-wrap leading-relaxed text-[11px] flex-1 min-w-0",
-                chunk.type === "stderr" ? "text-red-400" : "text-white/85",
+                "whitespace-pre-wrap text-[11px] flex-1 min-w-0 font-mono",
+                chunk.type === "stderr" ? "text-red-300 font-semibold" : "text-white/80",
               ].join(" ")}
-              // Safe: ansiToHtml HTML-escapes all text before adding span tags
               dangerouslySetInnerHTML={{ __html: ansiToHtml(chunk.text) }}
             />
           </div>
         ))}
 
         {!hasContent && isRunning && (
-          <span className="text-white/30 italic">Waiting for output…</span>
+          <span className="text-white/30 text-[10px] italic">Waiting for output…</span>
         )}
         {result && !visibleChunks.some((c) => c.text.trim()) && (
-          <span className="text-white/30 italic">No output.</span>
+          <span className="text-white/30 text-[10px] italic">No output.</span>
         )}
         <div ref={bottomRef} />
       </div>

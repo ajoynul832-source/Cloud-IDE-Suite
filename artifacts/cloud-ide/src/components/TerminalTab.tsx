@@ -162,46 +162,49 @@ export function TerminalTab({ isActive }: TerminalTabProps) {
       onClick={() => inputRef.current?.focus()}
     >
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/8 bg-[#161b22] shrink-0">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.08] bg-gradient-to-r from-white/[0.01] to-transparent shrink-0">
+        <div className="flex items-center gap-2.5">
           <TerminalIcon size={11} className="text-[#4ade80]" />
-          <span className="text-[10px] text-white/40">Terminal</span>
-          <div className={`w-1.5 h-1.5 rounded-full ${
-            wsState === "open" ? "bg-[#4ade80]" :
-            wsState === "connecting" ? "bg-yellow-400 animate-pulse" :
-            wsState === "error" ? "bg-red-400" : "bg-white/20"
-          }`} />
+          <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wide">Terminal</span>
+          <div className={`px-2 py-0.5 rounded text-[8px] font-mono font-bold ${
+            wsState === "open" ? "text-[#4ade80] bg-[#4ade80]/12 border border-[#4ade80]/25" :
+            wsState === "connecting" ? "text-yellow-400 bg-yellow-400/12 border border-yellow-400/25 animate-pulse" :
+            wsState === "error" ? "text-red-400 bg-red-400/12 border border-red-400/25" : 
+            "text-white/30 bg-white/5 border border-white/10"
+          }`}>
+            {wsState === "open" ? "● Connected" : wsState === "connecting" ? "⟳ Connecting…" : wsState === "error" ? "✕ Error" : "○ Offline"}
+          </div>
         </div>
         <div className="flex items-center gap-1">
           {wsState !== "open" && (
             <button
               onClick={(e) => { e.stopPropagation(); connect(); }}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] text-white/30 hover:text-white/60 hover:bg-white/8 transition-colors"
+              className="px-3 py-1 text-[9px] font-bold text-[#4ade80] bg-[#4ade80]/10 border border-[#4ade80]/25 rounded hover:bg-[#4ade80]/20 transition-all"
+              title="Connect to terminal server"
             >
-              <TerminalIcon size={9} />
               Connect
             </button>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); clear(); }}
-            title="Clear terminal"
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] text-white/30 hover:text-white/60 hover:bg-white/8 transition-colors"
+            title="Clear terminal (Ctrl+L)"
+            className="px-2 py-1 rounded text-white/30 hover:text-white/70 hover:bg-white/8 transition-colors"
           >
-            <RotateCcw size={9} />
+            <RotateCcw size={10} />
           </button>
         </div>
       </div>
 
       {/* Output */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5 cursor-text">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5 cursor-text scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         {lines.map((line) => (
           <div
             key={line.id}
-            className={`leading-relaxed whitespace-pre-wrap break-all ${
-              line.type === "input"  ? "text-[#4ade80]/80" :
-              line.type === "error"  ? "text-red-400/80" :
-              line.type === "info"   ? "text-white/30 italic" :
-              "text-white/65"
+            className={`leading-relaxed whitespace-pre-wrap break-all text-[11px] font-mono ${
+              line.type === "input"  ? "text-[#4ade80]/85 font-semibold" :
+              line.type === "error"  ? "text-red-300 bg-red-500/8 px-2 py-1 rounded border-l-2 border-red-400/40" :
+              line.type === "info"   ? "text-white/35 italic text-[10px]" :
+              "text-white/70"
             }`}
           >
             {line.text || "\u00a0"}
@@ -211,8 +214,8 @@ export function TerminalTab({ isActive }: TerminalTabProps) {
       </div>
 
       {/* Input */}
-      <div className="flex items-center gap-2 px-3 py-2 border-t border-white/8 bg-[#0d1117] shrink-0">
-        <span className="text-[#4ade80]/70 shrink-0">$</span>
+      <div className="flex items-center gap-2.5 px-4 py-2 border-t border-white/[0.08] bg-gradient-to-r from-white/[0.01] to-transparent shrink-0">
+        <span className="text-[#4ade80]/70 shrink-0 font-bold">$</span>
         <input
           ref={inputRef}
           value={input}
@@ -227,9 +230,9 @@ export function TerminalTab({ isActive }: TerminalTabProps) {
       </div>
 
       {wsState === "error" && (
-        <div className="px-3 py-1 bg-amber-500/8 border-t border-amber-500/15 flex items-center gap-1.5 shrink-0">
-          <AlertCircle size={9} className="text-amber-400 shrink-0" />
-          <span className="text-[9px] text-amber-300/50">WebSocket unavailable — using HTTP bash execution</span>
+        <div className="px-4 py-2 bg-red-500/8 border-t border-red-400/20 flex items-center gap-2 shrink-0">
+          <AlertCircle size={10} className="text-red-400 shrink-0" />
+          <span className="text-[10px] text-red-300/75 font-mono">WebSocket unavailable — using HTTP fallback for bash execution</span>
         </div>
       )}
     </div>
