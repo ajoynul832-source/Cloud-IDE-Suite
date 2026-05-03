@@ -1,5 +1,6 @@
-import { Gauge, Home, Circle, Plus, Minus, Type } from "lucide-react";
+import { Gauge, Home, Circle, Plus, Minus, Type, CheckCircle2, Loader2, Save } from "lucide-react";
 import { Link } from "wouter";
+import type { AutosaveStatus } from "./Toolbar";
 
 interface StatusBarProps {
   language?:          string;
@@ -11,6 +12,9 @@ interface StatusBarProps {
   fontSize?:          number;
   onFontSizeIncrease?: () => void;
   onFontSizeDecrease?: () => void;
+  saveStatus?:        AutosaveStatus;
+  hasUnsavedChanges?: boolean;
+  onSave?:            () => void;
 }
 
 export function StatusBar({
@@ -23,6 +27,9 @@ export function StatusBar({
   fontSize,
   onFontSizeIncrease,
   onFontSizeDecrease,
+  saveStatus = "idle",
+  hasUnsavedChanges = false,
+  onSave,
 }: StatusBarProps) {
   const runsLow = runsRemaining !== null && runsRemaining !== undefined && runsRemaining < 5;
 
@@ -57,6 +64,29 @@ export function StatusBar({
 
       {/* Right */}
       <div className="flex items-center gap-3 text-[10px] font-mono text-white/40">
+        {/* Save status */}
+        {saveStatus === "saving" && (
+          <span className="flex items-center gap-1 text-white/30">
+            <Loader2 size={8} className="animate-spin" />
+            Saving…
+          </span>
+        )}
+        {saveStatus === "saved" && (
+          <span className="flex items-center gap-1 text-[#4ade80]/50">
+            <CheckCircle2 size={8} />
+            Saved
+          </span>
+        )}
+        {saveStatus === "idle" && hasUnsavedChanges && onSave && (
+          <button
+            onClick={onSave}
+            title="Save now (Ctrl+S)"
+            className="flex items-center gap-1 text-amber-400/60 hover:text-amber-300 transition-colors"
+          >
+            <Save size={8} />
+            Unsaved
+          </button>
+        )}
         {isRunning && (
           <span className="flex items-center gap-1 text-yellow-400">
             <Circle size={7} className="fill-yellow-400 animate-pulse" />

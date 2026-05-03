@@ -12,6 +12,11 @@ import shareRouter        from "./share";
 import metricsRouter      from "./metrics";
 import docsRouter         from "./docs";
 import snackRouter        from "./snack";
+import aiRouter           from "./ai";
+import gitRouter          from "./git";
+import deployRouter       from "./deploy";
+import packagesRouter     from "./packages";
+import envVarsRouter      from "./env-vars";
 
 const router: IRouter = Router();
 
@@ -28,5 +33,10 @@ router.use(buildRouter);
 router.use(metricsRouter);
 router.use(docsRouter);
 router.use(snackRouter);
+router.use(aiRouter);
+router.use(gitRouter);
+router.use(deployRouter);
+router.use(packagesRouter);
+router.use(envVarsRouter);
 
 export default router;

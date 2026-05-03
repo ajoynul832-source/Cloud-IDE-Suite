@@ -1,7 +1,7 @@
 import {
   Play, Box, Download, Loader2, FolderOpen, ChevronDown,
   Database, Share2, Compass, CheckCircle2, LogOut, User, RotateCcw,
-  Settings, HelpCircle, Archive, Wand2, WrapText,
+  Settings, HelpCircle, Archive, Wand2, WrapText, Rocket, CreditCard,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ interface ToolbarProps {
   onReset?:          () => void;
   onShowSettings?:   () => void;
   onShowShortcuts?:  () => void;
+  onDeploy?:         () => void;
   buildStatus?:      string | null;
   jobId?:            string | null;
   currentLanguage?:  string;
@@ -46,6 +47,7 @@ export function Toolbar({
   onReset,
   onShowSettings,
   onShowShortcuts,
+  onDeploy,
   buildStatus,
   jobId,
   currentLanguage,
@@ -223,6 +225,27 @@ export function Toolbar({
         {buildStatus === "failed" && (
           <span className="text-xs font-mono text-red-400">Build failed</span>
         )}
+
+        {/* Deploy */}
+        {onDeploy && (
+          <button
+            onClick={onDeploy}
+            title="Deploy a shareable preview URL"
+            className="flex items-center gap-1 px-2 h-7 rounded text-[11px] font-mono text-white/40 hover:text-[#4ade80] hover:bg-[#4ade80]/10 transition-colors border border-transparent hover:border-[#4ade80]/25"
+          >
+            <Rocket size={11} />
+            <span className="hidden lg:block">Deploy</span>
+          </button>
+        )}
+
+        {/* Billing link */}
+        <Link
+          href="/billing"
+          title="Billing & plans"
+          className="hidden lg:flex items-center gap-1 px-2 h-7 rounded text-[11px] font-mono text-white/30 hover:text-white/60 hover:bg-white/8 transition-colors"
+        >
+          <CreditCard size={11} />
+        </Link>
 
         {/* Word wrap toggle */}
         {onWordWrapToggle && (

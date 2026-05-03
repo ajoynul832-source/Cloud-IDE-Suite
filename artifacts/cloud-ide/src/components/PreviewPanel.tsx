@@ -3,10 +3,11 @@ import { RefreshCw, ExternalLink } from "lucide-react";
 import { BuildLog }       from "./BuildLog";
 import { ConsoleOutput }  from "./ConsoleOutput";
 import { MobilePreview }  from "./MobilePreview";
+import { TerminalTab }    from "./TerminalTab";
 import { StreamState }    from "@/hooks/useRun";
 import type { SnackPlatform, SnackSyncData } from "@/hooks/useSnackSync";
 
-export type PanelTab = "preview" | "console" | "build";
+export type PanelTab = "preview" | "console" | "build" | "terminal";
 
 interface PreviewPanelProps {
   logs?:          string | null;
@@ -47,9 +48,10 @@ export function PreviewPanel({
   const defaultStream: StreamState = { chunks: [], result: null };
 
   const tabs: { id: PanelTab; label: string }[] = [
-    { id: "preview", label: isRNProject ? "Phone Preview" : "Preview" },
-    { id: "console", label: "Console"   },
-    { id: "build",   label: "Build Log" },
+    { id: "preview",  label: isRNProject ? "Phone Preview" : "Preview" },
+    { id: "console",  label: "Console"   },
+    { id: "terminal", label: "Terminal"  },
+    { id: "build",    label: "Build Log" },
   ];
 
   return (
@@ -117,6 +119,9 @@ export function PreviewPanel({
             stdinInput={stdinInput}
             onStdinChange={onStdinChange}
           />
+        )}
+        {activeTab === "terminal" && (
+          <TerminalTab isActive={activeTab === "terminal"} />
         )}
         {activeTab === "build" && (
           <BuildLog

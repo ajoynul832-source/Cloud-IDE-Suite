@@ -1,437 +1,380 @@
-# CloudIDE — Master Build Document
+# CloudIDE
 
-> **Version**: 2.2 | **Updated**: May 2026
->
-> This is the single source of truth for the CloudIDE product.
-> It documents every feature that works, every bug that exists,
-> the full competitive landscape, and a phased roadmap to beat every competitor.
-> Read this before touching a single line of code.
+A professional browser-based IDE — write, run, and share code in JavaScript, TypeScript, Python, HTML, Bash, C, C++, and more. No installs. No sign-up required to start.
 
 ---
 
-## What CloudIDE Is
+## Table of Contents
 
-A professional, browser-based cloud IDE with real code execution, live previews, mobile app building, JWT authentication, and a community explore gallery.
-
-**The core promise:** Write code in your browser, see it run immediately. No setup, no installs, no waiting.
-
----
-
-## Features
-
-### Core Editor
-- **Monaco-style editor** powered by CodeMirror 6 — syntax highlighting for 20+ languages
-- **Multi-file workspace** — full file tree with create, rename, delete, expand/collapse folders
-- **Tabs** — multiple open files, close with ✕
-- **Autosave** — 3-second debounce autosave to PostgreSQL (when signed in)
-- **Prettier formatting** — Ctrl+Shift+F formats JS/TS/HTML/CSS/JSON/Markdown
-- **Word wrap toggle** — toolbar button + Alt+Z
-- **Font size controls** — status bar +/- buttons, persisted to localStorage
-- **Line/column display** — real-time cursor position in status bar
-- **Theme switching** — VS Code Dark, GitHub Dark, Dracula, Monokai (settings panel)
-
-### Code Execution
-- **JavaScript / TypeScript** — Node.js (backend sandboxed child process)
-- **Python** — python3 (backend)
-- **Bash / Perl** — shell execution (backend)
-- **C / C++** — gcc/g++ compile + run (backend)
-- **50 runs/day** — per-user rate limit, resets midnight UTC
-- **Stdin support** — expandable stdin textarea in console panel
-- **Streaming output** — real-time stdout/stderr via SSE
-
-### Live Previews (no backend needed)
-- **HTML** — runs in sandboxed iframe instantly (Refresh + Open in new tab buttons)
-- **CSS** — applied to a rich demo page with common UI patterns
-- **Markdown** — rendered to styled GitHub-flavoured HTML
-- **JSON** — colorized tree viewer
-- **SVG** — rendered preview with dimensions
-- **React (CDN)** — React 18 + Babel standalone, JSX works out of the box
-- **Vue 3 (CDN)** — Composition API, no build step
-- **Three.js** — UMD build, full 3D canvas via WebGL
-- **p5.js** — creative coding, Perlin noise, generative art
-- **Chart.js** — 4-panel responsive dashboard
-
-### Mobile / React Native
-- **React Native Web runner** — Expo Starter and RN templates run live in the browser via React Native Web 0.19 + Babel standalone. No Expo Snack API needed for web preview.
-- **Android / iOS QR codes** — Expo Snack sync for testing on real devices via Expo Go
-- **APK build pipeline** — Flutter/Kotlin/Java projects can be compiled (requires Flutter SDK on server)
-
-### Auth & Projects
-- **JWT httpOnly cookies** — secure session, bcrypt passwords
-- **Projects saved to PostgreSQL** — load/save from Projects panel
-- **Version history** — auto-snapshot on save
-- **Share** — generate public read-only link for any project
-
-### Explore Gallery
-- **Browse public projects** — search by name, filter by language
-- **Fork** — one-click fork into your own IDE workspace
-- **Back button** goes to /ide (not the landing page)
+1. [Quick Start](#quick-start)
+2. [Supported Languages](#supported-languages)
+3. [Running Code](#running-code)
+4. [File System](#file-system)
+5. [Projects & Autosave](#projects--autosave)
+6. [Sharing & Explore](#sharing--explore)
+7. [Editor Features](#editor-features)
+8. [Keyboard Shortcuts](#keyboard-shortcuts)
+9. [Terminal](#terminal)
+10. [Templates](#templates)
+11. [Mobile / React Native](#mobile--react-native)
+12. [Build APK](#build-apk)
+13. [Deploy](#deploy)
+14. [AI Code Assistant](#ai-code-assistant)
+15. [Git Integration](#git-integration)
+16. [Environment Variables](#environment-variables)
+17. [Authentication](#authentication)
+18. [Billing & Plans](#billing--plans)
+19. [Architecture](#architecture)
+20. [Local Development](#local-development)
+21. [Environment Variables Reference](#environment-variables-reference)
 
 ---
 
-## Tech Stack
+## Quick Start
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 18, Vite, TailwindCSS, CodeMirror 6, wouter |
-| Backend API | Express 5, TypeScript, Drizzle ORM |
-| Database | PostgreSQL (Neon serverless) |
-| Job Queue | BullMQ + Redis (Upstash) |
-| Auth | JWT httpOnly cookies, bcrypt |
-| Mobile preview | React Native Web 0.19.12, Babel standalone 7.23 |
-| Code execution | Node.js child_process sandboxed subprocess |
-| Monorepo | pnpm workspaces |
-
----
-
-## Project Structure
-
-```
-workspace/
-├── artifacts/
-│   ├── api-server/              Express 5 API
-│   │   ├── src/
-│   │   │   ├── routes/
-│   │   │   │   ├── auth.ts      POST /auth/register, /login, /logout, GET /me
-│   │   │   │   ├── run.ts       POST /run  (code execution + rate limiting)
-│   │   │   │   ├── projects.ts  CRUD /projects
-│   │   │   │   ├── build.ts     POST /build, GET /build/:jobId, GET /download/:jobId
-│   │   │   │   ├── snack.ts     POST /snack  (Expo Snack proxy for QR codes)
-│   │   │   │   └── explore.ts   GET /explore, GET /explore/:id
-│   │   │   ├── db/
-│   │   │   │   ├── schema.ts    Drizzle schema (users, projects, run_usage, versions)
-│   │   │   │   └── index.ts     DB client
-│   │   │   ├── lib/
-│   │   │   │   ├── executor.ts  Sandboxed code runner
-│   │   │   │   └── queue.ts     BullMQ build queue
-│   │   │   └── index.ts         Server entry point
-│   │   └── drizzle.config.ts
-│   └── cloud-ide/               React + Vite frontend
-│       ├── src/
-│       │   ├── components/
-│       │   │   ├── Editor.tsx           CodeMirror 6 wrapper with EditorRef
-│       │   │   ├── Toolbar.tsx          Top bar with Run, Build, Nav, Settings
-│       │   │   ├── FileTree.tsx         Multi-file tree with CRUD
-│       │   │   ├── PreviewPanel.tsx     Tabbed right panel (Preview/Console/Build)
-│       │   │   ├── MobilePreview.tsx    RNW runner + Expo Snack QR codes
-│       │   │   ├── ConsoleOutput.tsx    Streaming stdout/stderr display
-│       │   │   ├── BuildLog.tsx         APK build log with honest errors
-│       │   │   ├── StatusBar.tsx        Language, cursor pos, font size
-│       │   │   ├── TemplateSelector.tsx Template picker modal
-│       │   │   ├── SettingsPanel.tsx    Slide-out settings (theme, font, wrap)
-│       │   │   └── KeyboardShortcutsModal.tsx  "?" modal
-│       │   ├── hooks/
-│       │   │   ├── useFileSystem.ts     In-memory file store
-│       │   │   ├── useRun.ts            Code execution + SSE streaming
-│       │   │   ├── useBuild.ts          APK build job polling
-│       │   │   ├── useProjects.ts       Save/load/version projects
-│       │   │   └── useSnackSync.ts      Expo Snack debounced sync
-│       │   ├── lib/
-│       │   │   ├── templates.ts         ~35 project templates with full file content
-│       │   │   └── preview-generators.ts  HTML generators for CSS/MD/JSON/SVG/RNW
-│       │   └── pages/
-│       │       ├── IDE.tsx              Main IDE orchestration (800 lines)
-│       │       ├── Landing.tsx          Marketing landing page
-│       │       ├── AuthPage.tsx         Sign in / sign up
-│       │       ├── Explore.tsx          Community gallery
-│       │       └── SharedProject.tsx    Read-only shared project view
-│       └── vite.config.ts
-└── package.json
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20+
-- pnpm 8+
-- PostgreSQL database (Neon works great, free tier)
-- Redis instance (Upstash works, free tier)
-
-### Install
-
-```bash
-pnpm install
-```
-
-### Environment Variables
-
-Set these in your environment (or `.env` file in `artifacts/api-server/`):
-
-```env
-DATABASE_URL=postgresql://user:password@host/db
-REDIS_URL=redis://default:token@host:port
-JWT_SECRET=your-random-secret-at-least-32-characters
-NODE_ENV=development
-PORT=8080
-```
-
-### Run (development)
-
-```bash
-# Terminal 1 — API server
-pnpm --filter @workspace/api-server run dev
-
-# Terminal 2 — Frontend (Vite dev server)
-pnpm --filter @workspace/cloud-ide run dev
-```
-
-The IDE is available at `/ide/`, the landing page at `/`.
-
-### Database migrations
-
-```bash
-pnpm --filter @workspace/api-server run db:push
-```
-
----
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|---|---|
-| `Ctrl+Enter` | Run / Preview current file |
-| `Ctrl+Shift+P` | **Command palette** (search all commands, files, templates) |
-| `Ctrl+Shift+F` | Format with Prettier |
-| `Ctrl+,` | Toggle settings panel |
-| `?` | Keyboard shortcuts reference |
-| `Alt+Z` | Toggle word wrap |
-| `Ctrl+/` | Toggle line comment |
-| `Ctrl+]` / `Ctrl+[` | Indent / dedent |
-| `Ctrl+D` | Select next occurrence |
-| `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / Redo |
-| `Ctrl+F` | Find in file |
-| `Ctrl+G` | Go to line |
+1. Open the IDE at `/ide`
+2. Pick a template from **New → Template** or start from scratch
+3. Press **Run ▶** (or `Ctrl+Enter`) to execute
+4. Sign in (free) to save projects permanently
 
 ---
 
 ## Supported Languages
 
-| Language | Execution | Live Preview |
+| Language | Extension | Execution |
 |---|---|---|
-| JavaScript (.js, .jsx, .mjs) | Node.js backend | — |
-| TypeScript (.ts, .tsx) | ts-node backend | — |
-| Python (.py) | python3 backend | — |
-| Bash (.sh) | bash backend | — |
-| Perl (.pl) | perl backend | — |
-| C (.c) | gcc → run | — |
-| C++ (.cpp, .cxx) | g++ → run | — |
-| HTML (.html) | — | Sandboxed iframe (instant) |
-| CSS (.css) | — | Styled demo page |
-| Markdown (.md) | — | GitHub-flavoured HTML |
-| JSON (.json) | — | Colorized tree |
-| SVG (.svg) | — | Rendered image |
-| React CDN (.html) | — | React 18 + Babel standalone |
-| Vue 3 CDN (.html) | — | Composition API via CDN |
-| Three.js (.html) | — | WebGL 3D canvas |
-| p5.js (.html) | — | Creative coding canvas |
-| Chart.js (.html) | — | Responsive chart dashboard |
-| React Native (.js) | — | React Native Web (browser) |
-| Go, Rust, Kotlin, Swift, … | — | Syntax highlight only |
+| JavaScript | `.js`, `.jsx`, `.mjs` | Node.js (server sandbox) |
+| TypeScript | `.ts`, `.tsx` | ts-node (server sandbox) |
+| Python | `.py` | Python 3 (server sandbox) |
+| Bash | `.sh`, `.bash` | bash (server sandbox) |
+| Perl | `.pl`, `.pm` | perl (server sandbox) |
+| C | `.c`, `.h` | gcc compile + run |
+| C++ | `.cpp`, `.cxx`, `.cc` | g++ -std=c++17 compile + run |
+| HTML | `.html`, `.htm` | Instant live iframe preview |
+| CSS | `.css`, `.scss` | Styled demo preview |
+| Markdown | `.md` | Rendered HTML preview |
+| JSON | `.json` | Tree viewer preview |
+| SVG | `.svg` | Rendered image preview |
 
 ---
 
-## API Routes
+## Running Code
 
-All routes prefixed with `/api`.
+- **Run button** — toolbar green **Run ▶** button
+- **Keyboard** — `Ctrl+Enter` (Windows/Linux) or `Cmd+Enter` (Mac)
+- HTML/CSS/Markdown/JSON/SVG files show instant **in-browser previews** — no server round-trip
+- All other languages execute in a secure server sandbox with a **10 second timeout**
+- **Stdin** — expand the "Stdin" panel in the Console tab before running to provide program input (`input()`, `scanf`, etc.)
+- **Free tier**: 50 code runs per day, resets at midnight UTC
+- Run count shown in the bottom-right status bar
 
-### Auth
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/auth/register` | Register, returns JWT cookie |
-| `POST` | `/auth/login` | Login, returns JWT cookie |
-| `POST` | `/auth/logout` | Clear JWT cookie |
-| `GET` | `/auth/me` | Current user info |
+---
 
-### Code Execution
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/run` | Execute code — body: `{ language, code, stdin?, filename? }` |
-| `GET` | `/usage` | `{ runsRemaining: number }` |
+## File System
 
-### Projects
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/projects` | List user's projects |
-| `POST` | `/projects` | Save/create project |
-| `GET` | `/projects/:id` | Load project files |
-| `DELETE` | `/projects/:id` | Delete project |
+- Files stored in `localStorage` until you sign in
+- **File Tree** (left panel) shows all project files with collapsible folders
+- **New file**: click `+` in Explorer header, type a name, press Enter
+- **Rename**: double-click any file in the tree, edit, press Enter
+- **Delete**: hover a file → click `×` (confirmation required)
+- **Folders**: use `/` in filenames — e.g. `src/index.ts` auto-creates `src/`
+- **Ctrl+S** — saves to the cloud (requires sign-in)
+- Status bar shows **Unsaved** (amber) when local changes exist
 
-### Build
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/build` | Queue APK build — body: `{ files }` |
-| `GET` | `/build/:jobId` | Poll job status |
-| `GET` | `/download/:jobId` | Stream APK download |
+---
 
-### Explore
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/explore` | List public projects (search/filter) |
-| `GET` | `/explore/:id` | Get shared project |
-| `POST` | `/explore/:id/fork` | Fork project to your account |
+## Projects & Autosave
+
+- Sign in to enable cloud projects
+- Autosave triggers **3 seconds** after your last keystroke
+- **Projects modal** (toolbar → Projects) — save, load, and delete
+- Each project has full **version history** — restore any previous snapshot
+- **Download ZIP** — toolbar archive icon downloads all files as `.zip`
+- Projects are **private by default**
+
+---
+
+## Sharing & Explore
+
+- **Share** button — creates a public read-only link
+- Shared projects can be **Run** and **Forked** by anyone
+- **Explore** page (`/explore`) — browse community-shared projects
+  - Filter by language chip (JS, TS, Python, HTML, Flutter, React Native, Android)
+  - Search by project name
+  - Fork any project directly into your IDE
+
+---
+
+## Editor Features
+
+| Feature | Details |
+|---|---|
+| Syntax highlighting | All supported languages via CodeMirror 6 + Lezer parsers |
+| Syntax error linting | Real-time underlines for JS, TS, Python, HTML, CSS, JSON, Go, Rust, C/C++ |
+| Code folding | Click `›` gutter icons to fold/unfold blocks |
+| Auto-closing brackets | `(`, `[`, `{`, `"`, `'` auto-close |
+| Bracket matching | Matching brackets highlighted |
+| Multi-cursor | `Alt+Click` to add cursors; `Ctrl+D` selects next occurrence |
+| Find & Replace | `Ctrl+F` — full search panel with regex support |
+| Comment toggle | `Ctrl+/` — toggles line or block comment |
+| Format code | `Ctrl+Shift+F` — Prettier (JS, TS, HTML, CSS, JSON) |
+| Word wrap | `Alt+Z` or toolbar toggle |
+| Font size | Status bar `−`/`+` or Settings panel (10–24 px) |
+| Color themes | VS Code Dark, GitHub Dark, Dracula, Monokai |
+| Cursor position | Line/column shown in bottom-left status bar |
+
+### Settings Panel
+
+Click the ⚙ gear icon (or press `Ctrl+,`) to open Settings:
+
+- **Color Theme** — 4 built-in themes with live preview swatches
+- **Font Size** — presets (11, 13, 15, 17) or fine ±1 control
+- **Word Wrap** — toggle with animation
+
+---
+
+## Keyboard Shortcuts
+
+Press `?` anywhere in the IDE to open the full shortcut reference.
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+Enter` | Run / Preview current file |
+| `Ctrl+/` | Toggle line comment |
+| `Ctrl+F` | Find in file |
+| `Ctrl+Shift+F` | Format with Prettier |
+| `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
+| `Ctrl+D` | Select next occurrence |
+| `Alt+↑ / ↓` | Move line up / down |
+| `Tab` / `Shift+Tab` | Indent / Dedent block |
+| `Alt+Z` | Toggle word wrap |
+| `Ctrl+Shift+P` | Command palette |
+| `Ctrl+,` | Open settings |
+| `?` | Open keyboard shortcuts panel |
+| `Escape` | Close any modal |
+
+---
+
+## Terminal
+
+The **Terminal** tab (right panel) gives you an interactive shell:
+
+- Connects to `/api/terminal/ws` via WebSocket
+- Falls back to HTTP polling if WebSocket is unavailable
+- Supports ANSI colors and standard terminal control sequences
+- Session resets on reconnect
 
 ---
 
 ## Templates
 
-35+ project templates in `artifacts/cloud-ide/src/lib/templates.ts`:
+Open **New → Template** to choose from all available templates, organized by section:
 
-**Quick Start** (featured 6, run in < 2 seconds):
-- React 18 CDN, TypeScript Starter, Python Data Science
-- Three.js 3D, p5.js Flow Field, Chart.js Dashboard
+### Runnable Now
+Run instantly — results in seconds, no build needed:
 
-**More Languages** (also runnable in the sandbox):
-- JS Algorithms, TS Types/Generics, TS OOP, TS Async
-- Python ML, Python Regex, Python Web Scrape
-- Bash Script, C Program, C++ Program, Perl Script
-- Vue 3 CDN, HTML Page, HTML Canvas, CSS Animations, CSS Grid
-- Markdown Doc, JSON Explorer, SVG Art, API Mock
+| Template | Language | What it shows |
+|---|---|---|
+| JS Algorithms | JavaScript | Sorting (bubble/merge/quick), binary search, linked list, Fibonacci |
+| TypeScript | TypeScript | Interfaces, generics, type guards, utility types |
+| Python Data | Python | Statistics, grade distribution, quartiles from stdlib only |
+| Python Script | Python | Classes, list comprehensions, closures, word frequency |
+| HTML Page | HTML | Interactive page with live iframe — forms, counter |
+| HTML Canvas | HTML | Bouncing balls physics animation with click-to-add |
 
-**Mobile Live Preview** (runs in-browser, no build):
-- Expo Starter (React Native Web)
-- React Native TypeScript (React Native Web)
+### More Languages
+- **JS Fetch API** — async fetch simulation, Promise.all, error handling
+- **JS Promises** — promise chaining, async/await patterns
+- **Bash Script** — variables, arrays, functions, word frequency
+- **Python Input** — stdin demo for `input()` programs
+- **C Program** — structs, pointers, qsort, linked list
+- **C++ Program** — STL containers, lambdas, templates, algorithms
 
-**Mobile — Build Required**:
-- Flutter, Android Kotlin, Android Java, iOS Swift, Python Kivy
+### Mobile Live Preview
+- **Expo Starter** / **React Native TS** — in-browser phone simulator via Expo Snack
 
-### Adding a template
+### Mobile / Build Required
+- Flutter, Android Kotlin, Android Java — requires SDK
 
-```typescript
-// In artifacts/cloud-ide/src/lib/templates.ts
-{
-  id: "my-template",        // unique slug
-  name: "My Template",
-  description: "Short description",
-  icon: "🎯",               // emoji
-  language: "JavaScript",
-  runnable: true,           // appears in "Runnable Now" section
-  files: {
-    "main.js": `// your starter code here\nconsole.log("Hello!");`,
-  },
-}
+---
+
+## Mobile / React Native
+
+React Native projects use **Expo Snack** for live preview:
+
+1. Choose **Expo Starter** or **React Native TS** template
+2. IDE auto-syncs files to Expo Snack on every save
+3. **Preview tab** shows a phone simulator running your app
+4. Switch iOS / Android / Web with the platform selector
+5. No build pipeline required
+
+---
+
+## Build APK
+
+> **Honest status**: Flutter/Android SDK is **not available** in the hosted environment. The Build Log tab shows clear instructions and setup steps if you attempt a build.
+
+To enable APK builds locally:
+```bash
+git clone https://github.com/flutter/flutter.git -b stable ~/flutter
+export PATH="$PATH:$HOME/flutter/bin"
+flutter doctor
 ```
 
----
-
-## React Native Web Preview (How It Works)
-
-Mobile templates run live in the browser — no Expo API dependency for the web tab:
-
-1. `useSnackSync` detects RN imports (`from 'react-native'`, `from 'expo'`)
-2. IDE switches the right panel to "Phone Preview" automatically
-3. `MobilePreview.tsx` receives the `files` prop from `PreviewPanel`
-4. On each file change (debounced 2 seconds), `generateReactNativeWebPreview(files)` is called
-5. `transformRNCode()` rewrites imports:
-   - `import { View } from 'react-native'` → `const { View } = ReactNativeWeb;`
-   - `import React, { useState } from 'react'` → `const { useState } = React;`
-   - `export default function App()` → `function App()`
-6. The transformed code is JSON-encoded and embedded in a self-contained HTML page
-7. CDN scripts load: React 18 UMD, ReactDOM 18 UMD, React Native Web 0.19.12, Babel standalone 7.23
-8. Babel transforms JSX at runtime; indirect `eval()` runs the code in global scope
-9. `AppRegistry.runApplication()` mounts `window.App` into `<div id="root">`
-10. The HTML page is served from a `blob://` URL in an iframe
-
-The Android/iOS Expo Go prompt has been removed — the preview is **Web-only** (React Native Web in-browser). No download prompts, no Expo Go app required.
+The build pipeline uses BullMQ + Redis for async job processing. Poll `/api/build/:jobId/status` for real-time progress.
 
 ---
 
-## Build Pipeline
+## Deploy
 
-The APK build is real but requires server-side SDKs:
+Click **Deploy** in the toolbar to publish a preview URL:
 
-1. User clicks **Build APK** → `POST /api/build`
-2. BullMQ job queued in Redis
-3. Worker: copies files to temp dir, runs `flutter build apk --release` or `./gradlew assembleDebug`
-4. Frontend polls `GET /api/build/:jobId` every 2 seconds
-5. Success → `GET /api/download/:jobId` streams the `.apk`
-6. Failure → real compiler error shown in Build Log panel (no vague messages)
-
-> **Without Flutter/Android SDK on the server**, the build fails with an honest error.
-> The Build Log shows the actual stderr output so you know exactly what's missing.
+- Packages all project files
+- Returns a shareable URL (valid 7 days)
+- Great for sharing working HTML/JS demos
+- POSTs to `/api/deploy` — requires sign-in
 
 ---
 
-## Rate Limiting
+## AI Code Assistant
 
-- **50 executions per user per day**
-- Resets at midnight UTC
-- Tracked in PostgreSQL `run_usage` table
-- Guest (unauthenticated) users: IP-based limit
-- Toolbar Run button shows remaining count; disables at 0
+Click the **sparkle ✦** icon in the left sidebar to open AI Chat:
+
+- Ask questions about your code, request refactors, explanations, new code
+- Click **Insert into editor** on any code block to inject at the cursor
+- Backed by `/api/ai/chat`
 
 ---
 
-## Known Limitations
+## Git Integration
 
-| Feature | Status | Notes |
+Click the **branch** icon in the left sidebar:
+
+- View current branch and repository status
+- Stage, commit, push, pull with a GitHub PAT
+- PAT stored in Environment Variables (never in code)
+- Backend: `/api/git/*` routes using `simple-git`
+
+---
+
+## Environment Variables
+
+Click the **key** icon in the left sidebar:
+
+- Variables stored in `localStorage` under `cloudide_env_vars`
+- Injected as `process.env` in run requests
+- Never committed to project files or sent to the server in plaintext
+
+---
+
+## Authentication
+
+### Email + Password
+- Register / sign in at `/auth`
+- Passwords hashed with bcrypt (12 rounds)
+- Auth token stored as `httpOnly` cookie (7-day expiry)
+
+### GitHub OAuth
+- "Continue with GitHub" on the auth page
+- Requires `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET`
+- Flow: `GET /api/auth/github` → GitHub → `GET /api/auth/github/callback`
+
+### Google OAuth
+- Requires `GOOGLE_CLIENT_ID`
+- Uses `google-auth-library` ID token verification
+
+---
+
+## Billing & Plans
+
+Visit `/billing` for full pricing.
+
+| Plan | Price | Limits |
 |---|---|---|
-| APK build | Needs SDK | Requires Flutter/Android SDK on server |
-| Go / Rust execution | Not implemented | Templates show code only |
-| Multi-user collaboration | Not implemented | One user per session |
-| File upload | Not implemented | Files created in-IDE only |
-| Custom domains | Not implemented | Roadmap item |
-| Mobile exports (`.ipa`) | Not implemented | Apple signing complexity |
+| Free | $0/forever | 50 runs/day, 5 projects, 1-day version history |
+| Pro | $9/month | Unlimited runs, AI, Git, Deploy, 30-day history |
+| Team | $29/month (coming soon) | Collaboration, SSO, custom domains |
+
+> During beta, all Pro features are free.
 
 ---
 
-## Security
+## Architecture
 
-- JWT secrets stored in environment variables only
-- httpOnly, SameSite=Strict cookies
-- Code executed in child process with resource limits (CPU/memory timeout)
-- User files sandboxed per execution — no cross-user file access
-- SQL injection prevented by Drizzle ORM parameterized queries
-- Rate limiting prevents execution abuse
+```
+/
+├── artifacts/
+│   ├── cloud-ide/          # React + Vite frontend (TypeScript)
+│   │   └── src/
+│   │       ├── components/ # Editor, FileTree, PreviewPanel, Toolbar, …
+│   │       ├── pages/      # IDE, AuthPage, Explore, BillingPage, …
+│   │       ├── hooks/      # useFileSystem, useRun, useBuild, useProjects, …
+│   │       ├── contexts/   # AuthContext
+│   │       └── lib/        # templates.ts, preview-generators.ts
+│   └── api-server/         # Express 5 + TypeScript API
+│       └── src/
+│           ├── routes/     # run, build, projects, auth, share, ai, git, deploy, …
+│           ├── lib/        # runner, builder, logger
+│           └── middlewares/
+├── packages/
+│   └── db/                 # Drizzle ORM + PostgreSQL schema
+└── pnpm-workspace.yaml
+```
+
+### Key Technologies
+
+| Layer | Stack |
+|---|---|
+| Frontend | React 18, Vite, TypeScript, Tailwind CSS, CodeMirror 6 |
+| Backend | Express 5, TypeScript, Node.js |
+| Database | PostgreSQL + Drizzle ORM |
+| Job Queue | BullMQ + Redis |
+| Auth | JWT (httpOnly cookies), bcrypt, Google OAuth, GitHub OAuth |
+| Editor | CodeMirror 6 with 12+ language parsers |
+| Terminal | WebSocket (`ws`) server |
+| Code runner | Isolated per-language subprocess execution |
 
 ---
 
-## Deployment
+## Local Development
 
-Two services to deploy:
+```bash
+# Install all dependencies
+pnpm install
+
+# Start the frontend dev server
+pnpm --filter @workspace/cloud-ide run dev
+
+# Start the API server
+pnpm --filter @workspace/api-server run dev
+
+# Run database migrations
+pnpm --filter @workspace/db run migrate
+```
+
+**Prerequisites**: Node.js 20+, pnpm 8+, PostgreSQL 15+, Redis 7+
+
+---
+
+## Environment Variables Reference
 
 ### API Server
-```bash
-pnpm --filter @workspace/api-server run build
-node artifacts/api-server/dist/index.js
-```
-Requires: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `PORT=8080`
+
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `REDIS_URL` | ✅ | Redis URL (for BullMQ) |
+| `JWT_SECRET` | ✅ | Token signing secret (min 32 chars) |
+| `PORT` | — | API port (default: 8080) |
+| `NODE_ENV` | — | `production` enables secure cookies |
+| `GOOGLE_CLIENT_ID` | — | Google OAuth client ID |
+| `GITHUB_CLIENT_ID` | — | GitHub OAuth app client ID |
+| `GITHUB_CLIENT_SECRET` | — | GitHub OAuth app client secret |
+| `FRONTEND_URL` | — | Frontend base URL (for OAuth redirects) |
+| `OPENAI_API_KEY` | — | OpenAI key (for AI code assistant) |
 
 ### Frontend
-```bash
-pnpm --filter @workspace/cloud-ide run build
-# Serve artifacts/cloud-ide/dist as static files
-```
-The frontend proxies `/api/*` to the API server in dev. In production, configure your reverse proxy:
 
-```nginx
-location /api/  { proxy_pass http://localhost:8080/api/; }
-location /ide/  { root /srv; try_files $uri /ide/index.html; }
-location /      { root /srv; try_files $uri /index.html; }
-```
-
----
-
-## Roadmap
-
-### Phase 2 (Next)
-- [ ] Real-time collaborative editing (Y.js / Liveblocks)
-- [ ] AI code completion (OpenAI / Claude API)
-- [ ] More languages: Go, Rust, Ruby, PHP execution
-- [ ] File upload + image assets in projects
-- [ ] Custom subdomain per shared project
-
-### Phase 3
-- [ ] Teams & organizations
-- [ ] Private projects (paid tier)
-- [ ] Custom domains for deployed projects
-- [ ] Package.json support — `npm install` in sandbox
-- [ ] Persistent filesystem between runs
-
----
-
-## License
-
-MIT
+| Variable | Required | Description |
+|---|---|---|
+| `VITE_API_URL` | — | API base URL override (default: same origin) |

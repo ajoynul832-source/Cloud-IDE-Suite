@@ -9,8 +9,9 @@ import SharedProject from "@/pages/SharedProject";
 import LandingPage   from "@/pages/LandingPage";
 import { AuthProvider } from "@/contexts/AuthContext";
 
-const Explore  = lazy(() => import("@/pages/Explore"));
-const AuthPage = lazy(() => import("@/pages/AuthPage"));
+const Explore     = lazy(() => import("@/pages/Explore"));
+const AuthPage    = lazy(() => import("@/pages/AuthPage"));
+const BillingPage = lazy(() => import("@/pages/BillingPage"));
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,11 @@ function Router() {
       <Route path="/auth">
         <Suspense fallback={LoadingScreen}>
           <AuthPage />
+        </Suspense>
+      </Route>
+      <Route path="/billing">
+        <Suspense fallback={LoadingScreen}>
+          <BillingPage />
         </Suspense>
       </Route>
       <Route path="/p/:shareId" component={SharedProject} />

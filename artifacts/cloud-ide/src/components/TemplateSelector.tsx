@@ -8,12 +8,12 @@ interface TemplateSelectorProps {
 }
 
 const QUICK_START_IDS = [
-  "html-react-cdn",
+  "js-algorithms",
   "ts-starter",
   "python-data",
-  "html-threejs",
-  "html-p5js",
-  "html-chartjs",
+  "python-starter",
+  "html-page",
+  "html-canvas",
 ];
 
 const LIVE_PREVIEW_IDS = ["expo-starter", "react-native-ts"];
@@ -183,12 +183,12 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
           {/* Normal sections — only shown when not searching */}
           {!q && (
             <>
-              {/* Section 1: Quick Start (featured 6) */}
+              {/* Section 1: Runnable Now (featured 6) */}
               <div className="px-6 pt-3 pb-2">
                 <div className="flex items-center gap-2 mb-3">
                   <Star size={13} className="text-[#4ade80]" />
                   <h3 className="font-mono text-xs font-semibold uppercase tracking-widest text-[#4ade80]/80">
-                    Quick Start
+                    Runnable Now
                   </h3>
                   <span className="text-[10px] font-mono text-muted-foreground/50">
                     — run instantly, results in seconds

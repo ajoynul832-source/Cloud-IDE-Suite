@@ -1,6 +1,6 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { EditorState, Extension } from "@codemirror/state";
-import { EditorView, lineNumbers, keymap, highlightActiveLine, highlightActiveLineGutter } from "@codemirror/view";
+import { EditorView, lineNumbers, keymap, highlightActiveLine, highlightActiveLineGutter, drawSelection, rectangularSelection, crosshairCursor, highlightSpecialChars } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, toggleComment } from "@codemirror/commands";
 import { search, searchKeymap } from "@codemirror/search";
 import { linter, lintGutter, Diagnostic } from "@codemirror/lint";
@@ -19,8 +19,8 @@ import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { dracula } from "@uiw/codemirror-theme-dracula";
 import { monokai } from "@uiw/codemirror-theme-monokai";
 import { githubDark } from "@uiw/codemirror-theme-github";
-import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
-import { bracketMatching, indentOnInput, syntaxTree } from "@codemirror/language";
+import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
+import { bracketMatching, indentOnInput, syntaxTree, foldGutter, foldKeymap, indentUnit } from "@codemirror/language";
 
 // ── Theme system ───────────────────────────────────────────────────────────────
 
@@ -156,13 +156,22 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
         lineNumbers(),
         highlightActiveLine(),
         highlightActiveLineGutter(),
+        highlightSpecialChars(),
         history(),
+        drawSelection(),
+        rectangularSelection(),
+        crosshairCursor(),
         bracketMatching(),
         closeBrackets(),
         indentOnInput(),
+        indentUnit.of("  "),
+        foldGutter(),
         keymap.of([
           ...defaultKeymap,
           ...historyKeymap,
+          ...foldKeymap,
+          ...closeBracketsKeymap,
+          ...completionKeymap,
           indentWithTab,
           {
             key: "Ctrl-Enter", mac: "Cmd-Enter",
@@ -179,7 +188,7 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
         ]),
         getLanguageExtension(filename),
         getThemeExtension(theme),
-        autocompletion(),
+        autocompletion({ defaultKeymap: false }),
         search({ top: true }),
         keymap.of(searchKeymap),
         EditorView.theme({
@@ -190,8 +199,14 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
           },
           ".cm-scroller": { overflow: "auto", height: "100%" },
           ".cm-content":  { padding: "8px 0" },
-          // Lint gutter width
           ".cm-gutter.cm-lint-gutter": { width: "18px" },
+          ".cm-foldGutter": { width: "14px" },
+          ".cm-foldGutter .cm-gutterElement": {
+            cursor: "pointer",
+            padding: "0 2px",
+            color: "rgba(255,255,255,0.2)",
+          },
+          ".cm-foldGutter .cm-gutterElement:hover": { color: "rgba(74,222,128,0.7)" },
         }),
       ];
 

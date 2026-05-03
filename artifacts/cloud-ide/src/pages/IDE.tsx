@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { FileTree } from "@/components/FileTree";
 import { Editor, EditorRef } from "@/components/Editor";
@@ -12,6 +12,9 @@ import { ShareModal } from "@/components/ShareModal";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { KeyboardShortcutsModal } from "@/components/KeyboardShortcutsModal";
 import { CommandPalette } from "@/components/CommandPalette";
+import { SidebarPanel, SidebarTab } from "@/components/SidebarPanel";
+import { DeployModal } from "@/components/DeployModal";
+import { EnvVar } from "@/components/EnvPanel";
 import AuthPage from "@/pages/AuthPage";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useBuild } from "@/hooks/useBuild";
@@ -26,7 +29,8 @@ import {
   generateJSONPreview,
   generateSVGPreview,
 } from "@/lib/preview-generators";
-import { Zap, Code2, Globe, Terminal } from "lucide-react";
+import { Zap, Code2, Globe, Terminal, Rocket, CreditCard } from "lucide-react";
+import { Link } from "wouter";
 import { EditorTheme } from "@/components/Editor";
 
 const AUTOSAVE_DEBOUNCE_MS = 3_000;
@@ -127,6 +131,12 @@ export default function IDE() {
   const [showSettings,        setShowSettings]        = useState(false);
   const [showShortcuts,       setShowShortcuts]       = useState(false);
   const [showCommandPalette,  setShowCommandPalette]  = useState(false);
+  const [showDeploy,          setShowDeploy]          = useState(false);
+  const [sidebarTab,          setSidebarTab]          = useState<SidebarTab>(null);
+  const [envVars,             setEnvVars]             = useState<EnvVar[]>([]);
+  const [hasUnsavedChanges,   setHasUnsavedChanges]  = useState(false);
+  const [isMobileView,        setIsMobileView]        = useState(false);
+  const [mobilePanelIdx,      setMobilePanelIdx]      = useState(0);
 
   const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
 
@@ -171,6 +181,7 @@ export default function IDE() {
   const editorRef     = useRef<EditorRef>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedHash = useRef<string>("");
+  const lastFileHash  = useRef<string>("");
 
   const runTarget       = getRunTarget(activeFile ?? "");
   const currentLanguage = getDisplayLanguage(activeFile ?? Object.keys(files)[0] ?? "");
@@ -237,6 +248,26 @@ export default function IDE() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Mobile viewport detection
+  useEffect(() => {
+    const check = () => setIsMobileView(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // Track unsaved changes
+  useEffect(() => {
+    const hash = JSON.stringify(files);
+    if (hash !== lastFileHash.current) {
+      lastFileHash.current = hash;
+      if (currentProjectId) {
+        setHasUnsavedChanges(hash !== lastSavedHash.current);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files, currentProjectId]);
+
   // Global keyboard shortcuts (outside CodeMirror)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -263,10 +294,39 @@ export default function IDE() {
         setShowCommandPalette((v) => !v);
         return;
       }
+
+      // Ctrl+S / Cmd+S → manual save
+      if (e.key === "s" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        handleManualSave();
+        return;
+      }
+
+      // Ctrl+Shift+F / Cmd+Shift+F → find in files (global shortcut outside editor)
+      if (e.key === "F" && (e.ctrlKey || e.metaKey) && e.shiftKey && !inInput) {
+        e.preventDefault();
+        setSidebarTab((v) => v === "search" ? null : "search");
+        return;
+      }
+
+      // Ctrl+Shift+G → git panel
+      if (e.key === "G" && (e.ctrlKey || e.metaKey) && e.shiftKey && !inInput) {
+        e.preventDefault();
+        setSidebarTab((v) => v === "git" ? null : "git");
+        return;
+      }
+
+      // Ctrl+I / Cmd+I → AI assistant
+      if (e.key === "i" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !inInput) {
+        e.preventDefault();
+        setSidebarTab((v) => v === "ai" ? null : "ai");
+        return;
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProjectId, files, currentProjectName]);
 
   // Autosave
   const scheduleAutosave = useCallback(() => {
@@ -522,10 +582,81 @@ export default function IDE() {
     setCurrentProjectId(id);
     setCurrentProjectName(name);
     lastSavedHash.current = JSON.stringify(files);
+    setHasUnsavedChanges(false);
     createVersion(id, "Saved");
   };
 
+  // Manual save (Ctrl+S)
+  const handleManualSave = useCallback(async () => {
+    if (!currentProjectId) {
+      setShowProjects(true);
+      return;
+    }
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    const currentHash = JSON.stringify(files);
+    if (currentHash === lastSavedHash.current) return;
+    setAutosaveStatus("saving");
+    const saved = await saveProject(currentProjectName, projectType, files, currentProjectId);
+    if (saved) {
+      lastSavedHash.current = currentHash;
+      setHasUnsavedChanges(false);
+      setAutosaveStatus("saved");
+      setTimeout(() => setAutosaveStatus("idle"), 2_000);
+    } else {
+      setAutosaveStatus("idle");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProjectId, currentProjectName, projectType, files, saveProject]);
+
+  // Handle file selection from search panel (with optional line navigation)
+  const handleSearchSelectFile = useCallback((filename: string, _line?: number) => {
+    if (!openFiles.includes(filename)) setOpenFiles((prev) => [...prev, filename]);
+    setActiveFile(filename);
+    setSidebarTab(null);
+    setCursorPos(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openFiles]);
+
   // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (isMobileView) {
+    return <MobileIDELayout
+      files={files}
+      activeFile={activeFile}
+      openFiles={openFiles}
+      mobilePanelIdx={mobilePanelIdx}
+      setMobilePanelIdx={setMobilePanelIdx}
+      onSelectFile={handleSelectFile}
+      onCloseFile={handleCloseFile}
+      editorRef={editorRef}
+      saveFile={saveFile}
+      createFile={createFile}
+      deleteFile={deleteFile}
+      renameFile={renameFile}
+      handleRun={handleRun}
+      handleFormat={handleFormat}
+      isRunning={isRunning}
+      stream={stream}
+      runsRemaining={localRunsRemaining}
+      stdinInput={stdinInput}
+      setStdinInput={setStdinInput}
+      htmlPreview={htmlPreview}
+      rightPanelTab={rightPanelTab}
+      setRightPanelTab={setRightPanelTab}
+      fontSize={fontSize}
+      wordWrap={wordWrap}
+      theme={theme}
+      isBuilding={isBuilding}
+      buildLogs={logs}
+      buildStatus={status?.status}
+      canRun={canRun}
+      previewMode={previewMode}
+      onNewProject={() => setShowTemplates(true)}
+      showTemplates={showTemplates}
+      handleLoadTemplate={handleLoadTemplate}
+      setShowTemplates={setShowTemplates}
+    />;
+  }
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#0d1117]">
@@ -545,6 +676,7 @@ export default function IDE() {
         }}
         onShowSettings={() => setShowSettings((v) => !v)}
         onShowShortcuts={() => setShowShortcuts(true)}
+        onDeploy={() => setShowDeploy(true)}
         buildStatus={status?.status}
         jobId={jobId}
         currentLanguage={currentLanguage}
@@ -575,8 +707,26 @@ export default function IDE() {
         </div>
       )}
 
-      <div className="flex-1 overflow-hidden relative">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
+      <div className="flex-1 overflow-hidden relative flex">
+        {/* Icon-rail + slide-out panel sidebar (AI / Search / Git / Env / Packages) */}
+        <SidebarPanel
+          activeTab={sidebarTab}
+          onTabChange={setSidebarTab}
+          files={files}
+          projectId={currentProjectId}
+          onSelectFile={handleSearchSelectFile}
+          envVars={envVars}
+          onEnvVarsChange={setEnvVars}
+          currentContent={activeFile ? (files[activeFile] ?? "") : ""}
+          onInsertCode={(code) => {
+            if (activeFile) {
+              const prev = files[activeFile] ?? "";
+              saveFile(activeFile, prev + "\n" + code);
+            }
+          }}
+        />
+
+        <ResizablePanelGroup direction="horizontal" className="h-full flex-1">
           <ResizablePanel defaultSize={20} minSize={12} maxSize={40}>
             <FileTree
               files={files}
@@ -674,6 +824,9 @@ export default function IDE() {
         fontSize={fontSize}
         onFontSizeIncrease={() => setFontSize(fontSize + 1)}
         onFontSizeDecrease={() => setFontSize(fontSize - 1)}
+        saveStatus={autosaveStatus}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onSave={handleManualSave}
       />
 
       {/* Modals */}
@@ -754,6 +907,164 @@ export default function IDE() {
         theme={theme}
         onThemeChange={setTheme}
       />
+
+      {showDeploy && (
+        <DeployModal
+          projectId={currentProjectId}
+          projectName={currentProjectName}
+          files={files}
+          onClose={() => setShowDeploy(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Mobile IDE Layout ──────────────────────────────────────────────────────────
+interface MobileIDELayoutProps {
+  files: Record<string, string>;
+  activeFile: string | null;
+  openFiles: string[];
+  mobilePanelIdx: number;
+  setMobilePanelIdx: (i: number) => void;
+  onSelectFile: (path: string) => void;
+  onCloseFile: (path: string) => void;
+  editorRef: React.RefObject<EditorRef | null>;
+  saveFile: (path: string, content: string) => void;
+  handleRun: () => void;
+  handleFormat: () => void;
+  createFile: (path: string, content?: string) => void;
+  deleteFile: (path: string) => void;
+  renameFile: (oldPath: string, newPath: string) => void;
+  isRunning: boolean;
+  stream: Parameters<typeof PreviewPanel>[0]["stream"];
+  runsRemaining: number | null;
+  stdinInput: string;
+  setStdinInput: (v: string) => void;
+  htmlPreview: string | null;
+  rightPanelTab: PanelTab;
+  setRightPanelTab: (t: PanelTab) => void;
+  fontSize: number;
+  wordWrap: boolean;
+  theme: EditorTheme;
+  isBuilding: boolean;
+  buildLogs: string | null;
+  buildStatus: string | null | undefined;
+  canRun: boolean;
+  previewMode: boolean;
+  onNewProject: () => void;
+  showTemplates: boolean;
+  handleLoadTemplate: (t: ProjectTemplate) => void;
+  setShowTemplates: (v: boolean) => void;
+}
+
+const MOBILE_PANELS = ["Files", "Editor", "Output"] as const;
+
+function MobileIDELayout({
+  files, activeFile, openFiles, mobilePanelIdx, setMobilePanelIdx,
+  onSelectFile, onCloseFile, editorRef, saveFile, handleRun, handleFormat,
+  createFile, deleteFile, renameFile,
+  isRunning, stream, runsRemaining, stdinInput, setStdinInput,
+  htmlPreview, rightPanelTab, setRightPanelTab, fontSize, wordWrap, theme,
+  isBuilding, buildLogs, buildStatus, canRun,
+  onNewProject: _onNewProject, showTemplates, handleLoadTemplate, setShowTemplates,
+}: MobileIDELayoutProps) {
+
+  return (
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#0d1117]">
+      {/* Mobile panel tabs */}
+      <div className="flex border-b border-white/8 bg-[#161b22] shrink-0">
+        {MOBILE_PANELS.map((label, i) => (
+          <button
+            key={label}
+            onClick={() => setMobilePanelIdx(i)}
+            className={`flex-1 py-2 text-[11px] font-mono uppercase tracking-widest transition-colors ${
+              mobilePanelIdx === i
+                ? "text-[#4ade80] border-b-2 border-[#4ade80]"
+                : "text-white/40 hover:text-white/70"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          onClick={handleRun}
+          disabled={isRunning || !canRun || runsRemaining === 0}
+          className="px-4 py-2 bg-[#4ade80] text-black font-bold text-[11px] font-mono shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isRunning ? "…" : "▶"}
+        </button>
+      </div>
+
+      {/* Panel content */}
+      <div className="flex-1 overflow-hidden">
+        {mobilePanelIdx === 0 && (
+          <FileTree
+            files={files}
+            activeFile={activeFile}
+            onSelect={(path) => { onSelectFile(path); setMobilePanelIdx(1); }}
+            onCreate={createFile}
+            onDelete={deleteFile}
+            onRename={renameFile}
+          />
+        )}
+        {mobilePanelIdx === 1 && (
+          <div className="h-full flex flex-col">
+            <TabBar
+              openFiles={openFiles}
+              activeFile={activeFile}
+              onSelect={onSelectFile}
+              onClose={onCloseFile}
+            />
+            <div className="flex-1 overflow-hidden">
+              {activeFile && files[activeFile] !== undefined ? (
+                <Editor
+                  ref={editorRef}
+                  key={activeFile}
+                  initialContent={files[activeFile]}
+                  filename={activeFile}
+                  onChange={(c) => saveFile(activeFile, c)}
+                  onRun={handleRun}
+                  onFormat={handleFormat}
+                  fontSize={fontSize}
+                  wordWrap={wordWrap}
+                  theme={theme}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <button
+                    onClick={() => setMobilePanelIdx(0)}
+                    className="text-white/40 text-sm font-mono"
+                  >
+                    ← Select a file
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {mobilePanelIdx === 2 && (
+          <PreviewPanel
+            logs={buildLogs}
+            buildStatus={buildStatus ?? null}
+            buildError={buildStatus === "failed" ? "Build failed" : null}
+            isBuilding={isBuilding}
+            isRunning={isRunning}
+            activeTab={rightPanelTab}
+            onTabChange={setRightPanelTab}
+            stream={stream as never}
+            htmlPreview={htmlPreview}
+            runsRemaining={runsRemaining}
+            stdinInput={stdinInput}
+            onStdinChange={setStdinInput}
+            livePreview={!!htmlPreview}
+          />
+        )}
+      </div>
+
+      {showTemplates && (
+        <TemplateSelector onSelect={handleLoadTemplate} onClose={() => setShowTemplates(false)} />
+      )}
     </div>
   );
 }

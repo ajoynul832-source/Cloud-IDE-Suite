@@ -559,6 +559,234 @@ console.log("\\nFibonacci[0..9]:", fibs);
   },
 
   {
+    id: "js-fetch-mock",
+    name: "JS Fetch API",
+    description: "Simulated REST API calls, Promise.all, error handling, and JSON processing",
+    icon: "🌐",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "fetch-demo.js": `// JS Fetch API — simulated REST calls (click Run ▶)
+// Note: Real network fetch is blocked in the sandbox.
+// This demo uses a mock fetch that mirrors the real Fetch API.
+
+// ── Mock fetch (mirrors browser fetch API) ─────────────────────────
+const MOCK_DB = {
+  users: [
+    { id: 1, name: "Alice",   role: "admin",  score: 98 },
+    { id: 2, name: "Bob",     role: "user",   score: 74 },
+    { id: 3, name: "Charlie", role: "user",   score: 85 },
+    { id: 4, name: "Diana",   role: "mod",    score: 91 },
+    { id: 5, name: "Eve",     role: "user",   score: 62 },
+  ],
+  posts: [
+    { id: 1, userId: 1, title: "Intro to JS",    likes: 42 },
+    { id: 2, userId: 2, title: "Python tips",    likes: 17 },
+    { id: 3, userId: 1, title: "CSS grid guide", likes: 31 },
+    { id: 4, userId: 3, title: "Async/await",    likes: 55 },
+    { id: 5, userId: 4, title: "TS generics",    likes: 23 },
+  ],
+};
+
+function mockFetch(url) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const [, resource, id] = url.match(/\\/api\\/(\\w+)(?:\\/(\\d+))?/) || [];
+      const data = MOCK_DB[resource];
+      if (!data)         { reject(new Error(\`404 Not Found: \${url}\`)); return; }
+      const result = id ? data.find(d => d.id === Number(id)) : data;
+      if (!result)       { reject(new Error(\`404 Not Found: id=\${id}\`)); return; }
+      resolve({ ok: true, json: () => Promise.resolve(result) });
+    }, 30 + Math.random() * 50);
+  });
+}
+
+// ── 1. Basic fetch ─────────────────────────────────────────────────
+async function getUser(id) {
+  const res  = await mockFetch(\`/api/users/\${id}\`);
+  const user = await res.json();
+  return user;
+}
+
+// ── 2. Promise.all — parallel fetches ─────────────────────────────
+async function getAllUsers() {
+  const res   = await mockFetch("/api/users");
+  return res.json();
+}
+
+async function getAllPosts() {
+  const res = await mockFetch("/api/posts");
+  return res.json();
+}
+
+// ── 3. Error handling ─────────────────────────────────────────────
+async function safeFetch(url) {
+  try {
+    const res  = await mockFetch(url);
+    return { data: await res.json(), error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────
+async function main() {
+  console.log("=== Fetch API Demo ===\\n");
+
+  // Single fetch
+  const alice = await getUser(1);
+  console.log("User #1:", alice);
+
+  // Parallel fetch with Promise.all
+  const [users, posts] = await Promise.all([getAllUsers(), getAllPosts()]);
+  console.log(\`\\nLoaded \${users.length} users and \${posts.length} posts in parallel\`);
+
+  // Join data
+  const enriched = posts.map(post => {
+    const author = users.find(u => u.id === post.userId);
+    return { ...post, authorName: author?.name ?? "Unknown" };
+  });
+  console.log("\\nPosts with authors:");
+  enriched.forEach(p =>
+    console.log(\`  [\${p.id}] "\${p.title}" by \${p.authorName} — \${p.likes} likes\`)
+  );
+
+  // Aggregation
+  const topPost = enriched.reduce((a, b) => a.likes > b.likes ? a : b);
+  console.log(\`\\nTop post: "\${topPost.title}" (\${topPost.likes} likes)\`);
+
+  // Error handling
+  const { data, error } = await safeFetch("/api/users/999");
+  console.log("\\nFetch non-existent user:", error ?? data);
+
+  // Score leaderboard
+  const sorted = [...users].sort((a, b) => b.score - a.score);
+  console.log("\\nLeaderboard:");
+  sorted.forEach((u, i) =>
+    console.log(\`  \${i + 1}. \${u.name.padEnd(10)} \${u.score}/100  [\${u.role}]\`)
+  );
+}
+
+main();
+`,
+    },
+  },
+
+  {
+    id: "js-promises",
+    name: "JS Promises",
+    description: "Promise chaining, async/await patterns, race, allSettled, and error handling",
+    icon: "⏳",
+    language: "JavaScript",
+    runnable: true,
+    files: {
+      "promises.js": `// JavaScript Promises — click Run ▶ or press Ctrl+Enter
+
+// ── 1. Basic Promise ──────────────────────────────────────────────
+function delay(ms, value) {
+  return new Promise(resolve => setTimeout(() => resolve(value), ms));
+}
+
+function failAfter(ms, reason) {
+  return new Promise((_, reject) => setTimeout(() => reject(new Error(reason)), ms));
+}
+
+// ── 2. Promise chaining ───────────────────────────────────────────
+async function chainDemo() {
+  console.log("=== Promise Chaining ===");
+  const result = await delay(10, 5)
+    .then(v => { console.log("Step 1:", v); return v * 2; })
+    .then(v => { console.log("Step 2:", v); return v + 3; })
+    .then(v => { console.log("Step 3:", v); return v; });
+  console.log("Final:", result);
+}
+
+// ── 3. Promise.all ────────────────────────────────────────────────
+async function allDemo() {
+  console.log("\\n=== Promise.all (parallel) ===");
+  const t0 = Date.now();
+  const [a, b, c] = await Promise.all([
+    delay(40, "alpha"),
+    delay(20, "beta"),
+    delay(30, "gamma"),
+  ]);
+  console.log("Results:", a, b, c);
+  console.log(\`Time: ~\${Date.now() - t0}ms (all parallel)\`);
+}
+
+// ── 4. Promise.allSettled ─────────────────────────────────────────
+async function allSettledDemo() {
+  console.log("\\n=== Promise.allSettled ===");
+  const results = await Promise.allSettled([
+    delay(10, "ok-1"),
+    failAfter(10, "oops"),
+    delay(10, "ok-2"),
+  ]);
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") console.log(\`  [\${i}] ✓ \${r.value}\`);
+    else                          console.log(\`  [\${i}] ✗ \${r.reason.message}\`);
+  });
+}
+
+// ── 5. Promise.race ───────────────────────────────────────────────
+async function raceDemo() {
+  console.log("\\n=== Promise.race ===");
+  const winner = await Promise.race([
+    delay(50, "slow"),
+    delay(10, "fast"),
+    delay(30, "medium"),
+  ]);
+  console.log("Winner:", winner);
+}
+
+// ── 6. Async error handling ───────────────────────────────────────
+async function errorDemo() {
+  console.log("\\n=== Error Handling ===");
+  // try/catch
+  try {
+    await failAfter(5, "network timeout");
+  } catch (err) {
+    console.log("Caught:", err.message);
+  }
+
+  // .catch()
+  const result = await delay(5, 42)
+    .then(v => { throw new Error(\`bad value: \${v}\`); })
+    .catch(err => { console.log("Recovered from:", err.message); return 0; });
+  console.log("Recovered result:", result);
+}
+
+// ── 7. Async iterator pattern ─────────────────────────────────────
+async function sequential() {
+  console.log("\\n=== Sequential vs Parallel ===");
+  const items = [10, 20, 30];
+
+  // Sequential (slow)
+  const t0 = Date.now();
+  for (const ms of items) await delay(ms, null);
+  console.log(\`Sequential: \${Date.now() - t0}ms\`);
+
+  // Parallel (fast)
+  const t1 = Date.now();
+  await Promise.all(items.map(ms => delay(ms, null)));
+  console.log(\`Parallel:   \${Date.now() - t1}ms\`);
+}
+
+// ── Run all demos ────────────────────────────────────────────────
+(async () => {
+  await chainDemo();
+  await allDemo();
+  await allSettledDemo();
+  await raceDemo();
+  await errorDemo();
+  await sequential();
+  console.log("\\n✓ All done!");
+})();
+`,
+    },
+  },
+
+  {
     id: "python-input",
     name: "Python Input",
     description: "Stdin demo — set input in the Console tab then press Run",
@@ -2918,104 +3146,6 @@ await log("PUT",    "/users/2", { name: "Bobby", role: "admin" });
 await log("DELETE", "/users/3");
 await log("GET",    "/users");
 await log("GET",    "/users/99");  // 404
-`,
-    },
-  },
-
-  {
-    id: "js-fetch-mock",
-    name: "Fetch & JSON",
-    description: "HTTP fetch patterns, async/await, error handling, and data transformation",
-    icon: "🌐",
-    language: "JavaScript",
-    runnable: true,
-    files: {
-      "fetch-demo.js": `// Fetch & JSON Patterns — async HTTP, error handling, data transforms
-// Uses built-in mock data (no real network calls needed)
-
-// ── Mock fetch (works like real fetch, no network needed) ───────────
-const MOCK_DB = {
-  "https://api.example.com/users": [
-    { id: 1, name: "Alice",   email: "alice@example.com",   score: 92 },
-    { id: 2, name: "Bob",     email: "bob@example.com",     score: 78 },
-    { id: 3, name: "Charlie", email: "charlie@example.com", score: 95 },
-    { id: 4, name: "Diana",   email: "diana@example.com",   score: 88 },
-    { id: 5, name: "Eve",     email: "eve@example.com",     score: 70 },
-  ],
-  "https://api.example.com/posts": [
-    { id: 1, userId: 1, title: "Getting started with JS",     views: 4200 },
-    { id: 2, userId: 1, title: "Async/await patterns",        views: 3100 },
-    { id: 3, userId: 2, title: "REST API design",             views: 2800 },
-    { id: 4, userId: 3, title: "TypeScript generics",         views: 5600 },
-    { id: 5, userId: 3, title: "Performance optimization",    views: 1900 },
-  ],
-};
-
-async function fetchJson(url) {
-  await new Promise(r => setTimeout(r, 10)); // simulate latency
-  const data = MOCK_DB[url] ?? MOCK_DB[url.split("?")[0]];
-  if (!data) throw new Error(\`404: \x24{url} not found\`);
-  return { ok: true, json: async () => JSON.parse(JSON.stringify(data)) };
-}
-
-// ── Pattern 1: Basic fetch + error handling ─────────────────────────
-console.log("=== Pattern 1: Basic Fetch ===");
-try {
-  const res  = await fetchJson("https://api.example.com/users");
-  if (!res.ok) throw new Error(\`HTTP error \x24{res.status}\`);
-  const data = await res.json();
-  console.log(\`Fetched \x24{data.length} users\`);
-  data.slice(0, 3).forEach(u => console.log(\`  [\x24{u.id}] \x24{u.name} (score: \x24{u.score})\`));
-} catch (err) {
-  console.error("Fetch failed:", err.message);
-}
-
-// ── Pattern 2: Parallel fetch with Promise.all ─────────────────────
-console.log("\\n=== Pattern 2: Parallel Fetch ===");
-const [usersRes, postsRes] = await Promise.all([
-  fetchJson("https://api.example.com/users"),
-  fetchJson("https://api.example.com/posts"),
-]);
-const [users, posts] = await Promise.all([usersRes.json(), postsRes.json()]);
-console.log(\`Loaded \x24{users.length} users and \x24{posts.length} posts in parallel\`);
-
-// ── Pattern 3: Join + transform ─────────────────────────────────────
-console.log("\\n=== Pattern 3: Join + Transform ===");
-const userMap = Object.fromEntries(users.map(u => [u.id, u]));
-const enriched = posts
-  .map(p => ({ ...p, author: userMap[p.userId]?.name ?? "Unknown" }))
-  .sort((a, b) => b.views - a.views);
-
-console.log("Top posts by views:");
-enriched.forEach(p => {
-  const bar = "█".repeat(Math.round(p.views / 400));
-  console.log(\`  \x24{bar.padEnd(15)} \x24{p.views.toLocaleString()} · "\x24{p.title}" by \x24{p.author}\`);
-});
-
-// ── Pattern 4: Aggregate stats ──────────────────────────────────────
-console.log("\\n=== Pattern 4: Aggregation ===");
-const stats = users.reduce((acc, u) => {
-  acc.totalScore += u.score;
-  acc.max = Math.max(acc.max, u.score);
-  acc.min = Math.min(acc.min, u.score);
-  return acc;
-}, { totalScore: 0, max: -Infinity, min: Infinity });
-
-console.log(\`Average score: \x24{(stats.totalScore / users.length).toFixed(1)}\`);
-console.log(\`Highest:       \x24{stats.max} (\x24{users.find(u => u.score === stats.max)?.name})\`);
-console.log(\`Lowest:        \x24{stats.min} (\x24{users.find(u => u.score === stats.min)?.name})\`);
-
-// ── Pattern 5: Error boundary ───────────────────────────────────────
-console.log("\\n=== Pattern 5: Error Handling ===");
-const results = await Promise.allSettled([
-  fetchJson("https://api.example.com/users"),
-  fetchJson("https://api.example.com/missing"),  // will fail
-  fetchJson("https://api.example.com/posts"),
-]);
-results.forEach((r, i) => {
-  if (r.status === "fulfilled") console.log(\`  [✓] Request \x24{i+1} succeeded\`);
-  else                          console.log(\`  [✗] Request \x24{i+1} failed: \x24{r.reason.message}\`);
-});
 `,
     },
   },
