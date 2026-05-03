@@ -52,7 +52,7 @@ export function PreviewPanel({
     { id: "preview",  label: isRNProject ? "Phone Preview" : "Preview" },
     { id: "console",  label: "Console"   },
     { id: "terminal", label: "Terminal"  },
-    { id: "build",    label: "Build Log" },
+    ...(isBuilding ? [{ id: "build" as const, label: "Build Log" }] : []),
   ];
 
   return (
@@ -90,12 +90,6 @@ export function PreviewPanel({
                 <span
                   title="Running…"
                   className="ml-1.5 inline-block w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse align-middle"
-                />
-              )}
-              {id === "build" && isBuilding && (
-                <span
-                  title="Building…"
-                  className="ml-1.5 inline-block w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse align-middle"
                 />
               )}
             </motion.button>
