@@ -1,0 +1,61 @@
+Redesign ONLY the Invoice List page to look premium and modern:
+
+- Background: #0F0F1A (deep navy)
+- Top section: Show 3 stat cards in a row:
+  "Total Outstanding" / "Paid This Month" / "Overdue"
+  Each card: glassmorphism (bg-white/5, border border-white/10, 
+  backdrop-blur), colored icon, bold number, small label below
+
+- Filter tabs (All, Draft, Sent, Viewed, Paid, Overdue):
+  Horizontal scroll row, pill shape, active = purple gradient bg,
+  inactive = transparent with white/30 border
+
+- Each invoice card:
+  Left: circular avatar with gradient background (unique per client)
+  Middle: INV number in purple/small, client name bold white large,
+  company name gray small below
+  Right: amount bold white large, status badge (colored dot + text)
+  Bottom row: issued date left, due date right — both gray/small
+  Card bg: #1A1A2E, border: white/5, border-radius: 16px
+  Add subtle left border color based on status 
+  (purple=viewed, green=paid, red=overdue, gray=draft)
+
+- Floating + FAB button: bottom right, purple gradient, 
+  soft glow shadow, slightly bounces on tap
+
+Redesign ONLY the New Invoice / Edit Invoice form to look premium:
+
+- Entire form: dark background #0F0F1A, NO white sections anywhere
+- Top bar: X icon left, "New Invoice" bold center, 
+  "Save" button right = purple gradient pill
+
+- Edit/Preview toggle: pill switcher, active side = white bg 
+  with dark text, inactive = transparent
+
+- All section labels: uppercase small gray tracking-widest
+
+- Client selector: dark card, avatar + name + dropdown arrow,
+  purple focus ring on tap
+
+- Date fields & Invoice # : dark input bg (#1A1A2E), 
+  white text, purple focus border, border-radius 10px
+
+- Payment terms: horizontal scroll chips, 
+  active = purple gradient, inactive = dark outlined
+
+- Line Items section:
+  Header row: DESCRIPTION / QTY / RATE — gray uppercase small
+  Each row: dark bg, editable inline fields, 
+  right side = auto-calculated amount
+  "+ Add Item" button: dashed border, purple text, full width
+  Subtotal / Tax / Total: right-aligned, 
+  Total = large bold purple
+
+- Tax Rate: chip row (0% 5% 10% 15% 20%), 
+  active = purple filled, inactive = dark outlined
+
+- Notes box: dark bg, rounded, placeholder gray
+
+- Bottom: full-width "Save Invoice" gradient button with shimmer,
+  border-radius 14px, padding generous
+
